@@ -1,0 +1,486 @@
+/* 1. CONFIGURACIÓN GENERAL */
+
+@page {
+    size: A4 portrait;
+    margin: 0;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    background: #e9e9e9;
+}
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    color: #111;
+    font-size: 10pt;
+    line-height: 1.4;
+}
+
+/* 2. HOJA A4 */
+
+.boletin {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 20px auto;
+    padding: 16mm 17mm 14mm 17mm;
+    background: #fff;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+}
+
+
+/* 3. ENCABEZADO INSTITUCIONAL */
+
+.encabezado {
+    display: grid;
+    grid-template-columns: 28mm 1fr 28mm;
+    align-items: center;
+    column-gap: 10mm;
+    padding-bottom: 6mm;
+    border-bottom: 1px solid #111;
+}
+
+.encabezado-logo {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 27mm;
+}
+
+.encabezado-logo img {
+    display: block;
+    max-width: 100%;
+    max-height: 27mm;
+    object-fit: contain;
+}
+
+.encabezado-institucion {
+    text-align: center;
+}
+
+.republica {
+    margin: 0 0 1mm;
+    font-size: 8pt;
+    font-weight: 700;
+    letter-spacing: 0.15mm;
+}
+
+.ministerio {
+    margin: 0 0 3mm;
+    font-size: 8pt;
+    letter-spacing: 0.1mm;
+}
+
+.encabezado-institucion h1 {
+    margin: 0;
+    font-size: 12pt;
+    font-weight: 700;
+    letter-spacing: 0.12mm;
+}
+
+.ubicacion {
+    margin: 1mm 0 0;
+    font-size: 8.5pt;
+    font-weight: 600;
+    letter-spacing: 0.2mm;
+}
+
+/* 4. TÍTULO DEL DOCUMENTO */
+
+.titulo-documento {
+    text-align: center;
+    padding: 5mm 0 6mm;
+}
+
+.titulo-documento h2 {
+    margin: 0;
+    font-size: 14pt;
+    font-weight: 700;
+    letter-spacing: 0.3mm;
+}
+
+/* 5. SECCIONES */
+
+.seccion {
+    margin-bottom: 6mm;
+}
+
+.seccion h3,
+.resultado-academico h3 {
+    margin: 0 0 3mm;
+    padding-bottom: 1.5mm;
+    border-bottom: 1px solid #111;
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: 0.25mm;
+}
+
+/* 6. DATOS DEL ESTUDIANTE */
+
+.datos-grid {
+    display: grid;
+    grid-template-columns: 1.7fr 1fr;
+    column-gap: 12mm;
+    row-gap: 3.5mm;
+}
+
+.dato {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5mm;
+}
+
+.etiqueta {
+    font-size: 7.5pt;
+    font-weight: 700;
+    color: #444;
+    text-transform: uppercase;
+    letter-spacing: 0.1mm;
+}
+
+.valor {
+    font-size: 9.5pt;
+    color: #111;
+}
+
+/* 7. TABLA DE CALIFICACIONES */
+
+.tabla-contenedor {
+    width: 100%;
+    overflow: hidden;
+}
+
+.tabla-calificaciones {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 8pt;
+}
+
+
+/* ANCHOS DE COLUMNAS */
+
+.tabla-calificaciones .col-asignatura {
+    width: 26%;
+}
+.tabla-calificaciones .col-lapso {
+    width: 8%;
+}
+.tabla-calificaciones .col-definitiva {
+    width: 10%;
+}
+
+
+.tabla-calificaciones .col-reparacion {
+    width: 11%;
+}
+
+.tabla-calificaciones .col-inasistencias {
+    width: 14%;
+}
+
+.tabla-calificaciones .col-estado {
+    width: 15%;
+}
+
+/* ENCABEZADO */
+
+.tabla-calificaciones thead {
+    display: table-header-group;
+}
+
+.tabla-calificaciones thead th {
+    padding: 2.5mm 1.2mm;
+    border-top: 1.2px solid #111;
+    border-bottom: 1px solid #111;
+    font-size: 6.8pt;
+    font-weight: 700;
+    text-align: center;
+    vertical-align: middle;
+    letter-spacing: 0.03mm;
+}
+
+/* CELDAS */
+
+.tabla-calificaciones tbody td {
+    padding: 2.5mm 1.2mm;
+    border-bottom: 0.6px solid #aaa;
+    text-align: center;
+    vertical-align: middle;
+    overflow-wrap: break-word;
+}
+
+.tabla-calificaciones tbody tr:last-child td {
+    border-bottom: 1px solid #111;
+}
+
+.tabla-calificaciones tbody td:first-child {
+    font-weight: 500;
+    text-align: left;
+}
+
+/* DEFINITIVA */
+
+.tabla-calificaciones .definitiva {
+    font-weight: 700;
+    font-size: 9pt;
+}
+
+
+/* ESTADO ACADÉMICO */
+
+.estado-materia {
+    font-size: 6.7pt;
+    font-weight: 700;
+    letter-spacing: 0.02mm;
+    line-height: 1.15;
+}
+
+.estado-aprobada {
+    font-weight: 700;
+}
+
+.estado-reprobada {
+    font-weight: 700;
+}
+
+.estado-inasistencia {
+    font-weight: 700;
+}
+
+/* INASISTENCIAS */
+
+.inasistencias-normal {
+    white-space: nowrap;
+}
+
+.inasistencias-excesivas {
+    font-weight: 700;
+}
+
+/* 8. RESUMEN ACADÉMICO */
+
+.resumen {
+    margin-top: 5mm;
+}
+
+.resumen-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 1px solid #111;
+    border-bottom: 1px solid #111;
+}
+
+.resumen-dato {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 17mm;
+    padding: 2.5mm 3mm;
+    text-align: center;
+}
+
+.resumen-dato + .resumen-dato {
+    border-left: 0.6px solid #aaa;
+}
+
+.resumen-dato .valor {
+    margin-top: 1mm;
+    font-size: 12pt;
+    font-weight: 700;
+}
+
+/* 9. RESULTADO ACADÉMICO */
+
+.resultado-academico {
+    margin: 7mm 0;
+    text-align: center;
+}
+
+.resultado-academico h3 {
+    text-align: left;
+}
+
+.estado-promocion {
+    margin: 5mm 0 1mm;
+    font-size: 13pt;
+    font-weight: 700;
+    letter-spacing: 0.3mm;
+}
+
+.siguiente-nivel {
+    margin: 0;
+    font-size: 9pt;
+}
+
+/* 10. OBSERVACIONES */
+
+.observaciones {
+    margin-bottom: 9mm;
+}
+
+.campo-observaciones {
+    min-height: 25mm;
+    padding: 3mm 4mm;
+    border: 0.7px solid #777;
+}
+
+.campo-observaciones p {
+    margin: 0;
+    font-size: 8.5pt;
+    line-height: 1.5;
+}
+
+/* 11. PIE Y FIRMA */
+
+.pie-boletin {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8mm;
+}
+
+.firma {
+    width: 65mm;
+    text-align: center;
+    font-size: 8pt;
+}
+
+.linea-firma {
+    width: 100%;
+    margin-bottom: 2mm;
+    border-top: 1px solid #111;
+}
+
+.firma p {
+    margin: 0.5mm 0;
+}
+
+.firma .nombre-firma {
+    font-weight: 700;
+    font-size: 8.5pt;
+}
+
+/* 12. IMPRESIÓN */
+
+@media print {
+    html,
+    body {
+        width: 210mm;
+        margin: 0;
+        padding: 0;
+        background: #fff;
+    }
+
+    .boletin {
+        width: 210mm;
+        min-height: 297mm;
+        margin: 0;
+        padding: 16mm 17mm 14mm 17mm;
+        box-shadow: none;
+    }
+
+    .tabla-calificaciones {
+        page-break-inside: auto;
+    }
+
+    .tabla-calificaciones tr {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    .tabla-calificaciones thead {
+        display: table-header-group;
+    }
+
+    .resumen,
+    .resultado-academico,
+    .observaciones,
+    .pie-boletin {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    .seccion h3,
+    .resultado-academico h3 {
+        page-break-after: avoid;
+        break-after: avoid;
+    }
+
+}
+
+
+/* 13. PANTALLAS PEQUEÑAS */
+
+@media screen and (max-width: 800px) {
+
+    body {
+        background: #fff;
+    }
+
+    .boletin {
+        width: 100%;
+        min-height: auto;
+        margin: 0;
+        padding: 20px;
+    }
+
+    .encabezado {
+        grid-template-columns: 1fr;
+        row-gap: 15px;
+    }
+
+    .encabezado-logo {
+        height: auto;
+    }
+
+    .encabezado-logo:first-child {
+        order: 2;
+    }
+
+    .encabezado-institucion {
+        order: 1;
+    }
+
+    .encabezado-logo:last-child {
+        order: 3;
+    }
+
+    .datos-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .resumen-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .resumen-dato:nth-child(3) {
+        border-left: none;
+        border-top: 0.6px solid #aaa;
+    }
+
+    .resumen-dato:nth-child(4) {
+        border-top: 0.6px solid #aaa;
+    }
+
+    .tabla-contenedor {
+        overflow-x: auto;
+    }
+
+    .tabla-calificaciones {
+        min-width: 680px;
+        font-size: 7pt;
+    }
+
+    .tabla-calificaciones th,
+    .tabla-calificaciones td {
+        padding: 2mm 1mm;
+    }
+
+}

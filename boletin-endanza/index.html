@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Boletín de Calificaciones - ENDANZA</title>
+
+    <link rel="stylesheet" href="styles.css">
+
+</head>
+
+
+<body>
+
+<main class="boletin">
+
+    <!-- ENCABEZADO INSTITUCIONAL -->
+
+    <header class="encabezado">
+
+        <div class="encabezado-logo">
+
+            <img
+                src="assets/logo-ministerio.png"
+                alt="Logo del Ministerio del Poder Popular para la Cultura"
+            >
+
+        </div>
+
+
+        <div class="encabezado-institucion">
+
+            <p class="republica">
+                REPÚBLICA BOLIVARIANA DE VENEZUELA
+            </p>
+
+            <p class="ministerio">
+                MINISTERIO DEL PODER POPULAR PARA LA CULTURA
+            </p>
+
+            <h1>
+                ESCUELA NACIONAL DE DANZA
+            </h1>
+
+            <p class="ubicacion">
+                ENDANZA TÁCHIRA
+            </p>
+
+        </div>
+
+
+        <div class="encabezado-logo">
+
+            <img
+                src="assets/logo-endanza.png"
+                alt="Logo de la Escuela Nacional de Danza Táchira"
+            >
+
+        </div>
+
+    </header>
+
+
+    <!-- TÍTULO DEL DOCUMENTO -->
+
+    <section class="titulo-documento">
+
+        <h2 id="titulo-boletin">
+            BOLETÍN ACADÉMICO
+        </h2>
+
+    </section>
+
+
+    <!-- DATOS DEL ESTUDIANTE -->
+
+    <section class="seccion datos-estudiante">
+
+        <h3>DATOS DEL ESTUDIANTE</h3>
+
+
+        <div class="datos-grid">
+
+            <div class="dato">
+
+                <span class="etiqueta">
+                    Nombres y apellidos
+                </span>
+
+                <span
+                    class="valor"
+                    id="nombre-estudiante">
+                </span>
+
+            </div>
+
+
+            <div class="dato">
+
+                <span class="etiqueta">
+                    Cédula de identidad
+                </span>
+
+                <span
+                    class="valor"
+                    id="cedula-estudiante">
+                </span>
+
+            </div>
+
+
+            <div class="dato">
+
+                <span class="etiqueta">
+                    Año / Grado
+                </span>
+
+                <span
+                    class="valor"
+                    id="grado-estudiante">
+                </span>
+
+            </div>
+
+
+            <div class="dato">
+
+                <span class="etiqueta">
+                    Sección
+                </span>
+
+                <span
+                    class="valor"
+                    id="seccion-estudiante">
+                </span>
+
+            </div>
+
+
+            <div class="dato">
+
+                <span class="etiqueta">
+                    Año escolar
+                </span>
+
+                <span
+                    class="valor"
+                    id="anio-escolar">
+                </span>
+
+            </div>
+
+
+            <div class="dato">
+
+                <span class="etiqueta">
+                    Fecha de emisión
+                </span>
+
+                <span
+                    class="valor"
+                    id="fecha-emision">
+                </span>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- CALIFICACIONES -->
+
+    <section class="seccion calificaciones">
+
+        <h3>CALIFICACIONES</h3>
+
+
+        <div class="tabla-contenedor">
+
+            <table class="tabla-calificaciones">
+
+                <thead>
+
+                    <tr>
+
+                        <th
+                            class="col-asignatura"
+                            scope="col"
+                        >
+                            ASIGNATURA
+                        </th>
+
+
+                        <th
+                            class="col-lapso col-lapso-1"
+                            scope="col"
+                        >
+                            1.er<br>
+                            LAPSO
+                        </th>
+
+
+                        <th
+                            class="col-lapso col-lapso-2"
+                            scope="col"
+                        >
+                            2.º<br>
+                            LAPSO
+                        </th>
+
+
+                        <th
+                            class="col-lapso col-lapso-3"
+                            scope="col"
+                        >
+                            3.er<br>
+                            LAPSO
+                        </th>
+
+
+                        <th
+                            class="col-definitiva"
+                            scope="col"
+                        >
+                            DEFINITIVA
+                        </th>
+
+
+                        <th
+                            class="col-reparacion"
+                            scope="col"
+                        >
+                            REPARACIÓN
+                        </th>
+
+
+                        <th
+                            class="col-inasistencias"
+                            scope="col"
+                        >
+                            INASISTENCIAS
+                        </th>
+
+
+                        <th
+                            class="col-estado"
+                            scope="col"
+                        >
+                            ESTADO
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody id="cuerpo-calificaciones"></tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+
+    <!-- RESUMEN ACADÉMICO -->
+
+    <section class="seccion resumen">
+
+        <h3>RESUMEN ACADÉMICO</h3>
+
+
+        <div class="resumen-grid">
+
+            <div class="resumen-dato">
+
+                <span class="etiqueta">
+                    Asignaturas cursadas
+                </span>
+
+                <span
+                    class="valor"
+                    id="asignaturas-cursadas">
+                </span>
+
+            </div>
+
+
+            <div class="resumen-dato">
+
+                <span class="etiqueta">
+                    Asignaturas aprobadas
+                </span>
+
+                <span
+                    class="valor"
+                    id="asignaturas-aprobadas">
+                </span>
+
+            </div>
+
+
+            <div class="resumen-dato">
+
+                <span class="etiqueta">
+                    Asignaturas reprobadas
+                </span>
+
+                <span
+                    class="valor"
+                    id="asignaturas-reprobadas">
+                </span>
+
+            </div>
+
+
+            <div class="resumen-dato">
+
+                <span
+                    class="etiqueta"
+                    id="etiqueta-promedio"
+                >
+                    Promedio final
+                </span>
+
+                <span
+                    class="valor"
+                    id="promedio-general">
+                </span>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- RESULTADO ACADÉMICO / PROMOCIÓN
+        Este bloque se ocultará automáticamente
+        cuando el estudiante no haya sido promovido. -->
+
+    <section
+        class="resultado-academico"
+        id="resultado-academico"
+        hidden
+    >
+
+        <h3>RESULTADO ACADÉMICO</h3>
+
+
+        <p
+            class="estado-promocion"
+            id="estado-promocion">
+        </p>
+
+
+        <p
+            class="siguiente-nivel"
+            id="siguiente-nivel">
+        </p>
+
+    </section>
+
+
+    <!-- OBSERVACIONES -->
+
+    <section class="seccion observaciones">
+
+        <h3>OBSERVACIONES</h3>
+
+
+        <div class="campo-observaciones">
+
+            <p id="texto-observaciones"></p>
+
+        </div>
+
+    </section>
+
+
+    <!-- PIE Y FIRMA -->
+
+    <footer class="pie-boletin">
+
+        <div class="firma">
+
+            <div class="linea-firma"></div>
+
+            <p class="nombre-firma">
+                Director(a)
+            </p>
+
+            <p>
+                Escuela Nacional de Danza
+            </p>
+
+            <p>
+                Táchira
+            </p>
+
+        </div>
+
+    </footer>
+
+</main>
+
+
+<script src="script.js"></script>
+
+</body>
+
+</html>

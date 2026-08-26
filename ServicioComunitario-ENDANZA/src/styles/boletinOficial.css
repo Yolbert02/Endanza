@@ -1,0 +1,459 @@
+/* ==========================================================================
+   ESTILOS OFICIALES DEL BOLETÍN ENDANZA (NORMAL Y PROMOCIÓN ANTICIPADA)
+   ========================================================================== */
+
+@page {
+    size: A4 portrait;
+    margin: 0;
+}
+
+.boletin-print-wrapper {
+    background: #e9e9e9;
+    padding: 20px 0;
+    display: flex;
+    justify-content: center;
+}
+
+.boletin-container-sheet {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    padding: 16mm 17mm 14mm 17mm;
+    background: #fff;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.12);
+    color: #111;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 10pt;
+    line-height: 1.4;
+    box-sizing: border-box;
+}
+
+/* ENCABEZADO INSTITUCIONAL */
+.boletin-encabezado {
+    display: grid;
+    grid-template-columns: 28mm 1fr 28mm;
+    align-items: center;
+    column-gap: 8mm;
+    padding-bottom: 5mm;
+    border-bottom: 1.2px solid #111;
+}
+
+.boletin-encabezado-logo {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 26mm;
+}
+
+.boletin-encabezado-logo img {
+    display: block;
+    max-width: 100%;
+    max-height: 26mm;
+    object-fit: contain;
+}
+
+.boletin-encabezado-institucion {
+    text-align: center;
+}
+
+.boletin-republica {
+    margin: 0 0 1mm;
+    font-size: 7.8pt;
+    font-weight: 700;
+    letter-spacing: 0.15mm;
+    color: #111;
+}
+
+.boletin-ministerio {
+    margin: 0 0 2.5mm;
+    font-size: 7.8pt;
+    letter-spacing: 0.1mm;
+    color: #222;
+}
+
+.boletin-encabezado-institucion h1 {
+    margin: 0;
+    font-size: 11.5pt;
+    font-weight: 700;
+    letter-spacing: 0.12mm;
+    color: #000;
+}
+
+.boletin-ubicacion {
+    margin: 1mm 0 0;
+    font-size: 8.5pt;
+    font-weight: 600;
+    letter-spacing: 0.2mm;
+    color: #333;
+}
+
+/* TÍTULO DEL DOCUMENTO */
+.boletin-titulo-documento {
+    text-align: center;
+    padding: 4.5mm 0 5mm;
+}
+
+.boletin-titulo-documento h2 {
+    margin: 0;
+    font-size: 13pt;
+    font-weight: 700;
+    letter-spacing: 0.3mm;
+    color: #000;
+    text-transform: uppercase;
+}
+
+/* SECCIONES COMUNES */
+.boletin-seccion {
+    margin-bottom: 5.5mm;
+}
+
+.boletin-seccion h3,
+.boletin-resultado-academico h3 {
+    margin: 0 0 2.5mm;
+    padding-bottom: 1.2mm;
+    border-bottom: 1px solid #111;
+    font-size: 8.2pt;
+    font-weight: 700;
+    letter-spacing: 0.25mm;
+    color: #111;
+}
+
+/* DATOS DEL ESTUDIANTE */
+.boletin-datos-grid {
+    display: grid;
+    grid-template-columns: 1.7fr 1fr;
+    column-gap: 10mm;
+    row-gap: 3mm;
+}
+
+.boletin-dato {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5mm;
+}
+
+.boletin-etiqueta {
+    font-size: 7.2pt;
+    font-weight: 700;
+    color: #444;
+    text-transform: uppercase;
+    letter-spacing: 0.1mm;
+}
+
+.boletin-valor {
+    font-size: 9pt;
+    color: #111;
+    font-weight: 600;
+}
+
+/* TABLA DE CALIFICACIONES */
+.boletin-tabla-contenedor {
+    width: 100%;
+    overflow: hidden;
+}
+
+.boletin-tabla-calificaciones {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 7.8pt;
+}
+
+.boletin-tabla-calificaciones thead th {
+    padding: 2mm 1mm;
+    border-top: 1.2px solid #111;
+    border-bottom: 1px solid #111;
+    font-size: 6.8pt;
+    font-weight: 700;
+    text-align: center;
+    vertical-align: middle;
+    letter-spacing: 0.03mm;
+    color: #000;
+}
+
+.boletin-tabla-calificaciones tbody td {
+    padding: 2.2mm 1mm;
+    border-bottom: 0.6px solid #ccc;
+    text-align: center;
+    vertical-align: middle;
+    overflow-wrap: break-word;
+    color: #111;
+}
+
+.boletin-tabla-calificaciones tbody tr:last-child td {
+    border-bottom: 1.2px solid #111;
+}
+
+.boletin-tabla-calificaciones tbody td:first-child {
+    font-weight: 600;
+    text-align: left;
+    padding-left: 2mm;
+}
+
+.boletin-tabla-calificaciones .definitiva {
+    font-weight: 700;
+    font-size: 8.8pt;
+}
+
+/* ESTADO ACADÉMICO */
+.boletin-estado-materia {
+    font-size: 6.8pt;
+    font-weight: 700;
+    letter-spacing: 0.02mm;
+    line-height: 1.15;
+}
+
+.boletin-estado-aprobada {
+    color: #0d6832;
+    font-weight: 700;
+}
+
+.boletin-estado-reprobada {
+    color: #aa1111;
+    font-weight: 700;
+}
+
+.boletin-estado-revision {
+    color: #995500;
+    font-weight: 700;
+}
+
+.boletin-estado-inasistencia {
+    color: #900;
+    font-weight: 700;
+}
+
+.boletin-inasistencias-normal {
+    white-space: nowrap;
+}
+
+.boletin-inasistencias-excesivas {
+    font-weight: 700;
+    color: #b00;
+}
+
+/* RESUMEN ACADÉMICO */
+.boletin-resumen {
+    margin-top: 4.5mm;
+}
+
+.boletin-resumen-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 1.2px solid #111;
+    border-bottom: 1.2px solid #111;
+}
+
+.boletin-resumen-dato {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 15mm;
+    padding: 2mm 2.5mm;
+    text-align: center;
+}
+
+.boletin-resumen-dato + .boletin-resumen-dato {
+    border-left: 0.6px solid #aaa;
+}
+
+.boletin-resumen-dato .boletin-valor {
+    margin-top: 1mm;
+    font-size: 11pt;
+    font-weight: 700;
+}
+
+/* RESULTADO ACADÉMICO / PROMOCIÓN */
+.boletin-resultado-academico {
+    margin: 6mm 0;
+    text-align: center;
+    background: #fbfbfb;
+    border: 1px dashed #444;
+    padding: 3mm 4mm;
+    border-radius: 4px;
+}
+
+.boletin-resultado-academico h3 {
+    text-align: left;
+    border-bottom: 1px solid #111;
+}
+
+.boletin-estado-promocion {
+    margin: 3mm 0 1mm;
+    font-size: 12.5pt;
+    font-weight: 700;
+    letter-spacing: 0.3mm;
+    color: #0b6832;
+    text-transform: uppercase;
+}
+
+.boletin-siguiente-nivel {
+    margin: 0;
+    font-size: 8.8pt;
+    color: #222;
+}
+
+.boletin-siguiente-nivel strong {
+    color: #000;
+    font-size: 9.5pt;
+}
+
+/* OBSERVACIONES */
+.boletin-observaciones {
+    margin-bottom: 6mm;
+}
+
+.boletin-campo-observaciones {
+    min-height: 20mm;
+    padding: 2.5mm 3.5mm;
+    border: 0.8px solid #666;
+    background: #fafafa;
+}
+
+.boletin-campo-observaciones p {
+    margin: 0;
+    font-size: 8.2pt;
+    line-height: 1.45;
+    color: #222;
+}
+
+/* PIE Y FIRMA */
+.boletin-pie {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 6mm;
+}
+
+.boletin-firma {
+    width: 65mm;
+    text-align: center;
+    font-size: 7.8pt;
+}
+
+.boletin-linea-firma {
+    width: 100%;
+    margin-bottom: 2mm;
+    border-top: 1px solid #111;
+}
+
+.boletin-firma p {
+    margin: 0.5mm 0;
+    color: #333;
+}
+
+.boletin-firma .boletin-nombre-firma {
+    font-weight: 700;
+    font-size: 8.2pt;
+    color: #000;
+}
+
+/* IMPRESIÓN OFICIAL */
+@media print {
+    html,
+    body {
+        width: 210mm;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+    }
+
+    .no-print,
+    .sidebar,
+    .header,
+    .c-sidebar,
+    .c-header,
+    .nav-tabs,
+    .btn,
+    .toast-container {
+        display: none !important;
+    }
+
+    .boletin-print-wrapper {
+        padding: 0 !important;
+        background: #fff !important;
+        display: block !important;
+    }
+
+    .boletin-container-sheet {
+        width: 210mm !important;
+        min-height: 297mm !important;
+        margin: 0 !important;
+        padding: 16mm 17mm 14mm 17mm !important;
+        box-shadow: none !important;
+        page-break-after: always;
+        break-after: page;
+    }
+
+    .boletin-tabla-calificaciones {
+        page-break-inside: auto;
+    }
+
+    .boletin-tabla-calificaciones tr {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    .boletin-tabla-calificaciones thead {
+        display: table-header-group;
+    }
+
+    .boletin-resumen,
+    .boletin-resultado-academico,
+    .boletin-observaciones,
+    .boletin-pie {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    .boletin-seccion h3,
+    .boletin-resultado-academico h3 {
+        page-break-after: avoid;
+        break-after: avoid;
+    }
+}
+
+/* RESPONSIVE PANTALLA */
+@media screen and (max-width: 800px) {
+    .boletin-container-sheet {
+        width: 100%;
+        min-height: auto;
+        margin: 0;
+        padding: 15px;
+    }
+
+    .boletin-encabezado {
+        grid-template-columns: 1fr;
+        row-gap: 10px;
+    }
+
+    .boletin-encabezado-logo {
+        height: auto;
+    }
+
+    .boletin-datos-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .boletin-resumen-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .boletin-resumen-dato:nth-child(3) {
+        border-left: none;
+        border-top: 0.6px solid #aaa;
+    }
+
+    .boletin-resumen-dato:nth-child(4) {
+        border-top: 0.6px solid #aaa;
+    }
+
+    .boletin-tabla-contenedor {
+        overflow-x: auto;
+    }
+
+    .boletin-tabla-calificaciones {
+        min-width: 620px;
+        font-size: 7pt;
+    }
+}

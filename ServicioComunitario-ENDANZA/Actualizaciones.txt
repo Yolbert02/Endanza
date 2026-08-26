@@ -1,0 +1,27 @@
+Tareas: 
+- CREACION DE MODULOS:
+    -INSCRIPCION (ALGO GRANDE) Prioridad
+    -NOTAS (CARGA DE NOTAS) Prioridad
+    -BOLETIN (GENERACION DE BOLETIN) Prioridad
+    -HORARIO (OPCIONAL POR LOS MOMENTOS)
+    -HACER DESDE CERO UN MODULO QUE SEA CAPAZ DE MOSTRAR UN AULARIO 
+    (COMPLETADA A MEDIAS FALTA CREAR LOS ELEMENTOS VISUALES DE CADA MODULO)
+-EDITAR EL SIDEBAR  (COMPLETADA)
+-EDITAR Y ELIMINAR LOS MODULOS QUE ESTAN YA CREADOS (COMPLETADA)
+
+-Creacion de modulo de estudSiantes capaz de filtrar y mostrar estudiantes de los diferentes grados y secciones como una pequeña parte de los datos del mismo ACTUALIZACION: NO SE AH TERMINADO AL 100 ESTE MODULO FALTA PULIR DETALLES ESTETICOS Y DE FUNCIONALIDAD EN LOS APARTADOS DE INPUTS 
+
+
+
+arreglar boletin que llegue a filtar principalmente por el promedio de la seccion y muestre un mini resume de estadisticas  COMPLETADA
+
+arreglar horario a nivel de usuario que sera el padre que descargara el boletin  completado   
+
+arreglar inscripciones para que tenga todos los campos necesarios (completada a medias hay una logica que necesita un ojo ) (completada falta configurar los formularios al 100 incluir que agregue al papa y mama o en caso opcional representante legal)
+
+diseñar y incluir el modulo de permisos para habilitar incripciones aprobacion de notas y plazos , a su vez diseñar el modulo para la inclusion al sistema de usuarios a nivel institucional por completar  (creado hasta cierto punto lo mejor seria con lo que se tiene agrandarlo se tiene modulado solo es agregar logica que se conecte con los demas modulos)
+
+
+arrelgar login y register hacerlos bonitos esteticamente para que sean bonitos xd por completar 
+
+
