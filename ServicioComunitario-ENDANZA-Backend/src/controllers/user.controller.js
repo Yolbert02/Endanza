@@ -906,7 +906,8 @@ const updateProfile = async (req, res) => {
     const { 
       email, security_word, respuesta_de_seguridad, 
       nombre, apellido, telefono, cedula,
-      fecha_nacimiento, genero, foto_usuario, Id_direccion 
+      fecha_nacimiento, genero, foto_usuario, Id_direccion,
+      direccion 
     } = req.body;
 
     // Check if email is being updated and if it already exists
@@ -936,6 +937,34 @@ const updateProfile = async (req, res) => {
       }
     }
 
+    // Handle address (direccion) update or creation
+    let finalIdDireccion = Id_direccion;
+    if (direccion && typeof direccion === 'string' && direccion.trim()) {
+      const db = require("../database/db.js");
+      // Check if user already has an address linked
+      const userResult = await db.query(
+        'SELECT "Id_direccion" FROM "Usuario" WHERE "Id_usuario" = $1',
+        [userId]
+      );
+      const currentIdDireccion = userResult.rows[0]?.Id_direccion;
+
+      if (currentIdDireccion) {
+        // Update existing Direccion record
+        await db.query(
+          'UPDATE "Direccion" SET "nombre_direccion" = $1 WHERE "Id_direccion" = $2',
+          [direccion.trim(), currentIdDireccion]
+        );
+        finalIdDireccion = currentIdDireccion;
+      } else {
+        // Create new Direccion record and link it
+        const insertResult = await db.query(
+          'INSERT INTO "Direccion" ("nombre_direccion") VALUES ($1) RETURNING "Id_direccion"',
+          [direccion.trim()]
+        );
+        finalIdDireccion = insertResult.rows[0].Id_direccion;
+      }
+    }
+
     const updatedUser = await UserModel.updateProfile(userId, {
       email,
       security_word,
@@ -947,7 +976,7 @@ const updateProfile = async (req, res) => {
       fecha_nacimiento,
       genero,
       foto_usuario,
-      Id_direccion,
+      Id_direccion: finalIdDireccion,
     });
 
     if (!updatedUser) {

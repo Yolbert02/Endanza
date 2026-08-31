@@ -29,7 +29,8 @@ import {
   cilBadge,
   cilCalendar,
   cilCheckCircle,
-  cilWarning
+  cilWarning,
+  cilLocationPin
 } from "@coreui/icons"
 
 const EditProfileModal = ({ visible, onClose, userData, onSave, loading }) => {
@@ -45,6 +46,7 @@ const EditProfileModal = ({ visible, onClose, userData, onSave, loading }) => {
     // Contacto
     email: "",
     telefono: "",
+    direccion: "",
   })
   
   const [errors, setErrors] = useState({})
@@ -76,6 +78,7 @@ const EditProfileModal = ({ visible, onClose, userData, onSave, loading }) => {
         // Contacto
         email: userData.email || "",
         telefono: userData.telefono || "",
+        direccion: userData.direccion?.nombre_direccion || "",
       })
     }
   }, [userData, visible])
@@ -145,7 +148,8 @@ const EditProfileModal = ({ visible, onClose, userData, onSave, loading }) => {
         email: formData.email,
         telefono: formData.telefono,
         fechaNacimiento: formData.fechaNacimiento,
-        genero: formData.genero
+        genero: formData.genero,
+        direccion: formData.direccion
       }
       
       console.log('📤 Enviando datos actualizados:', datosActualizados)
@@ -324,6 +328,21 @@ const EditProfileModal = ({ visible, onClose, userData, onSave, loading }) => {
                     invalid={isFieldInvalid('telefono')}
                     feedback={errors.telefono}
                     placeholder="+58 414-1234567"
+                  />
+                </CCol>
+
+                <CCol xs={12}>
+                  <CFormLabel className="fw-semibold">
+                    <CIcon icon={cilLocationPin} className="me-1 text-warning" />
+                    Dirección de Residencia
+                  </CFormLabel>
+                  <CFormInput
+                    type="text"
+                    name="direccion"
+                    value={formData.direccion}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    placeholder="Ej: Av. Principal, Urbanización Los Jardines, Casa #10"
                   />
                 </CCol>
               </CRow>

@@ -64,8 +64,8 @@ export const profileService = {
         telefono: profileData.telefono,
         cedula: profileData.cedula,
         fecha_nacimiento: profileData.fechaNacimiento || null,
-        genero: profileData.genero || null
-        // Id_direccion se maneja por separado si es necesario
+        genero: profileData.genero || null,
+        direccion: profileData.direccion || null
       }
 
       const response = await userAPI.updateProfile(backendData)

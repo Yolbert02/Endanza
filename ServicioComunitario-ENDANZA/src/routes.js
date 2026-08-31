@@ -106,7 +106,7 @@ const routes = [
   { path: '/docente/horario', name: 'Horario Docente', element: React.lazy(() => import('./views/Docente/HorarioDocente')) },
   { path: '/docente/inicio', name: 'Inicio Docente', element: React.lazy(() => import('./views/Docente/InicioDocente')) },
 
-  { path: '/perfil', name: 'PerfilUsuarioGeneral', element: perfil }, // Perfil Usuario General
+  { path: '/perfil', name: 'Perfil', element: perfil }, // Perfil Usuario General
 
   { path: '/docenteAsignacion', name: 'docente Asignacion', element: docenteAsignacion }, // Asignación Docente
 ]
