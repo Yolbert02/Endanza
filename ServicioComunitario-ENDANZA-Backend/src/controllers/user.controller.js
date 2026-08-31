@@ -168,6 +168,12 @@ const login = async (req, res) => {
       console.log("ℹ️ LOGIN - No es representante o error al verificar:", error.message);
     }
 
+    // Verificar si la cédula está vacía, nula o si es una cédula temporal
+    const mustChangeCedula =
+      !user.cedula ||
+      String(user.cedula || '').trim() === '' ||
+      String(user.cedula || '').trim().toUpperCase().startsWith('V-1000');
+
     // Generate access token
     const accessToken = jwt.sign(
       {
@@ -178,6 +184,7 @@ const login = async (req, res) => {
         apellido: user.apellido,
         email: user.email,
         cedula: user.cedula,
+        must_change_cedula: mustChangeCedula,
         tipo_rol: user.tipo_rol,
         es_profesor: !!profesorInfo,
         es_representante: !!representanteInfo,
@@ -216,6 +223,7 @@ const login = async (req, res) => {
       nombre: user.nombre,
       apellido: user.apellido,
       cedula: user.cedula,
+      must_change_cedula: mustChangeCedula,
       telefono: user.telefono,
       fecha_nacimiento: user.fecha_nacimiento,
       genero: user.genero,
@@ -490,6 +498,12 @@ const profile = async (req, res) => {
       userWithoutSensitiveInfo.direccion_trabajo_rep = representanteInfo.direccion_trabajo_rep;
       userWithoutSensitiveInfo.es_representante = true;
     }
+
+    userWithoutSensitiveInfo.must_change_cedula = (
+      !user.cedula ||
+      String(user.cedula || '').trim() === '' ||
+      String(user.cedula || '').trim().toUpperCase().startsWith('V-1000')
+    );
 
     return res.json({
       ok: true,
@@ -907,12 +921,17 @@ const updateProfile = async (req, res) => {
     }
 
     // Check if cedula is being updated and if it already exists
-    if (cedula) {
-      const existingUserByCedula = await UserModel.findByCedula(cedula);
-      if (existingUserByCedula && existingUserByCedula.id !== userId) {
+    let formattedCedula = cedula;
+    if (cedula && typeof cedula === 'string' && cedula.trim()) {
+      formattedCedula = cedula.trim().toUpperCase();
+      if (!/^[VvEe]-/.test(formattedCedula)) {
+        formattedCedula = 'V-' + formattedCedula;
+      }
+      const existingUserByCedula = await UserModel.findByCedula(formattedCedula);
+      if (existingUserByCedula && String(existingUserByCedula.id) !== String(userId)) {
         return res.status(400).json({
           ok: false,
-          msg: "Cedula already exists",
+          msg: "Esta cédula ya se encuentra registrada por otro usuario",
         });
       }
     }
@@ -924,7 +943,7 @@ const updateProfile = async (req, res) => {
       nombre,
       apellido,
       telefono,
-      cedula,
+      cedula: formattedCedula,
       fecha_nacimiento,
       genero,
       foto_usuario,
@@ -1583,6 +1602,83 @@ const register = async (req, res) => {
 };
 
 // ============================================
+// ACTUALIZAR CÉDULA OBLIGATORIA
+// ============================================
+const updateCedula = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    let { cedula } = req.body;
+
+    if (!cedula || !cedula.trim()) {
+      return res.status(400).json({
+        ok: false,
+        msg: "La cédula es requerida",
+      });
+    }
+
+    cedula = cedula.trim().toUpperCase();
+
+    // Normalizar prefijo V- o E-
+    if (!/^[VvEe]-/.test(cedula)) {
+      cedula = "V-" + cedula;
+    }
+
+    // Validar formato V-12345678 o E-12345678
+    if (!/^[VvEe]-\d{5,10}$/.test(cedula)) {
+      return res.status(400).json({
+        ok: false,
+        msg: "El formato de la cédula no es válido (Ejemplo: V-12345678 o E-12345678)",
+      });
+    }
+
+    // Verificar que no sea cédula temporal
+    if (cedula.startsWith("V-1000")) {
+      return res.status(400).json({
+        ok: false,
+        msg: "Debes ingresar una cédula real válida",
+      });
+    }
+
+    // Verificar si la cédula ya está tomada por otro usuario
+    const existing = await UserModel.findByCedula(cedula);
+    if (existing && String(existing.id) !== String(userId)) {
+      return res.status(400).json({
+        ok: false,
+        msg: "Esta cédula ya se encuentra registrada por otro usuario",
+      });
+    }
+
+    const updatedUser = await UserModel.updateCedula(userId, cedula);
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        ok: false,
+        msg: "Usuario no encontrado",
+      });
+    }
+
+    console.log(`✅ Cédula actualizada exitosamente para usuario ${userId}: ${cedula}`);
+
+    return res.json({
+      ok: true,
+      msg: "Cédula actualizada exitosamente",
+      user: {
+        ...updatedUser,
+        cedula,
+        must_change_cedula: false,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Error en updateCedula controller:", error);
+    return res.status(500).json({
+      ok: false,
+      msg: "Error en el servidor al actualizar la cédula",
+      error: error.message,
+    });
+  }
+};
+
+// ============================================
 // EXPORTAR TODOS LOS MÉTODOS DEL CONTROLADOR
 // ============================================
 export const UserController = {
@@ -1608,5 +1704,6 @@ export const UserController = {
   verifyEmail,
   recoverPasswordWithSecurity,
   getSecurityQuestion,
-  migrateAllPasswords
+  migrateAllPasswords,
+  updateCedula
 };

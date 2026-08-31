@@ -27,6 +27,9 @@ export const userAPI = {
   updateProfileWithSecurity: (data) => 
     fetch.put('/api/users/profile/security', data),
   
+  updateCedula: (cedula) => 
+    fetch.put('/api/users/update-cedula', { cedula }),
+  
   // ============ CONTRASEÑAS ============
   changePassword: (passwords) => 
     fetch.put('/api/users/change-password', passwords),
@@ -73,10 +76,11 @@ export const userAPI = {
   deactivateUser: (userId) => 
     fetch.put(`/api/users/deactivate/${userId}`, {}),
   
-  // ✅ CORREGIDO: Ahora usa el método correcto y URL correcta
   deleteUser: (userId) => 
-    fetch.del(`/api/users/${userId}`),  // ← CAMBIADO A 'del' Y URL CORRECTA
+    fetch.del(`/api/users/${userId}`),
   
   migratePasswords: () => 
     fetch.post('/api/users/migrate-passwords', {})
 }
+
+export default userAPI

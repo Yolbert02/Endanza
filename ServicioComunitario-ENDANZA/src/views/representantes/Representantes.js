@@ -181,7 +181,14 @@ const Representantes = () => {
                                                             </div>
                                                             <div className="text-muted-custom small d-flex align-items-center">
                                                                 <CIcon icon={cilBadge} size="sm" className="me-1 opacity-50" />
-                                                                {rep.dni}
+                                                                {rep.dni && rep.dni !== 'V-' && rep.dni.trim() !== '' ? (
+                                                                    rep.dni
+                                                                ) : (
+                                                                    <CBadge color="warning" className="bg-opacity-15 text-warning border border-warning border-opacity-25 px-2 py-1 rounded-pill d-flex align-items-center" style={{ fontSize: '0.65rem' }}>
+                                                                        <CIcon icon={cilWarning} size="sm" className="me-1" />
+                                                                        SIN CÉDULA
+                                                                    </CBadge>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>

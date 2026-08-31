@@ -1585,7 +1585,7 @@ export async function seedEstudiantesYRepresentantes() {
     const totalCount = Math.min(students.length, reps.length, academics.length);
     console.log(`📊 Procesando ${totalCount} registros cruzados...`);
 
-    const defaultPassword = "Endanza2026*";
+    const defaultPassword = "1234";
     const salt = await bcryptjs.genSalt(10);
     const hashedPassword = await bcryptjs.hash(defaultPassword, salt);
 

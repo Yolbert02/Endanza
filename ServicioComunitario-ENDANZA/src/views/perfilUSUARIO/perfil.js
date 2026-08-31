@@ -33,7 +33,8 @@ import {
   cilCheckCircle,
   cilInfo,
   cilShieldAlt,
-  cilClock
+  cilClock,
+  cilWarning
 } from "@coreui/icons"
 
 // Servicios
@@ -72,6 +73,18 @@ const PerfilUsuarioGeneral = () => {
         const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
         const updatedUser = { ...currentUser, ...response.user }
         localStorage.setItem('user', JSON.stringify(updatedUser))
+
+        // Si el usuario no tiene cédula válida, abrir modal de edición automáticamente
+        const currentCedula = response.user?.cedula
+        const needsCedula =
+          response.user?.must_change_cedula === true ||
+          !currentCedula ||
+          String(currentCedula).trim() === '' ||
+          String(currentCedula).trim().toUpperCase().startsWith('V-1000')
+
+        if (needsCedula) {
+          setEditModalVisible(true)
+        }
       } else {
         setError(response.message)
         showToast('danger', 'Error', response.message)
@@ -240,6 +253,22 @@ const PerfilUsuarioGeneral = () => {
           </CCol>
         </CRow>
       </div>
+
+      {/* Alerta de Cédula Obligatoria si falta */}
+      {(!user?.cedula || user?.cedula === 'No registrada' || user?.must_change_cedula || String(user?.cedula || '').startsWith('V-1000')) && (
+        <CAlert color="warning" className="d-flex align-items-center mb-4 p-3 shadow-sm border-warning rounded-4 bg-warning bg-opacity-10 text-dark">
+          <CIcon icon={cilWarning} size="xl" className="me-3 flex-shrink-0 text-warning" />
+          <div className="flex-grow-1">
+            <h5 className="alert-heading mb-1 fw-bold">⚠️ Actualización de Cédula Obligatoria</h5>
+            <p className="mb-0 small text-dark">
+              Tu cuenta no tiene registrada una cédula de identidad real. Por favor completa tus datos personales ingresando tu cédula para poder usar todas las funciones del sistema.
+            </p>
+          </div>
+          <CButton color="warning" className="ms-3 text-dark fw-bold text-nowrap rounded-pill px-4" onClick={handleEditProfile}>
+            Ingresar Cédula
+          </CButton>
+        </CAlert>
+      )}
 
       {/* Main Content Grid */}
       <CRow className="g-4">

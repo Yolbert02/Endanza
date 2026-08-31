@@ -36,7 +36,16 @@ import { authService } from '../../../services/authService'
 
 // FUNCIÓN PARA NORMALIZAR Y DETECTAR TIPOS DE ERROR
 const detectErrorType = (response) => {
-  const msg = String(response.msg || response.message || '')
+  if (!response) return 'generic'
+  let rawMsg = response.msg || response.message || ''
+  if (typeof rawMsg === 'object' && rawMsg !== null) {
+    try {
+      rawMsg = JSON.stringify(rawMsg)
+    } catch {
+      rawMsg = ''
+    }
+  }
+  const msg = (typeof rawMsg === 'string' ? rawMsg : '')
     .toLowerCase()
     .trim()
     .replace(/\s+/g, ' ')
@@ -89,8 +98,11 @@ const validateAccountStatus = (userData) => {
   if (!userData) return false
 
   // Buscar directamente en is_active que es como viene del backend
-  if (userData.is_active) {
-    const estado = String(userData.is_active).toLowerCase().trim()
+  if (userData.is_active !== undefined && userData.is_active !== null) {
+    const rawStatus = typeof userData.is_active === 'string'
+      ? userData.is_active
+      : (typeof userData.is_active === 'object' ? JSON.stringify(userData.is_active) : String(userData.is_active))
+    const estado = rawStatus.toLowerCase().trim()
     if (estado.includes('activo') || estado === '1' || estado === 'true') {
       console.log('✅ Usuario activo:', estado)
       return true
@@ -222,9 +234,16 @@ const Login = () => {
         // ✅ 3. Obtener rol del usuario (ya viene mapeado del authService)
         const roleName = userData.rol || 'estudiante'
 
-        // ✅ 4. Redirigir INMEDIATAMENTE sin usar cache
-        const redirectPath = getRedirectPathByRole(roleName)
-        console.log(`🚀 Redirigiendo a ${redirectPath} como ${roleName}`)
+        // ✅ 4. Verificar si necesita registrar cédula obligatoriamente
+        const needsCedula =
+          userData.must_change_cedula === true ||
+          !userData.cedula ||
+          String(userData.cedula || '').trim() === '' ||
+          String(userData.cedula || '').trim().toUpperCase().startsWith('V-1000')
+
+        // Si no tiene cédula, redirigir obligatoriamente al perfil
+        const redirectPath = needsCedula ? '/perfil' : getRedirectPathByRole(roleName)
+        console.log(`🚀 Redirigiendo a ${redirectPath} como ${roleName} (requiere cédula: ${needsCedula})`)
         navigate(redirectPath, { replace: true })
 
       } else {

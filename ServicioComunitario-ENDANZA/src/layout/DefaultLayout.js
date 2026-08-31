@@ -1,11 +1,15 @@
 // src/layout/DefaultLayout.js
 import React, { useEffect, useState } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { AppContent, AppSidebar, AppFooter, AppHeader } from '../components/index'
 import { getFilteredNav } from '../_nav'
 import useUserRole from '../Hooks/useUserRole'
 import { CSpinner } from '@coreui/react'
 
 const DefaultLayout = () => {
+  const navigate = useNavigate()
+  const location = useLocation()
+
   const {
     userRole,
     userData,
@@ -20,6 +24,23 @@ const DefaultLayout = () => {
 
   const [filteredNavigation, setFilteredNavigation] = useState([])
 
+  // Si el usuario no tiene cédula válida, redirigirlo a su perfil obligatoriamente
+  useEffect(() => {
+    if (userData && !isLoading) {
+      const currentCedula = userData.cedula
+      const needsCedula =
+        userData.must_change_cedula === true ||
+        !currentCedula ||
+        String(currentCedula || '').trim() === '' ||
+        String(currentCedula || '').trim().toUpperCase().startsWith('V-1000')
+
+      if (needsCedula && location.pathname !== '/perfil' && location.pathname !== '/profile') {
+        console.log('⚠️ Usuario sin cédula -> Redirigiendo a /perfil')
+        navigate('/perfil', { replace: true })
+      }
+    }
+  }, [userData, isLoading, location.pathname, navigate])
+
   // Filtrar navegación cuando cambia el rol
   useEffect(() => {
     if (userRole) {
@@ -33,8 +54,7 @@ const DefaultLayout = () => {
   // Mostrar errores
   useEffect(() => {
     if (error) {
-      console.error('❌ DefaultLayout - Error:', error)
-      // Podrías mostrar un toast o alerta aquí
+      console.error('❌ DefaultLayout - Error:', error?.message || error)
     }
   }, [error])
 
