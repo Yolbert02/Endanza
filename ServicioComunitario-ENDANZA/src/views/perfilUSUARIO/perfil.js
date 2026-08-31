@@ -299,18 +299,17 @@ const PerfilUsuarioGeneral = () => {
                   { icon: cilBadge, label: 'Cédula de Identidad', value: user.cedula || 'No registrada' },
                   { icon: cilEnvelopeClosed, label: 'Correo Electrónico', value: user.email },
                   { icon: cilPhone, label: 'Teléfono de Contacto', value: user.telefono || 'No registrado' },
-                  { icon: cilCalendar, label: 'Fecha de Nacimiento', value: `${userDisplay.fechaNacimiento} (${userDisplay.edad})` },
-                  { icon: cilClock, label: 'Último Acceso', value: user.ultimoAcceso || 'No registrado' }
+                  { icon: cilCalendar, label: 'Fecha de Nacimiento', value: `${userDisplay.fechaNacimiento} (${userDisplay.edad})` }
                 ].map((item, idx) => (
                   <CCol sm={6} key={idx}>
                     <div className="premium-info-box p-3 rounded-4 transition-all">
                       <div className="d-flex align-items-center">
-                        <div className="info-box-icon p-2 rounded-3 me-3">
+                        <div className="info-box-icon p-2 rounded-3 me-3 flex-shrink-0">
                           <CIcon icon={item.icon} />
                         </div>
-                        <div className="flex-grow-1 overflow-hidden">
+                        <div className="flex-grow-1 overflow-hidden" style={{ minWidth: 0 }}>
                           <small className="text-muted-custom text-uppercase fw-bold ls-1 d-block mb-1" style={{ fontSize: '0.65rem' }}>{item.label}</small>
-                          <p className="mb-0 fw-bold text-dark-custom text-truncate">{item.value}</p>
+                          <p className="mb-0 fw-bold text-dark-custom text-break" style={{ wordBreak: 'break-word', fontSize: '0.88rem' }}>{item.value}</p>
                         </div>
                       </div>
                     </div>

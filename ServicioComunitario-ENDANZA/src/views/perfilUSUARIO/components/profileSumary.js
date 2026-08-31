@@ -78,33 +78,27 @@ const ProfileSummary = ({ user }) => {
         </div>
 
         <div className="info-cards mt-2 space-y-3">
-          <div className="info-item-premium d-flex align-items-center p-3 mb-3 rounded-4 shadow-sm border border-light-custom">
-            <div className="info-icon-premium me-3">
+          <div className="info-item-premium d-flex align-items-center p-3 mb-3 rounded-4 shadow-sm border border-light-custom" style={{ overflow: 'hidden' }}>
+            <div className="info-icon-premium me-3 flex-shrink-0">
               <CIcon icon={cilEnvelopeClosed} />
             </div>
-            <div className="info-content-premium">
-              <small className="text-muted-custom d-block text-uppercase fw-bold ls-1 mb-1" style={{ fontSize: '0.6rem' }}>Correo Electrónico</small>
-              <span className="fw-bold text-dark-custom">{user?.email || 'usuario@email.com'}</span>
+            <div className="info-content-premium" style={{ minWidth: 0, flex: 1 }}>
+              <small className="text-muted-custom d-block text-uppercase fw-bold ls-1 mb-1" style={{ fontSize: '0.65rem' }}>Correo Electrónico</small>
+              <span className="fw-bold text-dark-custom d-block" style={{ wordBreak: 'break-all', fontSize: '0.88rem', lineHeight: '1.25' }}>
+                {user?.email || 'usuario@email.com'}
+              </span>
             </div>
           </div>
 
           <div className="info-item-premium d-flex align-items-center p-3 mb-3 rounded-4 shadow-sm border border-light-custom">
-            <div className="info-icon-premium me-3">
+            <div className="info-icon-premium me-3 flex-shrink-0">
               <CIcon icon={cilCalendar} />
             </div>
-            <div className="info-content-premium">
-              <small className="text-muted-custom d-block text-uppercase fw-bold ls-1 mb-1" style={{ fontSize: '0.6rem' }}>Fecha de Ingreso</small>
-              <span className="fw-bold text-dark-custom">{user?.created_at ? new Date(user.created_at).toLocaleDateString('es-ES') : 'No registrada'}</span>
-            </div>
-          </div>
-
-          <div className="info-item-premium d-flex align-items-center p-3 rounded-4 shadow-sm border border-light-custom">
-            <div className="info-icon-premium me-3">
-              <CIcon icon={cilShieldAlt} />
-            </div>
-            <div className="info-content-premium">
-              <small className="text-muted-custom d-block text-uppercase fw-bold ls-1 mb-1" style={{ fontSize: '0.6rem' }}>Identificador Único</small>
-              <span className="fw-bold text-dark-custom font-monospace ls-1">#{user?.id || 'N/A'}</span>
+            <div className="info-content-premium" style={{ minWidth: 0, flex: 1 }}>
+              <small className="text-muted-custom d-block text-uppercase fw-bold ls-1 mb-1" style={{ fontSize: '0.65rem' }}>Fecha de Ingreso</small>
+              <span className="fw-bold text-dark-custom d-block" style={{ fontSize: '0.88rem' }}>
+                {user?.created_at ? new Date(user.created_at).toLocaleDateString('es-ES') : 'No registrada'}
+              </span>
             </div>
           </div>
         </div>
