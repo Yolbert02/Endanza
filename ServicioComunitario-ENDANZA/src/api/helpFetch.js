@@ -1,6 +1,8 @@
 // helpFetch.js - Versión corregida
 export const helpFetch = () => {
-  const URL = 'http://localhost:3001'
+  // En producción usa la API real, en desarrollo usa localhost
+  const URL = import.meta.env.VITE_API_URL || 
+    (window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://api.endanzatachira.org.ve')
 
   const customFetch = async (endpoint, options = {}) => {
     options.method = options.method || 'GET'

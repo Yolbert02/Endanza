@@ -1249,6 +1249,7 @@ export const UserModel = {
   create,
   findOneByUsername,
   findOneById,
+  findById: findOneById,
   findOneByEmail,
   findAll,
   updatePassword,

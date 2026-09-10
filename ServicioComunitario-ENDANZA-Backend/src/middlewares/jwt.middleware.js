@@ -87,6 +87,7 @@ export const verifyToken = async (req, res, next) => {
 
       // Agregar información del usuario al request - CORREGIDO
       req.user = {
+        id: decoded.userId || decoded.id || user.id,
         userId: decoded.userId || decoded.id || user.id,
         username: decoded.username,
         Id_rol: decoded.Id_rol, // CORREGIDO: Usar Id_rol

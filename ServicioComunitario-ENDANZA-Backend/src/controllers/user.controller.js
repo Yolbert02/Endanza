@@ -8,21 +8,21 @@ import { db } from "../db/connection.database.js";
 // **FUNCIÓN HELPER PARA VERIFICAR ESTADO - MEJORADA**
 const isUserActive = (user) => {
   if (!user || !user.is_active) return false;
-  
+
   // Normalizar el estado: convertir a minúsculas, quitar espacios
   const normalizedStatus = String(user.is_active || '')
     .toLowerCase()
     .trim()
     .replace(/\s+/g, '');
-  
+
   console.log(`🔍 Verificando estado: "${user.is_active}" -> "${normalizedStatus}"`);
-  
+
   // Aceptar varias formas de "activo"
   const activeStatuses = ['activo', 'active', 'activado', 'enabled', 'true', '1', 'yes', 'sí'];
   return activeStatuses.includes(normalizedStatus);
 };
 
-const login = async (req, res) => {
+export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -38,11 +38,11 @@ const login = async (req, res) => {
     }
 
     console.log("🔍 LOGIN - Buscando usuario en BD...");
-    
+
     // Detectar si el identificador es un email o una cédula
     const isEmail = identifier.includes('@');
     let user;
-    
+
     if (isEmail) {
       console.log("📧 LOGIN - Buscando por correo electrónico...");
       user = await UserModel.findOneByEmail(identifier);
@@ -88,11 +88,11 @@ const login = async (req, res) => {
     }
 
     console.log("🔑 LOGIN - Verificando contraseña...");
-    
+
     // DEBUG: Ver qué tipo de password tenemos
     console.log("🔍 DEBUG - Password en BD (primeros 30 chars):", user.password?.substring(0, 30) || 'N/A');
     console.log("🔍 DEBUG - Longitud password BD:", user.password?.length || 0);
-    
+
     // Verificar si el password está vacío o no existe
     if (!user.password || user.password.trim() === '') {
       console.log("❌ LOGIN - Password está vacío en la BD");
@@ -110,19 +110,19 @@ const login = async (req, res) => {
     if (user.password.startsWith('$2')) {
       console.log("🔐 LOGIN - Password en BD es hash bcrypt, usando bcrypt.compare()");
       validPassword = await bcryptjs.compare(password, user.password);
-      
+
       if (!validPassword) {
         console.log("❌ LOGIN - Contraseña incorrecta (hash bcrypt)");
       }
-    } 
+    }
     // CASO 2: Si el password en BD está en texto plano (usuarios antiguos)
     else {
       console.log("📝 LOGIN - Password en BD es texto plano, comparando directamente");
       validPassword = (user.password === password);
-      
+
       if (validPassword) {
         console.log("✅ LOGIN - Contraseña correcta (texto plano). Migrando a hash...");
-        
+
         try {
           // Auto-migrar a hash bcrypt
           migratedHash = await UserModel.migratePasswordToHash(user.id, password);
@@ -136,7 +136,7 @@ const login = async (req, res) => {
         console.log("❌ LOGIN - Contraseña incorrecta (texto plano)");
       }
     }
-    
+
     if (!validPassword) {
       return res.status(400).json({
         ok: false,
@@ -276,10 +276,10 @@ const login = async (req, res) => {
 // ============================================
 // FUNCIÓN PARA MIGRAR TODOS LOS PASSWORDS (Endpoint)
 // ============================================
-const migrateAllPasswords = async (req, res) => {
+export const migrateAllPasswords = async (req, res) => {
   try {
     console.log("🚀 MIGRATE ALL - Iniciando migración de todos los passwords...");
-    
+
     // Verificar si es admin (opcional)
     if (req.user && req.user.Id_rol !== 1) {
       return res.status(403).json({
@@ -287,9 +287,9 @@ const migrateAllPasswords = async (req, res) => {
         msg: "Admin access required"
       });
     }
-    
+
     const result = await UserModel.migrateAllPasswords();
-    
+
     return res.json({
       ok: true,
       msg: `Migración completada: ${result.migrated} migrados, ${result.errors} errores`,
@@ -298,7 +298,7 @@ const migrateAllPasswords = async (req, res) => {
       total: result.total,
       results: result.results
     });
-    
+
   } catch (error) {
     console.error("❌ MIGRATE ALL - Error general:", error);
     return res.status(500).json({
@@ -309,7 +309,7 @@ const migrateAllPasswords = async (req, res) => {
   }
 };
 
-const refreshToken = async (req, res) => {
+export const refreshToken = async (req, res) => {
   try {
     const { refreshToken } = req.body;
 
@@ -422,7 +422,7 @@ const refreshToken = async (req, res) => {
   }
 };
 
-const logout = async (req, res) => {
+export const logout = async (req, res) => {
   try {
     // En este sistema simplificado, el logout solo confirma que el token es válido
     // El cliente debe eliminar el token de su almacenamiento local
@@ -439,93 +439,51 @@ const logout = async (req, res) => {
   }
 };
 
-const profile = async (req, res) => {
-  try {
-    console.log("👤 PROFILE - Solicitado para userId:", req.user.userId);
-
-    const userId = req.user.userId;
-    const user = await UserModel.findOneById(userId);
-
-    if (!user) {
-      console.log("❌ PROFILE - Usuario no encontrado");
-      return res.status(404).json({
-        ok: false,
-        msg: "User not found",
-      });
-    }
-
-    console.log("✅ PROFILE - Usuario encontrado:", user.username);
-
-    // Verificar si es profesor
-    let profesorInfo = null;
+export const getProfile = async (req, res) => {
     try {
-      profesorInfo = await UserModel.isProfesor(user.id);
+        const userId = req.user?.id || req.user?.userId;
+        const userRole = req.user?.role || req.user?.roleName;
+
+        if (!userId) {
+            return res.status(401).json({ ok: false, msg: "No autorizado" });
+        }
+
+        // Búsqueda genérica segura en el modelo principal de usuarios
+        let user = null;
+        if (typeof UserModel.findById === 'function') {
+            user = await UserModel.findById(userId);
+        } else if (typeof UserModel.findOneById === 'function') {
+            user = await UserModel.findOneById(userId);
+        }
+
+        if (!user) {
+            return res.status(404).json({ ok: false, msg: "Perfil de usuario no encontrado en la base de datos" });
+        }
+
+        // Excluir contraseñas por seguridad
+        delete user.password;
+        delete user.clave;
+
+        return res.json({ 
+            ok: true, 
+            role: userRole,
+            user 
+        });
     } catch (error) {
-      console.log("ℹ️ PROFILE - Error al verificar profesor:", error.message);
+        console.error("❌ Error al obtener perfil específico:", error);
+        return res.status(500).json({ ok: false, msg: "Error interno al procesar el perfil" });
     }
-
-    // Verificar si es representante
-    let representanteInfo = null;
-    try {
-      representanteInfo = await UserModel.isRepresentante(user.id);
-    } catch (error) {
-      console.log("ℹ️ PROFILE - Error al verificar representante:", error.message);
-    }
-
-    // Remover campos sensibles
-    const {
-      password: _,
-      security_word: __,
-      respuesta_de_seguridad: ___,
-      password_reset_token: ____,
-      password_reset_expires: _____,
-      email_verification_token: ______,
-      ...userWithoutSensitiveInfo
-    } = user;
-
-    // Agregar información específica si es profesor
-    if (profesorInfo) {
-      userWithoutSensitiveInfo.Id_profesor = profesorInfo.Id_profesor;
-      userWithoutSensitiveInfo.especialidad = profesorInfo.especialidad;
-      userWithoutSensitiveInfo.es_profesor = true;
-    }
-
-    // Agregar información específica si es representante
-    if (representanteInfo) {
-      userWithoutSensitiveInfo.Id_representante = representanteInfo.Id_representante;
-      userWithoutSensitiveInfo.es_familiar = representanteInfo.es_familiar;
-      userWithoutSensitiveInfo.profesion_rep = representanteInfo.profesion_rep;
-      userWithoutSensitiveInfo.direccion_trabajo_rep = representanteInfo.direccion_trabajo_rep;
-      userWithoutSensitiveInfo.es_representante = true;
-    }
-
-    userWithoutSensitiveInfo.must_change_cedula = (
-      !user.cedula ||
-      String(user.cedula || '').trim() === '' ||
-      String(user.cedula || '').trim().toUpperCase().startsWith('V-1000')
-    );
-
-    return res.json({
-      ok: true,
-      user: userWithoutSensitiveInfo,
-    });
-  } catch (error) {
-    console.error("❌ PROFILE - Error:", error);
-    return res.status(500).json({
-      ok: false,
-      msg: "Server error",
-      error: error.message,
-    });
-  }
 };
+
+export const profile = getProfile;
 
 // ============================================
 // 🆕 LIST USERS - MEJORADO (mapeo de roles)
 // ============================================
-const listUsers = async (req, res) => {
+export const listUsers = async (req, res) => {
   try {
     const users = await UserModel.findAll();
-    
+
     // Mapear al formato del frontend
     const mappedUsers = users.map(user => {
       const roleMap = {
@@ -534,7 +492,7 @@ const listUsers = async (req, res) => {
         3: 'estudiante',
         4: 'representante'
       };
-      
+
       return {
         id: user.id,
         dni: user.cedula,
@@ -566,18 +524,18 @@ const listUsers = async (req, res) => {
 // ============================================
 // 🆕 CREAR USUARIO POR ADMINISTRADOR
 // ============================================
-const createUser = async (req, res) => {
+export const createUser = async (req, res) => {
   try {
-    const { 
-      dni, first_name, last_name, password, phone, email, 
-      role, status, fecha_nacimiento, genero, Id_direccion 
+    const {
+      dni, first_name, last_name, password, phone, email,
+      role, status, fecha_nacimiento, genero, Id_direccion
     } = req.body;
 
-    console.log("👑 ADMIN CREATE - Creando usuario por admin:", { 
-      email, 
-      role, 
+    console.log("👑 ADMIN CREATE - Creando usuario por admin:", {
+      email,
+      role,
       dni,
-      creador: req.user.userId 
+      creador: req.user.userId
     });
 
     // Validaciones básicas
@@ -692,12 +650,12 @@ const createUser = async (req, res) => {
 // ============================================
 // 🆕 ACTUALIZAR USUARIO POR ADMIN
 // ============================================
-const updateUser = async (req, res) => {
+export const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { 
-      dni, first_name, last_name, phone, email, 
-      role, status, password 
+    const {
+      dni, first_name, last_name, phone, email,
+      role, status, password
     } = req.body;
 
     console.log(`👑 ADMIN UPDATE - Actualizando usuario ${id}`);
@@ -798,7 +756,7 @@ const updateUser = async (req, res) => {
 // ============================================
 // 🆕 ACTUALIZAR SOLO EL ROL DEL USUARIO
 // ============================================
-const updateUserRole = async (req, res) => {
+export const updateUserRole = async (req, res) => {
   try {
     const { id } = req.params;
     const { role } = req.body;
@@ -850,7 +808,7 @@ const updateUserRole = async (req, res) => {
 // ============================================
 // 🆕 DELETE USER - VERSIÓN MEJORADA
 // ============================================
-const deleteUser = async (req, res) => {
+export const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -871,7 +829,7 @@ const deleteUser = async (req, res) => {
     }
 
     let result;
-    
+
     // Si es DOCENTE (Id_rol = 2), usar función especializada
     if (user.Id_rol === 2) {
       console.log(`👨‍🏫 Eliminando docente ${id} con todas sus relaciones...`);
@@ -900,14 +858,14 @@ const deleteUser = async (req, res) => {
 
 
 
-const updateProfile = async (req, res) => {
+export const updateProfile = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { 
-      email, security_word, respuesta_de_seguridad, 
+    const {
+      email, security_word, respuesta_de_seguridad,
       nombre, apellido, telefono, cedula,
       fecha_nacimiento, genero, foto_usuario, Id_direccion,
-      direccion 
+      direccion
     } = req.body;
 
     // Check if email is being updated and if it already exists
@@ -1002,12 +960,12 @@ const updateProfile = async (req, res) => {
 };
 
 // Nueva función para actualizar perfil con validación de seguridad
-const updateProfileWithSecurity = async (req, res) => {
+export const updateProfileWithSecurity = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { 
+    const {
       email, security_word, respuesta_de_seguridad, current_security_answer,
-      nombre, apellido, telefono, cedula, fecha_nacimiento, genero, foto_usuario, Id_direccion 
+      nombre, apellido, telefono, cedula, fecha_nacimiento, genero, foto_usuario, Id_direccion
     } = req.body;
 
     if (!current_security_answer) {
@@ -1077,7 +1035,7 @@ const updateProfileWithSecurity = async (req, res) => {
   }
 };
 
-const changePassword = async (req, res) => {
+export const changePassword = async (req, res) => {
   try {
     const userId = req.user.userId;
     const { currentPassword, newPassword } = req.body;
@@ -1106,14 +1064,14 @@ const changePassword = async (req, res) => {
 
     // Verificar contraseña actual (soporta texto plano y hash)
     let validCurrentPassword = false;
-    
+
     if (user.password.startsWith('$2')) {
       // Si es hash bcrypt
       validCurrentPassword = await bcryptjs.compare(currentPassword, user.password);
     } else {
       // Si es texto plano
       validCurrentPassword = (user.password === currentPassword);
-      
+
       // Si la contraseña es correcta y está en texto plano, migrarla
       if (validCurrentPassword) {
         try {
@@ -1153,7 +1111,7 @@ const changePassword = async (req, res) => {
 };
 
 // Nueva función para cambiar contraseña con palabra de seguridad
-const changePasswordWithSecurity = async (req, res) => {
+export const changePasswordWithSecurity = async (req, res) => {
   try {
     const { username, respuesta_de_seguridad, newPassword } = req.body;
 
@@ -1202,7 +1160,7 @@ const changePasswordWithSecurity = async (req, res) => {
   }
 };
 
-const forgotPassword = async (req, res) => {
+export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -1239,7 +1197,7 @@ const forgotPassword = async (req, res) => {
   }
 };
 
-const resetPassword = async (req, res) => {
+export const resetPassword = async (req, res) => {
   try {
     const { token, newPassword } = req.body;
 
@@ -1285,7 +1243,7 @@ const resetPassword = async (req, res) => {
   }
 };
 
-const activateUser = async (req, res) => {
+export const activateUser = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -1314,7 +1272,7 @@ const activateUser = async (req, res) => {
   }
 };
 
-const deactivateUser = async (req, res) => {
+export const deactivateUser = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -1343,7 +1301,7 @@ const deactivateUser = async (req, res) => {
   }
 };
 
-const searchUsers = async (req, res) => {
+export const searchUsers = async (req, res) => {
   try {
     const { search } = req.query;
     if (!search) {
@@ -1354,7 +1312,7 @@ const searchUsers = async (req, res) => {
     }
 
     const users = await UserModel.searchByUsername(search);
-    
+
     // Mapear al formato del frontend
     const mappedUsers = users.map(user => {
       const roleMap = {
@@ -1363,7 +1321,7 @@ const searchUsers = async (req, res) => {
         3: 'estudiante',
         4: 'representante'
       };
-      
+
       return {
         id: user.id,
         dni: user.cedula,
@@ -1392,7 +1350,7 @@ const searchUsers = async (req, res) => {
   }
 };
 
-const verifyEmail = async (req, res) => {
+export const verifyEmail = async (req, res) => {
   try {
     const { token } = req.params;
 
@@ -1426,7 +1384,7 @@ const verifyEmail = async (req, res) => {
   }
 };
 
-const recoverPasswordWithSecurity = async (req, res) => {
+export const recoverPasswordWithSecurity = async (req, res) => {
   try {
     const { username, respuesta_de_seguridad, newPassword } = req.body;
 
@@ -1474,7 +1432,7 @@ const recoverPasswordWithSecurity = async (req, res) => {
   }
 };
 
-const getSecurityQuestion = async (req, res) => {
+export const getSecurityQuestion = async (req, res) => {
   try {
     const { username } = req.params;
 
@@ -1508,11 +1466,11 @@ const getSecurityQuestion = async (req, res) => {
   }
 };
 
-const register = async (req, res) => {
+export const register = async (req, res) => {
   try {
-    const { 
+    const {
       username, email, password, Id_rol, security_word, respuesta_de_seguridad,
-      nombre, apellido, cedula, telefono, fecha_nacimiento, genero, foto_usuario, Id_direccion 
+      nombre, apellido, cedula, telefono, fecha_nacimiento, genero, foto_usuario, Id_direccion
     } = req.body;
 
     if ((!username && !email) || !password || !Id_rol) {
@@ -1633,7 +1591,7 @@ const register = async (req, res) => {
 // ============================================
 // ACTUALIZAR CÉDULA OBLIGATORIA
 // ============================================
-const updateCedula = async (req, res) => {
+export const updateCedula = async (req, res) => {
   try {
     const userId = req.user.userId;
     let { cedula } = req.body;
@@ -1707,15 +1665,13 @@ const updateCedula = async (req, res) => {
   }
 };
 
-// ============================================
-// EXPORTAR TODOS LOS MÉTODOS DEL CONTROLADOR
-// ============================================
 export const UserController = {
-  register,
   login,
+  migrateAllPasswords,
   refreshToken,
   logout,
   profile,
+  getProfile,
   listUsers,
   createUser,
   updateUser,
@@ -1733,6 +1689,8 @@ export const UserController = {
   verifyEmail,
   recoverPasswordWithSecurity,
   getSecurityQuestion,
-  migrateAllPasswords,
-  updateCedula
+  register,
+  updateCedula,
 };
+
+

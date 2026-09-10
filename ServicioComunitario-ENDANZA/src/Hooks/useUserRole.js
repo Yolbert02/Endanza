@@ -3,10 +3,20 @@ import { useState, useEffect, useCallback } from 'react'
 import { userAPI } from '../api/user.api.js'
 
 const useUserRole = () => {
-  const [userRole, setUserRole] = useState(null)
-  const [userId, setUserId] = useState(null)
-  const [userData, setUserData] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const getCachedUser = () => {
+    try {
+      const cached = localStorage.getItem('user')
+      return cached ? JSON.parse(cached) : null
+    } catch {
+      return null
+    }
+  }
+
+  const cached = getCachedUser()
+  const [userRole, setUserRole] = useState(cached?.rol || null)
+  const [userId, setUserId] = useState(cached?.id || null)
+  const [userData, setUserData] = useState(cached)
+  const [isLoading, setIsLoading] = useState(!cached && !!localStorage.getItem('accessToken'))
   const [error, setError] = useState(null)
 
   const roleMap = {

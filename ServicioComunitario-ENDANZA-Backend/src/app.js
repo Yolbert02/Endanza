@@ -27,11 +27,35 @@ const app = express();
 // ============================================
 // CONFIGURACIÓN DE CORS
 // ============================================
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  "https://endanzatachira.org.ve",
+  "https://registro.endanzatachira.org.ve",
+  "http://localhost:5173",
+  "http://localhost:3000"
+].filter(Boolean);
+
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  origin: function (origin, callback) {
+    // Permitir peticiones sin origin (como Postman, curl, apps móviles)
+    if (!origin) return callback(null, true);
+
+    const isExplicitlyAllowed = allowedOrigins.includes(origin);
+    const isEndanzaDomain = /^https?:\/\/([a-zA-Z0-9-]+\.)*endanzatachira\.org\.ve(:[0-9]+)?$/.test(origin);
+    const isNetlifyDomain = /^https?:\/\/([a-zA-Z0-9-]+\.)*netlify\.app(:[0-9]+)?$/.test(origin);
+    const isLocalhost = /^https?:\/\/localhost(:[0-9]+)?$/.test(origin);
+
+    if (isExplicitlyAllowed || isEndanzaDomain || isNetlifyDomain || isLocalhost) {
+      return callback(null, true);
+    }
+
+    console.warn(`⚠️ CORS bloqueado para origen no autorizado: ${origin}`);
+    return callback(null, false);
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+  optionsSuccessStatus: 200,
 };
 
 app.use(cors(corsOptions));
