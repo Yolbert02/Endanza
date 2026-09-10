@@ -1,4 +1,6 @@
-// helpFetch.js - Versión corregida
+import { getStoredToken, clearStoredAuth } from '../utils/authStorage.js'
+
+// helpFetch.js - Versión corregida con sesión por pestaña
 export const helpFetch = () => {
   // En producción usa la API real, en desarrollo usa localhost
   const URL = import.meta.env.VITE_API_URL || 
@@ -11,7 +13,7 @@ export const helpFetch = () => {
       'Content-Type': 'application/json',
     }
 
-    const token = localStorage.getItem('accessToken')
+    const token = getStoredToken()
     if (token) {
       defaultHeaders.Authorization = `Bearer ${token}`
     }
@@ -31,6 +33,15 @@ export const helpFetch = () => {
       const response = await fetch(`${URL}${endpoint}`, options)
       
       console.log(`📡 Response status: ${response.status} ${response.statusText}`)
+
+      // Si el servidor responde 401 en cualquier endpoint protegido, cerrar sesión silenciosamente y enviar al login
+      if (response.status === 401 && !endpoint.includes('/login')) {
+        console.warn('🔒 Sesión no válida o expirada (401). Redirigiendo al login...')
+        clearStoredAuth()
+        if (window.location.hash !== '#/login' && !window.location.hash.startsWith('#/login')) {
+          window.location.hash = '#/login'
+        }
+      }
       
       const text = await response.text()
       

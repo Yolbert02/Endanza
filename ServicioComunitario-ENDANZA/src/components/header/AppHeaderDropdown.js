@@ -19,8 +19,9 @@ import {
 
 
 
-// ✅ IMPORTAR authService, NO helpFetch
+// ✅ IMPORTAR authService y authStorage
 import { authService } from '../../services/authService'
+import { getStoredToken, clearStoredAuth } from '../../utils/authStorage'
 
 const AppHeaderDropdown = () => {
   const navigate = useNavigate()
@@ -29,7 +30,6 @@ const AppHeaderDropdown = () => {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        // ✅ USAR authService.getProfile() - YA USA userAPI INTERNAMENTE
         const response = await authService.getProfile()
 
         if (response.success) {
@@ -40,7 +40,7 @@ const AppHeaderDropdown = () => {
       }
     }
 
-    if (localStorage.getItem('accessToken')) {
+    if (getStoredToken()) {
       fetchUserData()
     }
   }, [])
@@ -51,9 +51,7 @@ const AppHeaderDropdown = () => {
       navigate('/login?logout=success')
     } catch (error) {
       console.error('❌ Error en logout:', error)
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('refreshToken')
-      localStorage.removeItem('user')
+      clearStoredAuth()
       navigate('/login')
     }
   }

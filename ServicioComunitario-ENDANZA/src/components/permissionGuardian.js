@@ -33,27 +33,18 @@ const PermissionGuard = ({
   }
   
   if (!hasPermission) {
-    if (showForbidden) {
-      return (
-        <div className="container py-5">
-          <CAlert color="danger">
-            <h4>Acceso Denegado</h4>
-            <p>No tienes permisos para acceder a esta sección.</p>
-            <p><strong>Tu rol:</strong> {userRole}</p>
-            <p><strong>Rol requerido:</strong> {requiredRole || requiredAnyOf.join(' o ')}</p>
-            <div className="mt-3">
-              <CButton color="primary" onClick={() => navigate('/dashboard')}>
-                Volver al Dashboard
-              </CButton>
-            </div>
-          </CAlert>
-        </div>
-      )
+    if (!userRole) {
+      navigate('/login', { replace: true })
+    } else if (userRole === 'admin' || userRole === 'superadmin' || userRole === 'secretaria') {
+      navigate('/dashboard', { replace: true })
+    } else if (userRole === 'docente') {
+      navigate('/docente/inicio', { replace: true })
+    } else if (userRole === 'representante') {
+      navigate('/inicio', { replace: true })
     } else {
-      // Redirigir silenciosamente
-      navigate(redirectTo)
-      return null
+      navigate('/login', { replace: true })
     }
+    return null
   }
   
   return children

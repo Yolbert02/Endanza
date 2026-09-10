@@ -67,24 +67,10 @@ const DefaultLayout = () => {
     )
   }
 
-  // Si hay error pero tenemos datos de cache, mostrar igual con advertencia
-  if (error && !userData) {
-    return (
-      <div className="d-flex flex-column justify-content-center align-items-center min-vh-100 bg-light">
-        <div className="alert alert-warning" role="alert">
-          <h4 className="alert-heading">Error de conexión</h4>
-          <p>No se pudo verificar los permisos con el servidor.</p>
-          <hr />
-          <p className="mb-0">Por favor, verifica tu conexión a internet.</p>
-        </div>
-        <button
-          className="btn btn-primary mt-3"
-          onClick={() => window.location.reload()}
-        >
-          Reintentar
-        </button>
-      </div>
-    )
+  // Si no hay datos de usuario ni permisos, redirigir directamente al login sin mostrar carteles
+  if (!userData && !isLoading) {
+    navigate('/login', { replace: true })
+    return null
   }
 
   return (

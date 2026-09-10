@@ -1,19 +1,20 @@
 // src/components/ProtectedRoute.js
 import React from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
-import { CSpinner, CAlert } from '@coreui/react'
+import { CSpinner } from '@coreui/react'
+import { getStoredToken, getStoredUser, clearStoredAuth } from '../utils/authStorage'
 
-// Mapa de rutas permitidas por rol
+// Mapa de rutas permitidas por rol (incluye superadmin y secretaria)
 const routePermissions = {
-  // Rutas de admin
-  '/dashboard': ['admin'],
-  '/students': ['admin'],
-  '/students/*': ['admin'],
+  // Rutas de administración
+  '/dashboard': ['admin', 'superadmin', 'secretaria'],
+  '/students': ['admin', 'superadmin', 'secretaria'],
+  '/students/*': ['admin', 'superadmin', 'secretaria'],
   '/inscripcion': ['representante'],
-  '/aulas': ['admin'],
-  '/notas': ['admin', 'docente'],
-  '/boletin': ['admin'],
-  '/horario': ['admin'],
+  '/aulas': ['admin', 'superadmin', 'secretaria'],
+  '/notas': ['admin', 'superadmin', 'docente', 'secretaria'],
+  '/boletin': ['admin', 'superadmin', 'secretaria'],
+  '/horario': ['admin', 'superadmin', 'secretaria'],
 
   // Rutas de docente
   '/docente/*': ['docente'],
@@ -22,13 +23,13 @@ const routePermissions = {
   '/inicio': ['representante'],
   '/inicio-boletines': ['representante'],
   '/inicio-horarios': ['representante'],
-  '/perfilRepresentanteEstudiante/*': ['representante'], // 👈 AGREGADA
+  '/perfilRepresentanteEstudiante/*': ['representante'],
   '/boletin-estudiante/*': ['representante'],
   '/horario-estudiante/*': ['representante'],
 
   // Rutas compartidas
-  '/profile': ['representante', 'admin', 'docente'],
-  '/perfil': ['admin', 'docente', 'representante'],
+  '/profile': ['representante', 'admin', 'superadmin', 'docente', 'secretaria'],
+  '/perfil': ['admin', 'superadmin', 'docente', 'representante', 'secretaria'],
 }
 
 const ProtectedRoute = ({
@@ -37,14 +38,13 @@ const ProtectedRoute = ({
 }) => {
   const location = useLocation()
 
-  // Estado de carga
   const [isLoading, setIsLoading] = React.useState(true)
   const [userRole, setUserRole] = React.useState('')
 
   React.useEffect(() => {
     const loadUserData = () => {
       try {
-        const user = JSON.parse(localStorage.getItem('user') || '{}')
+        const user = getStoredUser() || {}
         setUserRole(user.rol || '')
       } catch (error) {
         console.error('Error loading user data:', error)
@@ -64,66 +64,52 @@ const ProtectedRoute = ({
   }
 
   // Verificar autenticación
-  const isAuthenticated = !!localStorage.getItem('accessToken')
+  const token = getStoredToken()
+  const isAuthenticated = !!token
 
   if (!isAuthenticated) {
-    localStorage.setItem('redirectAfterLogin', location.pathname)
+    clearStoredAuth()
     return <Navigate to="/login" replace />
   }
 
   // Determinar los roles permitidos para esta ruta
   let allowedRolesForRoute = allowedRoles
 
-  // Si no se especificaron roles, usar el mapa de rutas
   if (allowedRolesForRoute.length === 0) {
     const path = location.pathname
 
-    // Buscar coincidencia exacta primero
     allowedRolesForRoute = routePermissions[path] || []
 
-    // Si no hay coincidencia exacta, buscar por patrón
     if (allowedRolesForRoute.length === 0) {
-      // Rutas de admin con parámetros
       if (path.startsWith('/students/')) {
         allowedRolesForRoute = routePermissions['/students/*'] || []
-      }
-      // Rutas de representante con parámetros
-      else if (path.startsWith('/perfilRepresentanteEstudiante/')) {
+      } else if (path.startsWith('/perfilRepresentanteEstudiante/')) {
         allowedRolesForRoute = routePermissions['/perfilRepresentanteEstudiante/*'] || []
-      }
-      else if (path.startsWith('/boletin-estudiante/')) {
+      } else if (path.startsWith('/boletin-estudiante/')) {
         allowedRolesForRoute = routePermissions['/boletin-estudiante/*'] || []
-      }
-      else if (path.startsWith('/horario-estudiante/')) {
+      } else if (path.startsWith('/horario-estudiante/')) {
         allowedRolesForRoute = routePermissions['/horario-estudiante/*'] || []
-      }
-      else if (path.startsWith('/docente/')) {
+      } else if (path.startsWith('/docente/')) {
         allowedRolesForRoute = routePermissions['/docente/*'] || []
       }
     }
   }
 
-  // Verificar permisos
+  // Verificar permisos: si no tiene permisos o el rol es inválido, redirigir directo sin carteles
   if (allowedRolesForRoute.length > 0 && !allowedRolesForRoute.includes(userRole)) {
-    return (
-      <div className="container py-5">
-        <CAlert color="danger">
-          <h4>Acceso Denegado</h4>
-          <p>No tienes permisos para acceder a esta sección.</p>
-          <p><strong>Ruta:</strong> {location.pathname}</p>
-          <p><strong>Tu rol:</strong> {userRole || 'No definido'}</p>
-          <p><strong>Roles requeridos:</strong> {allowedRolesForRoute.join(', ')}</p>
-          <div className="mt-3">
-            <button
-              className="btn btn-primary"
-              onClick={() => window.history.back()}
-            >
-              Volver
-            </button>
-          </div>
-        </CAlert>
-      </div>
-    )
+    console.warn(`🚨 Acceso no autorizado a ${location.pathname} para rol "${userRole}". Redirigiendo a pantalla adecuada...`)
+    
+    // Redirigir según el rol que tenga, o a login si no tiene rol válido
+    if (userRole === 'admin' || userRole === 'superadmin' || userRole === 'secretaria') {
+      return <Navigate to="/dashboard" replace />
+    } else if (userRole === 'docente') {
+      return <Navigate to="/docente/inicio" replace />
+    } else if (userRole === 'representante') {
+      return <Navigate to="/inicio" replace />
+    } else {
+      clearStoredAuth()
+      return <Navigate to="/login" replace />
+    }
   }
 
   return children

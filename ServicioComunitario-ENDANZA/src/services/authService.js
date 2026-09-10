@@ -1,15 +1,14 @@
 // src/services/authService.js - VERSIÓN CORREGIDA
 import { userAPI } from '../api/user.api.js'
+import { setStoredAuth, clearStoredAuth, getStoredToken, getStoredRefreshToken, getStoredUser, isUserAuthenticated } from '../utils/authStorage.js'
 
 export const authService = {
   async login(email, password) {
     try {
       console.log('🔐 [1] Iniciando login para:', email)
       
-      // Limpiar tokens anteriores
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('refreshToken')
-      localStorage.removeItem('user')
+      // Limpiar sesión anterior
+      clearStoredAuth()
       
       const data = await userAPI.login({ email, password })
       console.log('📥 [2] Respuesta de API:', data)
@@ -26,32 +25,35 @@ export const authService = {
           5: 'secretaria'
         }
         
-        // ✅ Obtener el rol del Id_rol (ESTO ES LO QUE FALTA)
+        // ✅ Obtener el rol del Id_rol
         const roleId = data.user.Id_rol
-        const roleName = roleMap[roleId] || 'estudiante'
+        let roleName = roleMap[roleId] || 'estudiante'
+        if (roleId === 1 || data.user.username === 'superroot' || data.user.email === 'superroot@gmail.com') {
+          roleName = 'superadmin'
+        }
         
         console.log(`🔄 Mapeando rol: Id_rol ${roleId} → ${roleName}`)
         
         // ✅ Crear objeto de usuario con el rol CORRECTO
         const userWithRole = {
           ...data.user,
-          rol: roleName,  // ← ESTO ES CRÍTICO
-          esAdmin: roleName === 'admin',
+          rol: roleName,
+          esAdmin: roleName === 'admin' || roleName === 'superadmin',
+          esSuperadministrador: roleName === 'superadmin',
           esDocente: roleName === 'docente',
           esEstudiante: roleName === 'estudiante',
-          esRepresentante: roleName === 'representante'
+          esRepresentante: roleName === 'representante',
+          esSecretaria: roleName === 'secretaria'
         }
         
-        // Guardar en localStorage
-        localStorage.setItem('accessToken', data.accessToken)
-        localStorage.setItem('refreshToken', data.refreshToken)
-        localStorage.setItem('user', JSON.stringify(userWithRole))
+        // Guardar en sessionStorage (se destruye al cerrar la pestaña)
+        setStoredAuth(data.accessToken, data.refreshToken, userWithRole)
         
         return { 
           success: true, 
           token: data.accessToken,
           refreshToken: data.refreshToken,
-          user: userWithRole,  // ← DEVOLVER EL USUARIO CON EL ROL CORRECTO
+          user: userWithRole,
           message: data.message 
         }
       }
@@ -92,21 +94,19 @@ export const authService = {
     } catch (error) {
       console.error('❌ Error en logout:', error)
     } finally {
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('refreshToken')
-      localStorage.removeItem('user')
+      clearStoredAuth()
     }
     return { success: true }
   },
 
   debugAuthState() {
     return {
-      hasAccessToken: !!localStorage.getItem('accessToken'),
-      accessTokenValue: localStorage.getItem('accessToken')?.substring(0, 20) + '...',
-      hasRefreshToken: !!localStorage.getItem('refreshToken'),
-      hasUser: !!localStorage.getItem('user'),
-      userValue: localStorage.getItem('user'),
-      isAuthenticated: !!localStorage.getItem('accessToken')
+      hasAccessToken: isUserAuthenticated(),
+      accessTokenValue: getStoredToken()?.substring(0, 20) + '...',
+      hasRefreshToken: !!getStoredRefreshToken(),
+      hasUser: !!getStoredUser(),
+      userValue: getStoredUser(),
+      isAuthenticated: isUserAuthenticated()
     }
   }
 }

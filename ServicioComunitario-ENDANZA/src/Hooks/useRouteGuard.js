@@ -1,25 +1,26 @@
 import { useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import useUserRole from './useUserRole'
+import { getStoredToken, clearStoredAuth } from '../utils/authStorage'
 
 // Configuración de permisos por ruta
 const routePermissions = {
-  '/dashboard': ['admin', 'secretaria'],
-  '/students': ['admin', 'secretaria'],
-  '/students/:id': ['admin', 'secretaria'],
+  '/dashboard': ['admin', 'superadmin', 'secretaria'],
+  '/students': ['admin', 'superadmin', 'secretaria'],
+  '/students/:id': ['admin', 'superadmin', 'secretaria'],
   '/inscripcion': ['representante'],
-  '/aulas': ['admin', 'secretaria'],
-  '/notas': ['admin', 'secretaria'],
-  '/boletin': ['admin', 'secretaria'],
-  '/horario': ['admin', 'secretaria'],
+  '/aulas': ['admin', 'superadmin', 'secretaria'],
+  '/notas': ['admin', 'superadmin', 'secretaria'],
+  '/boletin': ['admin', 'superadmin', 'secretaria'],
+  '/horario': ['admin', 'superadmin', 'secretaria'],
   '/docente/inicio': ['docente'],
   '/docente/horario': ['docente'],
   '/inicio': ['representante'],
   '/perfilRepresentanteEstudiante/:id': ['representante'],
-  '/boletin-estudiante/:id': ['representante'], // 👈 ACTUALIZADO CON :id
-  '/horario-estudiante/:id': ['representante'], // 👈 ACTUALIZADO CON :id
-  '/profile': ['representante', 'admin', 'docente', 'secretaria'],
-  '/perfil': ['admin', 'docente', 'representante', 'secretaria'],
+  '/boletin-estudiante/:id': ['representante'],
+  '/horario-estudiante/:id': ['representante'],
+  '/profile': ['representante', 'admin', 'superadmin', 'docente', 'secretaria'],
+  '/perfil': ['admin', 'superadmin', 'docente', 'representante', 'secretaria'],
 }
 
 const useRouteGuard = () => {
@@ -28,23 +29,20 @@ const useRouteGuard = () => {
   const { userRole, isLoading } = useUserRole()
 
   useEffect(() => {
-    // 👇 LOG PARA VER SI EL EFECTO SE EJECUTA
-    console.log(`🔄 RouteGuard useEffect EJECUTÁNDOSE para: ${location.pathname}`)
-    
     if (isLoading) {
-      console.log('⏳ RouteGuard: Esperando carga del rol...')
       return
     }
 
-    const token = localStorage.getItem('accessToken')
+    const token = getStoredToken()
     if (!token) {
-      console.warn('🚫 RouteGuard: No hay token, redirigiendo a login')
+      clearStoredAuth()
       navigate('/login', { replace: true })
       return
     }
 
     if (!userRole) {
-      console.warn('⚠️ RouteGuard: userRole es null pero hay token.')
+      clearStoredAuth()
+      navigate('/login', { replace: true })
       return
     }
     

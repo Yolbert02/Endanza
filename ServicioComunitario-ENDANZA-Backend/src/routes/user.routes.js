@@ -56,8 +56,8 @@ router.put("/profile/security", verifyToken, autoVerifyRole, updateProfileWithSe
 router.put("/change-password", verifyToken, autoVerifyRole, changePassword);
 router.put("/change-password/security", verifyToken, autoVerifyRole, changePasswordWithSecurity);
 
-// Logout (requiere token válido)
-router.post("/logout", verifyToken, autoVerifyRole, logout);
+// Logout
+router.post("/logout", logout);
 
 router.post("/create", verifyToken, verifyAdmin, autoVerifyRole, createUser); 
 router.put("/:id", verifyToken, verifyAdmin, autoVerifyRole, updateUser);   

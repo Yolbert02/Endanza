@@ -1,22 +1,14 @@
-// src/Hooks/useUserRole.js - VERSIÓN QUE FUNCIONABA
+// src/Hooks/useUserRole.js - VERSIÓN CON SESIÓN POR PESTAÑA
 import { useState, useEffect, useCallback } from 'react'
 import { userAPI } from '../api/user.api.js'
+import { getStoredToken, getStoredUser, clearStoredAuth, setStoredAuth } from '../utils/authStorage.js'
 
 const useUserRole = () => {
-  const getCachedUser = () => {
-    try {
-      const cached = localStorage.getItem('user')
-      return cached ? JSON.parse(cached) : null
-    } catch {
-      return null
-    }
-  }
-
-  const cached = getCachedUser()
+  const cached = getStoredUser()
   const [userRole, setUserRole] = useState(cached?.rol || null)
   const [userId, setUserId] = useState(cached?.id || null)
   const [userData, setUserData] = useState(cached)
-  const [isLoading, setIsLoading] = useState(!cached && !!localStorage.getItem('accessToken'))
+  const [isLoading, setIsLoading] = useState(!cached && !!getStoredToken())
   const [error, setError] = useState(null)
 
   const roleMap = {
@@ -29,7 +21,7 @@ const useUserRole = () => {
 
   const fetchUserFromBackend = useCallback(async () => {
     try {
-      const token = localStorage.getItem('accessToken')
+      const token = getStoredToken()
       if (!token) return null
 
       console.log('🔍 useUserRole - Obteniendo datos del usuario desde backend...')
@@ -38,9 +30,10 @@ const useUserRole = () => {
 
       if (response._ok === false) {
         if (response._status === 401) {
-          localStorage.removeItem('accessToken')
-          localStorage.removeItem('user')
-          localStorage.removeItem('refreshToken')
+          clearStoredAuth()
+          if (window.location.hash !== '#/login' && !window.location.hash.startsWith('#/login')) {
+            window.location.hash = '#/login'
+          }
           return null
         }
         throw new Error(`Error del servidor: ${response._status}`)
@@ -52,7 +45,6 @@ const useUserRole = () => {
       let roleName = roleMap[roleId] || 'estudiante'
 
       // Identificar superadmin: todos los admins (Id_rol=1) son superadmin en este sistema
-      // También se identifica por usuario o correo específico
       if (roleId === 1 || response.user.username === 'superroot' || response.user.correo === 'superroot@gmail.com' || response.user.email === 'superroot@gmail.com') {
         roleName = 'superadmin'
       }
@@ -71,7 +63,9 @@ const useUserRole = () => {
         esRepresentante: roleName === 'representante'
       }
 
-      localStorage.setItem('user', JSON.stringify(completeUserData))
+      // Actualizar usuario en sessionStorage
+      const currentToken = getStoredToken()
+      setStoredAuth(currentToken, null, completeUserData)
 
       return completeUserData
 
@@ -83,16 +77,15 @@ const useUserRole = () => {
 
   const getUserData = useCallback(async (forceRefresh = false) => {
     try {
-      if (localStorage.getItem('accessToken')) {
+      if (getStoredToken()) {
         console.log('🔄 useUserRole - Forzando obtención de datos frescos')
         return await fetchUserFromBackend()
       }
 
-      const cachedUser = localStorage.getItem('user')
+      const cachedUser = getStoredUser()
       if (cachedUser) {
-        const parsedUser = JSON.parse(cachedUser)
         console.log('📦 useUserRole - Usando datos cacheados')
-        return parsedUser
+        return cachedUser
       }
 
       return null
@@ -107,19 +100,19 @@ const useUserRole = () => {
 
     const loadUserData = async () => {
       try {
-        if (isMounted) setIsLoading(true)
+        if (isMounted && !cached) setIsLoading(true)
 
-        const userData = await getUserData(true)
+        const freshData = await getUserData(true)
 
-        if (isMounted && userData) {
-          setUserData(userData)
-          setUserRole(userData.rol)
-          setUserId(userData.id)
+        if (isMounted && freshData) {
+          setUserData(freshData)
+          setUserRole(freshData.rol)
+          setUserId(freshData.id)
 
           console.log('✅ useUserRole - Datos cargados exitosamente:', {
-            id: userData.id,
-            rol: userData.rol,
-            tipo_rol: userData.tipo_rol
+            id: freshData.id,
+            rol: freshData.rol,
+            tipo_rol: freshData.tipo_rol
           })
         }
       } catch (err) {
@@ -129,7 +122,7 @@ const useUserRole = () => {
       }
     }
 
-    if (localStorage.getItem('accessToken')) {
+    if (getStoredToken()) {
       loadUserData()
     } else {
       setIsLoading(false)
