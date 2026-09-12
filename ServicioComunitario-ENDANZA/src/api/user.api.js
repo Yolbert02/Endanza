@@ -56,6 +56,12 @@ export const userAPI = {
   searchUsers: (searchTerm) => 
     fetch.get(`/api/users/search?search=${encodeURIComponent(searchTerm)}`),
   
+  searchDocenteCandidates: (searchTerm) => 
+    fetch.get(`/api/users/docente-candidates?search=${encodeURIComponent(searchTerm)}`),
+  
+  assignDocenteRole: (data) => 
+    fetch.post('/api/users/assign-docente', data),
+  
   createUser: (userData) => 
     fetch.post('/api/users/create', userData),
   

@@ -6,9 +6,86 @@ import {
   CFormInput,
   CFormSelect,
   CFormLabel,
+  CInputGroup,
+  CInputGroupText,
 } from "@coreui/react"
 
-const editForm = ({ formData, onInputChange, activeTab }) => {
+const PHONE_PREFIXES = ["0414", "0424", "0416", "0426", "0412", "0422"];
+
+const PhoneField = ({ label, name, value, onChange, error, placeholder = "1234567" }) => {
+  const val = value || "";
+  const matchedPrefix = PHONE_PREFIXES.find(p => val.startsWith(p + '-') || val.startsWith(p)) || "0414";
+  const numberPart = val.startsWith(matchedPrefix + '-')
+    ? val.slice(matchedPrefix.length + 1)
+    : val.startsWith(matchedPrefix)
+      ? val.slice(matchedPrefix.length)
+      : val.replace(/[^0-9]/g, '').slice(0, 7);
+
+  const handlePrefixChange = (e) => {
+    const newPrefix = e.target.value;
+    const combined = numberPart ? `${newPrefix}-${numberPart}` : '';
+    onChange({ target: { name, value: combined } });
+  };
+
+  const handleNumberChange = (e) => {
+    const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 7);
+    const combined = digits ? `${matchedPrefix}-${digits}` : '';
+    onChange({ target: { name, value: combined } });
+  };
+
+  return (
+    <div>
+      <CFormLabel className="fw-bold">{label}</CFormLabel>
+      <CInputGroup>
+        <CFormSelect
+          value={matchedPrefix}
+          onChange={handlePrefixChange}
+          style={{ maxWidth: '110px', flex: '0 0 110px' }}
+          className="input-premium py-2"
+        >
+          {PHONE_PREFIXES.map(p => <option key={p} value={p}>{p}</option>)}
+        </CFormSelect>
+        <CFormInput
+          type="tel"
+          value={numberPart}
+          onChange={handleNumberChange}
+          placeholder={placeholder}
+          maxLength={7}
+          className={`input-premium py-2 ${error ? 'is-invalid' : ''}`}
+        />
+      </CInputGroup>
+      {error && <div className="invalid-feedback d-block small mt-1">{error}</div>}
+    </div>
+  );
+};
+
+const CedulaField = ({ label, name, value, onChange, error, placeholder = "12345678" }) => {
+  const handleChange = (e) => {
+    const clean = e.target.value.replace(/[^0-9]/g, '').slice(0, 8);
+    onChange({ target: { name, value: clean } });
+  };
+
+  return (
+    <div>
+      <CFormLabel className="fw-bold">{label}</CFormLabel>
+      <CInputGroup>
+        <CInputGroupText className="bg-light-custom text-muted fw-bold">V-</CInputGroupText>
+        <CFormInput
+          type="text"
+          name={name}
+          value={value ? String(value).replace(/^V-?/i, '') : ''}
+          onChange={handleChange}
+          placeholder={placeholder}
+          maxLength={8}
+          className={`input-premium py-2 ${error ? 'is-invalid' : ''}`}
+        />
+      </CInputGroup>
+      {error && <div className="invalid-feedback d-block small mt-1">{error}</div>}
+    </div>
+  );
+};
+
+const editForm = ({ formData, onInputChange, activeTab, errors = {} }) => {
   // Opciones para selects
   const sexoOptions = [
     { value: "", label: "Seleccionar sexo" },
@@ -42,26 +119,60 @@ const editForm = ({ formData, onInputChange, activeTab }) => {
       {activeTab === 0 && (
         <>
           <h5 className="mb-3 text-primary form-section-border pb-2">Información de Identidad</h5>
+          <div className="d-flex align-items-center gap-2 mb-2">
+            <span className="badge bg-primary bg-opacity-10 text-primary fw-bold px-3 py-1 rounded-pill" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>
+              NOMBRES Y APELLIDOS DEL ESTUDIANTE
+            </span>
+            <div className="flex-grow-1" style={{ height: '1px', background: 'linear-gradient(to right, rgba(13,110,253,0.2), transparent)' }} />
+          </div>
           <CRow className="mb-3">
-            <CCol md={6}>
-              <CFormLabel className="fw-bold">Nombre</CFormLabel>
+            <CCol md={3}>
+              <CFormLabel className="fw-bold">1er Nombre</CFormLabel>
               <CFormInput
                 type="text"
-                name="NombreEstudiante"
-                value={formData.NombreEstudiante || ""}
+                name="EstudiantePrimerNombre"
+                value={formData.EstudiantePrimerNombre || ""}
                 onChange={onInputChange}
-                placeholder="Nombre del estudiante"
+                placeholder="Ej: Juan"
+                className={`input-premium h-auto py-2 ${errors.EstudiantePrimerNombre || errors.NombreEstudiante ? 'is-invalid' : ''}`}
+              />
+              {(errors.EstudiantePrimerNombre || errors.NombreEstudiante) && (
+                <div className="invalid-feedback">{errors.EstudiantePrimerNombre || errors.NombreEstudiante}</div>
+              )}
+            </CCol>
+            <CCol md={3}>
+              <CFormLabel className="fw-bold">2do Nombre</CFormLabel>
+              <CFormInput
+                type="text"
+                name="EstudianteSegundoNombre"
+                value={formData.EstudianteSegundoNombre || ""}
+                onChange={onInputChange}
+                placeholder="Ej: Carlos"
                 className="input-premium h-auto py-2"
               />
             </CCol>
-            <CCol md={6}>
-              <CFormLabel className="fw-bold">Apellido</CFormLabel>
+            <CCol md={3}>
+              <CFormLabel className="fw-bold">1er Apellido</CFormLabel>
               <CFormInput
                 type="text"
-                name="ApellidoEstudiante"
-                value={formData.ApellidoEstudiante || ""}
+                name="EstudiantePrimerApellido"
+                value={formData.EstudiantePrimerApellido || ""}
                 onChange={onInputChange}
-                placeholder="Apellido del estudiante"
+                placeholder="Ej: Pérez"
+                className={`input-premium h-auto py-2 ${errors.EstudiantePrimerApellido || errors.ApellidoEstudiante ? 'is-invalid' : ''}`}
+              />
+              {(errors.EstudiantePrimerApellido || errors.ApellidoEstudiante) && (
+                <div className="invalid-feedback">{errors.EstudiantePrimerApellido || errors.ApellidoEstudiante}</div>
+              )}
+            </CCol>
+            <CCol md={3}>
+              <CFormLabel className="fw-bold">2do Apellido</CFormLabel>
+              <CFormInput
+                type="text"
+                name="EstudianteSegundoApellido"
+                value={formData.EstudianteSegundoApellido || ""}
+                onChange={onInputChange}
+                placeholder="Ej: Gómez"
                 className="input-premium h-auto py-2"
               />
             </CCol>
@@ -177,14 +288,12 @@ const editForm = ({ formData, onInputChange, activeTab }) => {
               />
             </CCol>
             <CCol md={4}>
-              <CFormLabel className="fw-bold">Teléfono Principal</CFormLabel>
-              <CFormInput
-                type="tel"
+              <PhoneField
+                label="Teléfono Principal"
                 name="Telefono"
                 value={formData.Telefono || ""}
                 onChange={onInputChange}
-                placeholder="Ej: 0412-1234567"
-                className="input-premium h-auto py-2"
+                error={errors.Telefono}
               />
             </CCol>
           </CRow>
@@ -209,26 +318,55 @@ const editForm = ({ formData, onInputChange, activeTab }) => {
       {activeTab === 2 && (
         <>
           <h5 className="mb-3 text-primary form-section-border pb-2">Información del Padre / Representante</h5>
+          
+          <div className="d-flex align-items-center gap-2 mb-2">
+            <span className="badge bg-primary bg-opacity-10 text-primary fw-bold px-3 py-1 rounded-pill" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>
+              NOMBRES Y APELLIDOS DEL PADRE
+            </span>
+            <div className="flex-grow-1" style={{ height: '1px', background: 'linear-gradient(to right, rgba(13,110,253,0.2), transparent)' }} />
+          </div>
           <CRow className="mb-3">
-            <CCol md={6}>
-              <CFormLabel className="fw-bold">Nombre del Padre</CFormLabel>
+            <CCol md={3}>
+              <CFormLabel className="fw-bold">1er Nombre</CFormLabel>
               <CFormInput
                 type="text"
-                name="PadreNombre"
-                value={formData.PadreNombre || ""}
+                name="PadrePrimerNombre"
+                value={formData.PadrePrimerNombre || ""}
                 onChange={onInputChange}
-                placeholder="Nombre del padre"
+                placeholder="Ej: Juan"
                 className="input-premium h-auto py-2"
               />
             </CCol>
-            <CCol md={6}>
-              <CFormLabel className="fw-bold">Apellido del Padre</CFormLabel>
+            <CCol md={3}>
+              <CFormLabel className="fw-bold">2do Nombre</CFormLabel>
               <CFormInput
                 type="text"
-                name="PadreApellido"
-                value={formData.PadreApellido || ""}
+                name="PadreSegundoNombre"
+                value={formData.PadreSegundoNombre || ""}
                 onChange={onInputChange}
-                placeholder="Apellido del padre"
+                placeholder="Ej: Carlos"
+                className="input-premium h-auto py-2"
+              />
+            </CCol>
+            <CCol md={3}>
+              <CFormLabel className="fw-bold">1er Apellido</CFormLabel>
+              <CFormInput
+                type="text"
+                name="PadrePrimerApellido"
+                value={formData.PadrePrimerApellido || ""}
+                onChange={onInputChange}
+                placeholder="Ej: Pérez"
+                className="input-premium h-auto py-2"
+              />
+            </CCol>
+            <CCol md={3}>
+              <CFormLabel className="fw-bold">2do Apellido</CFormLabel>
+              <CFormInput
+                type="text"
+                name="PadreSegundoApellido"
+                value={formData.PadreSegundoApellido || ""}
+                onChange={onInputChange}
+                placeholder="Ej: Gómez"
                 className="input-premium h-auto py-2"
               />
             </CCol>
@@ -236,25 +374,21 @@ const editForm = ({ formData, onInputChange, activeTab }) => {
 
           <CRow className="mb-3">
             <CCol md={6}>
-              <CFormLabel className="fw-bold">Cédula del Padre</CFormLabel>
-              <CFormInput
-                type="text"
+              <CedulaField
+                label="Cédula del Padre"
                 name="PadreCedula"
                 value={formData.PadreCedula || ""}
                 onChange={onInputChange}
-                placeholder="V-XXXXXXXX"
-                className="input-premium h-auto py-2"
+                error={errors.PadreCedula}
               />
             </CCol>
             <CCol md={6}>
-              <CFormLabel className="fw-bold">Teléfono del Padre</CFormLabel>
-              <CFormInput
-                type="tel"
+              <PhoneField
+                label="Teléfono del Padre"
                 name="PadreTelefono"
                 value={formData.PadreTelefono || ""}
                 onChange={onInputChange}
-                placeholder="Teléfono de contacto"
-                className="input-premium h-auto py-2"
+                error={errors.PadreTelefono}
               />
             </CCol>
           </CRow>
@@ -290,26 +424,55 @@ const editForm = ({ formData, onInputChange, activeTab }) => {
       {activeTab === 3 && (
         <>
           <h5 className="mb-3 text-primary form-section-border pb-2">Información de la Madre / Representante</h5>
+          
+          <div className="d-flex align-items-center gap-2 mb-2">
+            <span className="badge bg-danger bg-opacity-10 text-danger fw-bold px-3 py-1 rounded-pill" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>
+              NOMBRES Y APELLIDOS DE LA MADRE
+            </span>
+            <div className="flex-grow-1" style={{ height: '1px', background: 'linear-gradient(to right, rgba(220,53,69,0.2), transparent)' }} />
+          </div>
           <CRow className="mb-3">
-            <CCol md={6}>
-              <CFormLabel className="fw-bold">Nombre de la Madre</CFormLabel>
+            <CCol md={3}>
+              <CFormLabel className="fw-bold">1er Nombre</CFormLabel>
               <CFormInput
                 type="text"
-                name="MadreNombre"
-                value={formData.MadreNombre || ""}
+                name="MadrePrimerNombre"
+                value={formData.MadrePrimerNombre || ""}
                 onChange={onInputChange}
-                placeholder="Nombre de la madre"
+                placeholder="Ej: María"
                 className="input-premium h-auto py-2"
               />
             </CCol>
-            <CCol md={6}>
-              <CFormLabel className="fw-bold">Apellido de la Madre</CFormLabel>
+            <CCol md={3}>
+              <CFormLabel className="fw-bold">2do Nombre</CFormLabel>
               <CFormInput
                 type="text"
-                name="MadreApellido"
-                value={formData.MadreApellido || ""}
+                name="MadreSegundoNombre"
+                value={formData.MadreSegundoNombre || ""}
                 onChange={onInputChange}
-                placeholder="Apellido de la madre"
+                placeholder="Ej: Elena"
+                className="input-premium h-auto py-2"
+              />
+            </CCol>
+            <CCol md={3}>
+              <CFormLabel className="fw-bold">1er Apellido</CFormLabel>
+              <CFormInput
+                type="text"
+                name="MadrePrimerApellido"
+                value={formData.MadrePrimerApellido || ""}
+                onChange={onInputChange}
+                placeholder="Ej: Rodríguez"
+                className="input-premium h-auto py-2"
+              />
+            </CCol>
+            <CCol md={3}>
+              <CFormLabel className="fw-bold">2do Apellido</CFormLabel>
+              <CFormInput
+                type="text"
+                name="MadreSegundoApellido"
+                value={formData.MadreSegundoApellido || ""}
+                onChange={onInputChange}
+                placeholder="Ej: Pérez"
                 className="input-premium h-auto py-2"
               />
             </CCol>
@@ -317,25 +480,21 @@ const editForm = ({ formData, onInputChange, activeTab }) => {
 
           <CRow className="mb-3">
             <CCol md={6}>
-              <CFormLabel className="fw-bold">Cédula de la Madre</CFormLabel>
-              <CFormInput
-                type="text"
+              <CedulaField
+                label="Cédula de la Madre"
                 name="MadreCedula"
                 value={formData.MadreCedula || ""}
                 onChange={onInputChange}
-                placeholder="V-XXXXXXXX"
-                className="input-premium h-auto py-2"
+                error={errors.MadreCedula}
               />
             </CCol>
             <CCol md={6}>
-              <CFormLabel className="fw-bold">Teléfono de la Madre</CFormLabel>
-              <CFormInput
-                type="tel"
+              <PhoneField
+                label="Teléfono de la Madre"
                 name="MadreTelefono"
                 value={formData.MadreTelefono || ""}
                 onChange={onInputChange}
-                placeholder="Teléfono de contacto"
-                className="input-premium h-auto py-2"
+                error={errors.MadreTelefono}
               />
             </CCol>
           </CRow>
@@ -387,20 +546,70 @@ const editForm = ({ formData, onInputChange, activeTab }) => {
 
                   if (selection === "Madre") {
                     updatedData.RepresentanteParentesco = "Madre";
-                    updatedData.RepresentanteNombre = formData.MadreNombre || "";
-                    updatedData.RepresentanteApellido = formData.MadreApellido || "";
-                    updatedData.RepresentanteCedula = formData.MadreCedula || "";
-                    updatedData.RepresentanteTelefono = formData.MadreTelefono || "";
-                    updatedData.RepresentanteOcupacion = formData.MadreOcupacion || "";
-                    updatedData.RepresentanteEmail = formData.MadreEmail || "";
+                    const fn1 = formData.MadrePrimerNombre || formData.RepresentantePrimerNombre || "";
+                    const fn2 = formData.MadreSegundoNombre || formData.RepresentanteSegundoNombre || "";
+                    const ln1 = formData.MadrePrimerApellido || formData.RepresentantePrimerApellido || "";
+                    const ln2 = formData.MadreSegundoApellido || formData.RepresentanteSegundoApellido || "";
+                    const ced = formData.MadreCedula || formData.RepresentanteCedula || "";
+                    const tel = formData.MadreTelefono || formData.RepresentanteTelefono || "";
+                    const ema = formData.MadreEmail || formData.RepresentanteEmail || "";
+                    const ocu = formData.MadreOcupacion || formData.RepresentanteOcupacion || "";
+                    const fullN = `${fn1} ${fn2}`.trim();
+                    const fullL = `${ln1} ${ln2}`.trim();
+
+                    updatedData.RepresentantePrimerNombre = fn1;
+                    updatedData.MadrePrimerNombre = fn1;
+                    updatedData.RepresentanteSegundoNombre = fn2;
+                    updatedData.MadreSegundoNombre = fn2;
+                    updatedData.RepresentantePrimerApellido = ln1;
+                    updatedData.MadrePrimerApellido = ln1;
+                    updatedData.RepresentanteSegundoApellido = ln2;
+                    updatedData.MadreSegundoApellido = ln2;
+                    updatedData.RepresentanteNombre = fullN;
+                    updatedData.MadreNombre = fullN;
+                    updatedData.RepresentanteApellido = fullL;
+                    updatedData.MadreApellido = fullL;
+                    updatedData.RepresentanteCedula = ced;
+                    updatedData.MadreCedula = ced;
+                    updatedData.RepresentanteTelefono = tel;
+                    updatedData.MadreTelefono = tel;
+                    updatedData.RepresentanteEmail = ema;
+                    updatedData.MadreEmail = ema;
+                    updatedData.RepresentanteOcupacion = ocu;
+                    updatedData.MadreOcupacion = ocu;
                   } else if (selection === "Padre") {
                     updatedData.RepresentanteParentesco = "Padre";
-                    updatedData.RepresentanteNombre = formData.PadreNombre || "";
-                    updatedData.RepresentanteApellido = formData.PadreApellido || "";
-                    updatedData.RepresentanteCedula = formData.PadreCedula || "";
-                    updatedData.RepresentanteTelefono = formData.PadreTelefono || "";
-                    updatedData.RepresentanteOcupacion = formData.PadreOcupacion || "";
-                    updatedData.RepresentanteEmail = formData.PadreEmail || "";
+                    const fn1 = formData.PadrePrimerNombre || formData.RepresentantePrimerNombre || "";
+                    const fn2 = formData.PadreSegundoNombre || formData.RepresentanteSegundoNombre || "";
+                    const ln1 = formData.PadrePrimerApellido || formData.RepresentantePrimerApellido || "";
+                    const ln2 = formData.PadreSegundoApellido || formData.RepresentanteSegundoApellido || "";
+                    const ced = formData.PadreCedula || formData.RepresentanteCedula || "";
+                    const tel = formData.PadreTelefono || formData.RepresentanteTelefono || "";
+                    const ema = formData.PadreEmail || formData.RepresentanteEmail || "";
+                    const ocu = formData.PadreOcupacion || formData.RepresentanteOcupacion || "";
+                    const fullN = `${fn1} ${fn2}`.trim();
+                    const fullL = `${ln1} ${ln2}`.trim();
+
+                    updatedData.RepresentantePrimerNombre = fn1;
+                    updatedData.PadrePrimerNombre = fn1;
+                    updatedData.RepresentanteSegundoNombre = fn2;
+                    updatedData.PadreSegundoNombre = fn2;
+                    updatedData.RepresentantePrimerApellido = ln1;
+                    updatedData.PadrePrimerApellido = ln1;
+                    updatedData.RepresentanteSegundoApellido = ln2;
+                    updatedData.PadreSegundoApellido = ln2;
+                    updatedData.RepresentanteNombre = fullN;
+                    updatedData.PadreNombre = fullN;
+                    updatedData.RepresentanteApellido = fullL;
+                    updatedData.PadreApellido = fullL;
+                    updatedData.RepresentanteCedula = ced;
+                    updatedData.PadreCedula = ced;
+                    updatedData.RepresentanteTelefono = tel;
+                    updatedData.PadreTelefono = tel;
+                    updatedData.RepresentanteEmail = ema;
+                    updatedData.PadreEmail = ema;
+                    updatedData.RepresentanteOcupacion = ocu;
+                    updatedData.PadreOcupacion = ocu;
                   } else if (selection === "Otro") {
                     updatedData.RepresentanteParentesco = "OTRO_VALOR"; // Flag para mostrar input
                   } else {
@@ -439,26 +648,55 @@ const editForm = ({ formData, onInputChange, activeTab }) => {
           </CRow>
 
           <h5 className="mb-3 text-primary form-section-border pb-2">Información del Representante</h5>
+          
+          <div className="d-flex align-items-center gap-2 mb-2">
+            <span className="badge bg-warning bg-opacity-10 text-warning fw-bold px-3 py-1 rounded-pill" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>
+              NOMBRES Y APELLIDOS DEL REPRESENTANTE
+            </span>
+            <div className="flex-grow-1" style={{ height: '1px', background: 'linear-gradient(to right, rgba(242,140,15,0.3), transparent)' }} />
+          </div>
           <CRow className="mb-3">
-            <CCol md={6}>
-              <CFormLabel className="fw-bold">Nombres</CFormLabel>
+            <CCol md={3}>
+              <CFormLabel className="fw-bold">1er Nombre</CFormLabel>
               <CFormInput
                 type="text"
-                name="RepresentanteNombre"
-                value={formData.RepresentanteNombre || ""}
+                name="RepresentantePrimerNombre"
+                value={formData.RepresentantePrimerNombre || ""}
                 onChange={onInputChange}
-                placeholder="Nombres del representante"
+                placeholder="Ej: Carlos"
                 className="input-premium h-auto py-2"
               />
             </CCol>
-            <CCol md={6}>
-              <CFormLabel className="fw-bold">Apellidos</CFormLabel>
+            <CCol md={3}>
+              <CFormLabel className="fw-bold">2do Nombre</CFormLabel>
               <CFormInput
                 type="text"
-                name="RepresentanteApellido"
-                value={formData.RepresentanteApellido || ""}
+                name="RepresentanteSegundoNombre"
+                value={formData.RepresentanteSegundoNombre || ""}
                 onChange={onInputChange}
-                placeholder="Apellidos del representante"
+                placeholder="Ej: Alberto"
+                className="input-premium h-auto py-2"
+              />
+            </CCol>
+            <CCol md={3}>
+              <CFormLabel className="fw-bold">1er Apellido</CFormLabel>
+              <CFormInput
+                type="text"
+                name="RepresentantePrimerApellido"
+                value={formData.RepresentantePrimerApellido || ""}
+                onChange={onInputChange}
+                placeholder="Ej: Mendoza"
+                className="input-premium h-auto py-2"
+              />
+            </CCol>
+            <CCol md={3}>
+              <CFormLabel className="fw-bold">2do Apellido</CFormLabel>
+              <CFormInput
+                type="text"
+                name="RepresentanteSegundoApellido"
+                value={formData.RepresentanteSegundoApellido || ""}
+                onChange={onInputChange}
+                placeholder="Ej: Ruiz"
                 className="input-premium h-auto py-2"
               />
             </CCol>
@@ -466,25 +704,21 @@ const editForm = ({ formData, onInputChange, activeTab }) => {
 
           <CRow className="mb-3">
             <CCol md={6}>
-              <CFormLabel className="fw-bold">Cédula de Identidad</CFormLabel>
-              <CFormInput
-                type="text"
+              <CedulaField
+                label="Cédula de Identidad"
                 name="RepresentanteCedula"
                 value={formData.RepresentanteCedula || ""}
                 onChange={onInputChange}
-                placeholder="V-XXXXXXXX"
-                className="input-premium h-auto py-2"
+                error={errors.RepresentanteCedula}
               />
             </CCol>
             <CCol md={6}>
-              <CFormLabel className="fw-bold">Teléfono de Contacto</CFormLabel>
-              <CFormInput
-                type="tel"
+              <PhoneField
+                label="Teléfono de Contacto"
                 name="RepresentanteTelefono"
                 value={formData.RepresentanteTelefono || ""}
                 onChange={onInputChange}
-                placeholder="Ej: 04XX-XXXXXXX"
-                className="input-premium h-auto py-2"
+                error={errors.RepresentanteTelefono}
               />
             </CCol>
           </CRow>

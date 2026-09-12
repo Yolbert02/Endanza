@@ -57,8 +57,8 @@ const PerfilStudents = () => {
     fetchStudentData()
   }, [id])
 
-  const fetchStudentData = async () => {
-    setLoading(true)
+  const fetchStudentData = async (showSpinner = true) => {
+    if (showSpinner) setLoading(true)
     try {
       const data = await getStudent(id)
       console.log("Datos del estudiante recibidos:", data) // Para debugging
@@ -67,7 +67,7 @@ const PerfilStudents = () => {
       console.error("Error fetching student:", error)
       showToast("danger", "Error", "No se pudo cargar el perfil del estudiante")
     } finally {
-      setLoading(false)
+      if (showSpinner) setLoading(false)
     }
   }
 
@@ -87,12 +87,21 @@ const PerfilStudents = () => {
   const handleSaveStudent = async (updatedData) => {
     setSaving(true)
     try {
-      const updated = await updateStudentService(id, updatedData)
-      setStudent(updated)
-      showToast("success", "Guardado", "Datos actualizados correctamente")
-      setEditModalVisible(false)
-      await fetchStudentData() // Refrescar datos
+      const response = await updateStudentService(id, updatedData)
+      console.log('📝 Respuesta de updateStudentService:', response)
+      
+      if (response && response.ok) {
+        if (response.data) {
+          setStudent(response.data)
+        }
+        showToast("success", "Guardado", "Datos actualizados correctamente")
+        setEditModalVisible(false)
+        await fetchStudentData(false) // Refrescar datos desde el servidor en segundo plano
+      } else {
+        showToast("danger", "Error", response?.msg || "No se pudieron guardar los datos")
+      }
     } catch (error) {
+      console.error('Error al guardar:', error)
       showToast("danger", "Error", "No se pudieron guardar los datos")
     } finally {
       setSaving(false)

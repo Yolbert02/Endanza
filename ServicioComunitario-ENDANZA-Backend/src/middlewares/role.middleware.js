@@ -13,6 +13,10 @@ export const roleMap = {
 const routePermissions = {
   // Rutas de administración (admin y secretaria)
   '/api/users/list': ['admin', 'secretaria'],
+  '/api/users/search': ['admin', 'secretaria'],
+  '/api/users/docente-candidates': ['admin', 'secretaria'],
+  '/api/users/create': ['admin'],
+  '/api/users/assign-docente': ['admin'],
 
   // ============================================
   // 🟢 RUTAS DE PERFIL Y SEGURIDAD (TODOS)
@@ -34,6 +38,8 @@ const routePermissions = {
   // ============================================
   '/api/config/academic-years': ['admin', 'docente', 'representante', 'estudiante', 'secretaria'],
   '/api/config/academic-years/active': ['admin', 'docente', 'representante', 'estudiante', 'secretaria'],
+  '/api/config/enrollment-period/:yearId': ['admin', 'secretaria'],
+  '/api/config/grades-period/:yearId': ['admin', 'secretaria'],
 
   // ============================================
   // 🟢 RUTAS DE TEACHERS
@@ -173,17 +179,22 @@ export const autoVerifyRole = async (req, res, next) => {
       return next();
     }
 
-    // Obtener rol del usuario desde el token
+    // Obtener rol del usuario desde el token y lista de roles múltiples
     const userRoleId = req.user.Id_rol;
     const userRole = roleMap[userRoleId] || 'estudiante';
+    const userRoles = Array.isArray(req.user.roles) && req.user.roles.length > 0
+      ? req.user.roles
+      : [userRole];
 
-    console.log(`👤 Rol del usuario: "${userRole}" (Id_rol: ${userRoleId})`);
+    console.log(`👤 Rol principal: "${userRole}" (Id_rol: ${userRoleId}), Roles: [${userRoles.join(', ')}]`);
 
-    // Verificar si el usuario tiene el rol requerido
-    if (!requiredRoles.includes(userRole)) {
+    // Verificar si el usuario tiene alguno de los roles requeridos
+    const hasPermission = requiredRoles.some(role => userRoles.includes(role));
+
+    if (!hasPermission) {
       console.warn(`\n🚨 ACCESO DENEGADO - Ruta: ${path}`);
       console.warn(`   Usuario ID: ${req.user.userId}`);
-      console.warn(`   Usuario rol: ${userRole}`);
+      console.warn(`   Usuario roles: ${userRoles.join(', ')}`);
       console.warn(`   Roles requeridos: ${requiredRoles.join(', ')}`);
       console.warn(`   Patrón coincidente: ${matchedPattern}`);
 
@@ -192,6 +203,7 @@ export const autoVerifyRole = async (req, res, next) => {
         msg: "Acceso denegado. No tienes permisos suficientes.",
         details: {
           userRole,
+          userRoles,
           requiredRoles,
           path,
           userId: req.user.userId,
@@ -214,12 +226,12 @@ export const autoVerifyRole = async (req, res, next) => {
         });
       }
 
-      // Bloquear accesos a habilitación de inscripción o subida de notas en config
-      if (path.includes('/enrollment-period') || path.includes('/grades-period')) {
-        console.warn(`\n🚨 ACCESO DENEGADO PARA SECRETARIA - Intento de acceso a periodos de config en ${path}`);
+      // Bloquear modificación de periodos, ciclos o validaciones para secretaria
+      if (isWriteMethod && (path.includes('/enrollment-period') || path.includes('/grades-period') || path.includes('/academic-years') || path.includes('/boletines') || path.includes('/validar'))) {
+        console.warn(`\n🚨 ACCESO DENEGADO PARA SECRETARIA - Intento de modificación en ${path}`);
         return res.status(403).json({
           ok: false,
-          msg: "Acceso denegado. El rol Secretaria no tiene acceso a la gestión de periodos académicos.",
+          msg: "Acceso denegado. El rol Secretaria no puede crear ni modificar periodos, ciclos o notas.",
         });
       }
     }
@@ -261,8 +273,11 @@ export const verifyRole = (requiredRoles = []) => {
 
       const userRoleId = req.user.Id_rol;
       const userRole = roleMap[userRoleId] || 'estudiante';
+      const userRoles = Array.isArray(req.user.roles) && req.user.roles.length > 0
+        ? req.user.roles
+        : [userRole];
 
-      console.log(`\n🔍 VERIFY ROLE EXPLÍCITO - Usuario: ${req.user.userId}, Rol: ${userRole}`);
+      console.log(`\n🔍 VERIFY ROLE EXPLÍCITO - Usuario: ${req.user.userId}, Roles: [${userRoles.join(', ')}]`);
       console.log(`   Roles requeridos: [${requiredRoles.join(', ')}]`);
 
       if (requiredRoles.length === 0) {
@@ -270,15 +285,18 @@ export const verifyRole = (requiredRoles = []) => {
         return next();
       }
 
-      if (!requiredRoles.includes(userRole)) {
+      const hasPermission = requiredRoles.some(role => userRoles.includes(role));
+
+      if (!hasPermission) {
         console.warn(`\n🚨 ACCESO DENEGADO - verifyRole explícito`);
-        console.warn(`   Usuario rol: ${userRole}`);
+        console.warn(`   Usuario roles: [${userRoles.join(', ')}]`);
         console.warn(`   Roles requeridos: ${requiredRoles.join(', ')}`);
 
         return res.status(403).json({
           ok: false,
           msg: "Acceso denegado. Permisos insuficientes.",
           userRole,
+          userRoles,
           requiredRoles
         });
       }

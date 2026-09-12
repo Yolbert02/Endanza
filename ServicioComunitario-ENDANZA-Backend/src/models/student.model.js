@@ -1,5 +1,6 @@
 import { db } from "../db/connection.database.js";
 import { RevisionModel } from "./revision.model.js";
+import { capitalizeWords } from "../utils/formatters.js";
 
 // ============================================
 // MODELO DE ESTUDIANTES
@@ -116,6 +117,8 @@ const findById = async (id) => {
           e."cedula" as dni,
           TO_CHAR(e."fecha_nacimiento", 'YYYY-MM-DD') as birth_date,
           e."genero" as gender,
+          COALESCE(e."estatus", 'Activo') as status,
+          hm."tipo_sangre" as blood_type,
           e."seguro_escolar" as school_insurance,
           e."Id_nivel" as grade_level_id,
           nl."nivel" as grade_level_name,
@@ -132,11 +135,25 @@ const findById = async (id) => {
           u_r."cedula" as representative_dni,
           u_r."telefono" as representative_phone,
           u_r."correo" as representative_email,
+          u_r."genero" as representative_gender,
+          r."es_familiar" as representative_es_familiar,
+          r."profesion_rep" as representative_occupation,
+          CASE 
+            WHEN r."es_familiar" = true THEN (
+              CASE 
+                WHEN LOWER(u_r."genero") LIKE 'f%' OR LOWER(u_r."nombre") LIKE 'diana%' OR LOWER(u_r."nombre") LIKE '%maría%' OR LOWER(u_r."nombre") LIKE '%maria%' THEN 'Madre'
+                WHEN LOWER(u_r."genero") LIKE 'm%' THEN 'Padre'
+                ELSE 'Madre'
+              END
+            )
+            ELSE 'Otro'
+          END as representative_relationship,
           d."nombre_direccion" as address,
           c."nombre_ciudad" as city,
           st."nombre_estado" as state,
           e."Id_historial" as medical_history_id
         FROM "Estudiante" e
+        LEFT JOIN "Historial_Medico" hm ON e."Id_historial" = hm."Id_historial"
         LEFT JOIN "Nivel_Escolar" nl ON e."Id_nivel" = nl."Id_nivel"
         LEFT JOIN "Nivel_Danza" nd ON e."Id_nivel_danza" = nd."Id_nivel_danza"
         LEFT JOIN "Escuela_Regular" er ON e."Id_escuela" = er."Id_escuela"
@@ -218,6 +235,9 @@ const create = async (studentData) => {
       Id_historial
     } = studentData;
 
+    const formattedNombre = capitalizeWords(nombre);
+    const formattedApellido = capitalizeWords(apellido);
+
     const query = {
       text: `
         INSERT INTO "Estudiante" (
@@ -227,13 +247,13 @@ const create = async (studentData) => {
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING 
-          "Id_estudiante" as id,
+          "Id_estudiante" as id, 
           "nombre" as first_name,
           "apellido" as last_name,
           "cedula" as dni
       `,
       values: [
-        nombre, apellido, cedula, fecha_nacimiento, genero,
+        formattedNombre, formattedApellido, cedula, fecha_nacimiento, genero,
         seguro_escolar || false, Id_nivel, Id_nivel_danza, Id_escuela,
         Id_seguro, Id_representante, Id_historial
       ]
@@ -260,20 +280,26 @@ const create = async (studentData) => {
  */
 const update = async (id, studentData) => {
   try {
-    const {
-      nombre,
-      apellido,
-      cedula,
-      fecha_nacimiento,
-      genero,
-      seguro_escolar,
-      Id_nivel,
-      Id_nivel_danza,
-      Id_escuela,
-      Id_seguro,
-      Id_representante,
-      Id_historial
-    } = studentData;
+    const rawNombre = studentData.EstudiantePrimerNombre
+      ? `${studentData.EstudiantePrimerNombre} ${studentData.EstudianteSegundoNombre || ''}`.trim()
+      : (studentData.nombre ?? studentData.first_name ?? studentData.NombreEstudiante);
+    const rawApellido = studentData.EstudiantePrimerApellido
+      ? `${studentData.EstudiantePrimerApellido} ${studentData.EstudianteSegundoApellido || ''}`.trim()
+      : (studentData.apellido ?? studentData.last_name ?? studentData.ApellidoEstudiante);
+    const cedula = studentData.cedula ?? studentData.dni ?? studentData.Cedula;
+    const fecha_nacimiento = studentData.fecha_nacimiento ?? studentData.birth_date ?? studentData.FechaNacimiento;
+    const genero = studentData.genero ?? studentData.gender ?? studentData.Sexo;
+    const seguro_escolar = studentData.seguro_escolar ?? studentData.school_insurance;
+    const Id_nivel = studentData.Id_nivel ?? studentData.grade_level_id;
+    const Id_nivel_danza = studentData.Id_nivel_danza ?? studentData.dance_level_id;
+    const Id_escuela = studentData.Id_escuela ?? studentData.school_id;
+    const Id_seguro = studentData.Id_seguro ?? studentData.insurance_id;
+    const Id_representante = studentData.Id_representante ?? studentData.representative_id;
+    const Id_historial = studentData.Id_historial ?? studentData.medical_history_id;
+    const estatus = studentData.estatus ?? studentData.status ?? studentData.Estatus;
+
+    const formattedNombre = rawNombre !== undefined ? capitalizeWords(rawNombre) : undefined;
+    const formattedApellido = rawApellido !== undefined ? capitalizeWords(rawApellido) : undefined;
 
     const query = {
       text: `
@@ -290,8 +316,9 @@ const update = async (id, studentData) => {
           "Id_escuela" = COALESCE($9, "Id_escuela"),
           "Id_seguro" = COALESCE($10, "Id_seguro"),
           "Id_representante" = COALESCE($11, "Id_representante"),
-          "Id_historial" = COALESCE($12, "Id_historial")
-        WHERE "Id_estudiante" = $13
+          "Id_historial" = COALESCE($12, "Id_historial"),
+          "estatus" = COALESCE($13, "estatus")
+        WHERE "Id_estudiante" = $14
         RETURNING 
           "Id_estudiante" as id,
           "nombre" as first_name,
@@ -299,14 +326,227 @@ const update = async (id, studentData) => {
           "cedula" as dni
       `,
       values: [
-        nombre, apellido, cedula, fecha_nacimiento, genero,
+        formattedNombre, formattedApellido, cedula, fecha_nacimiento, genero,
         seguro_escolar, Id_nivel, Id_nivel_danza, Id_escuela,
-        Id_seguro, Id_representante, Id_historial, id
+        Id_seguro, Id_representante, Id_historial, estatus, id
       ]
     };
 
     const { rows } = await db.query(query.text, query.values);
-    return rows[0];
+
+    // Actualizar o crear datos del representante vinculado
+    let existingStudent = await findById(id);
+    const isMadre = studentData.RepresentanteParentesco === 'Madre' ||
+      existingStudent?.representative_relationship === 'Madre' ||
+      (existingStudent?.representative_gender && String(existingStudent.representative_gender).toLowerCase().startsWith('f')) ||
+      (!['Padre', 'Tío', 'Abuelo', 'Hermano'].includes(studentData.RepresentanteParentesco));
+
+    const isPadre = studentData.RepresentanteParentesco === 'Padre' ||
+      existingStudent?.representative_relationship === 'Padre' ||
+      (existingStudent?.representative_gender && String(existingStudent.representative_gender).toLowerCase().startsWith('m'));
+
+    const repFirstName = studentData.RepresentantePrimerNombre
+      ? `${studentData.RepresentantePrimerNombre} ${studentData.RepresentanteSegundoNombre || ''}`.trim()
+      : (studentData.representative_first_name ?? studentData.RepresentanteNombre ?? (isMadre ? (studentData.MadrePrimerNombre || studentData.MadreNombre) : (isPadre ? (studentData.PadrePrimerNombre || studentData.PadreNombre) : null)));
+    const repLastName = studentData.RepresentantePrimerApellido
+      ? `${studentData.RepresentantePrimerApellido} ${studentData.RepresentanteSegundoApellido || ''}`.trim()
+      : (studentData.representative_last_name ?? studentData.RepresentanteApellido ?? (isMadre ? (studentData.MadrePrimerApellido || studentData.MadreApellido) : (isPadre ? (studentData.PadrePrimerApellido || studentData.PadreApellido) : null)));
+
+    // Extraer cédula limpia
+    const rawRepDni = (studentData.RepresentanteCedula && String(studentData.RepresentanteCedula).trim()) ||
+      (isMadre && studentData.MadreCedula && String(studentData.MadreCedula).trim()) ||
+      (isPadre && studentData.PadreCedula && String(studentData.PadreCedula).trim()) ||
+      (studentData.MadreCedula && String(studentData.MadreCedula).trim()) ||
+      (studentData.PadreCedula && String(studentData.PadreCedula).trim()) ||
+      studentData.representative_dni;
+    const repDni = rawRepDni ? String(rawRepDni).replace(/[^0-9]/g, '').slice(0, 8) : null;
+
+    const rawRepPhone = (studentData.RepresentanteTelefono && String(studentData.RepresentanteTelefono).trim()) ||
+      (isMadre && studentData.MadreTelefono && String(studentData.MadreTelefono).trim()) ||
+      (isPadre && studentData.PadreTelefono && String(studentData.PadreTelefono).trim()) ||
+      (studentData.MadreTelefono && String(studentData.MadreTelefono).trim()) ||
+      studentData.representative_phone;
+    const repPhone = rawRepPhone || null;
+
+    const rawRepEmail = (studentData.RepresentanteEmail && String(studentData.RepresentanteEmail).trim()) ||
+      (isMadre && studentData.MadreEmail && String(studentData.MadreEmail).trim()) ||
+      (isPadre && studentData.PadreEmail && String(studentData.PadreEmail).trim()) ||
+      (studentData.MadreEmail && String(studentData.MadreEmail).trim()) ||
+      studentData.representative_email;
+    const repEmail = rawRepEmail || null;
+
+    const repOccupation = studentData.RepresentanteOcupacion || (isMadre ? studentData.MadreOcupacion : (isPadre ? studentData.PadreOcupacion : null)) || studentData.representative_occupation;
+    const repParentesco = studentData.RepresentanteParentesco ?? studentData.parentesco ?? (isMadre ? 'Madre' : (isPadre ? 'Padre' : 'Otro'));
+
+    console.log('🔍 [UPDATE] Datos del representante a actualizar:', {
+      repFirstName,
+      repLastName,
+      repDni,
+      repPhone,
+      repEmail,
+      representative_user_id: existingStudent?.representative_user_id,
+      representative_id: existingStudent?.representative_id,
+      isMadre,
+      isPadre
+    });
+
+    // CASO 1: Si no tiene representante asignado en Estudiante pero se enviaron datos, crearlo o vincularlo
+    if (!existingStudent?.representative_user_id && (repFirstName || repLastName || repDni || repPhone || repEmail)) {
+      let usuarioId = null;
+      if (repDni) {
+        const uRes = await db.query(
+          'SELECT "Id_usuario" FROM "Usuario" WHERE "cedula" = $1 OR "cedula" = $2',
+          [repDni, `V-${repDni}`]
+        );
+        if (uRes.rows.length > 0) {
+          usuarioId = uRes.rows[0].Id_usuario;
+        }
+      }
+
+      if (!usuarioId) {
+        const insertUser = await db.query(`
+          INSERT INTO "Usuario" ("nombre", "apellido", "cedula", "telefono", "correo", "Id_rol")
+          VALUES ($1, $2, $3, $4, $5, 2)
+          RETURNING "Id_usuario"
+        `, [
+          repFirstName ? capitalizeWords(repFirstName) : 'Representante',
+          repLastName ? capitalizeWords(repLastName) : '',
+          repDni,
+          repPhone,
+          repEmail
+        ]);
+        usuarioId = insertUser.rows[0].Id_usuario;
+      }
+
+      let repId = null;
+      const existRep = await db.query('SELECT "Id_representante" FROM "Representante" WHERE "Id_usuario" = $1', [usuarioId]);
+      if (existRep.rows.length > 0) {
+        repId = existRep.rows[0].Id_representante;
+      } else {
+        const insertRep = await db.query(`
+          INSERT INTO "Representante" ("Id_usuario", "es_familiar", "profesion_rep")
+          VALUES ($1, $2, $3)
+          RETURNING "Id_representante"
+        `, [
+          usuarioId,
+          repParentesco !== 'Otro',
+          repOccupation || null
+        ]);
+        repId = insertRep.rows[0].Id_representante;
+      }
+
+      await db.query(`UPDATE "Estudiante" SET "Id_representante" = $1 WHERE "Id_estudiante" = $2`, [repId, id]);
+    } else if (existingStudent?.representative_user_id) {
+      // CASO 2: Ya tiene representante asignado
+      // Verificar si la cédula ya pertenece a otro Usuario para evitar error de constraint UNIQUE
+      if (repDni) {
+        const dupCheck = await db.query(
+          'SELECT "Id_usuario" FROM "Usuario" WHERE ("cedula" = $1 OR "cedula" = $2) AND "Id_usuario" != $3',
+          [repDni, `V-${repDni}`, existingStudent.representative_user_id]
+        );
+        if (dupCheck.rows.length > 0) {
+          const otherUserId = dupCheck.rows[0].Id_usuario;
+          const repCheck = await db.query('SELECT "Id_representante" FROM "Representante" WHERE "Id_usuario" = $1', [otherUserId]);
+          let otherRepId = repCheck.rows[0]?.Id_representante;
+          if (!otherRepId) {
+            const newRep = await db.query('INSERT INTO "Representante" ("Id_usuario", "es_familiar") VALUES ($1, true) RETURNING "Id_representante"', [otherUserId]);
+            otherRepId = newRep.rows[0].Id_representante;
+          }
+          await db.query('UPDATE "Estudiante" SET "Id_representante" = $1 WHERE "Id_estudiante" = $2', [otherRepId, id]);
+          existingStudent.representative_user_id = otherUserId;
+          existingStudent.representative_id = otherRepId;
+        }
+      }
+
+      if (repFirstName || repLastName || repDni || repPhone || repEmail) {
+        const updateResult = await db.query(`
+          UPDATE "Usuario"
+          SET
+            "nombre" = COALESCE($1, "nombre"),
+            "apellido" = COALESCE($2, "apellido"),
+            "cedula" = COALESCE($3, "cedula"),
+            "telefono" = COALESCE($4, "telefono"),
+            "correo" = COALESCE($5, "correo"),
+            "actualizado_en" = NOW()
+          WHERE "Id_usuario" = $6
+          RETURNING "Id_usuario", "cedula"
+        `, [
+          repFirstName ? capitalizeWords(repFirstName) : null,
+          repLastName ? capitalizeWords(repLastName) : null,
+          repDni,
+          repPhone,
+          repEmail,
+          existingStudent.representative_user_id
+        ]);
+        console.log('✅ [UPDATE] Resultado de UPDATE Usuario:', updateResult.rows);
+      }
+
+      if (existingStudent.representative_id && (repOccupation !== undefined || repParentesco !== undefined)) {
+        await db.query(`
+          UPDATE "Representante"
+          SET
+            "profesion_rep" = COALESCE($1, "profesion_rep"),
+            "es_familiar" = COALESCE($2, "es_familiar")
+          WHERE "Id_representante" = $3
+        `, [
+          repOccupation || null,
+          repParentesco ? (repParentesco !== 'Otro') : null,
+          existingStudent.representative_id
+        ]);
+      }
+    }
+
+    // Actualizar tipo de sangre en Historial_Medico
+    const tipoSangre = studentData.tipo_sangre ?? studentData.blood_type ?? studentData.TipoSangre;
+    if (tipoSangre) {
+      if (existingStudent?.medical_history_id) {
+        await db.query(
+          'UPDATE "Historial_Medico" SET "tipo_sangre" = $1 WHERE "Id_historial" = $2',
+          [tipoSangre, existingStudent.medical_history_id]
+        );
+      } else {
+        const insHist = await db.query(
+          'INSERT INTO "Historial_Medico" ("tipo_sangre") VALUES ($1) RETURNING "Id_historial"',
+          [tipoSangre]
+        );
+        const newHistId = insHist.rows[0].Id_historial;
+        await db.query('UPDATE "Estudiante" SET "Id_historial" = $1 WHERE "Id_estudiante" = $2', [newHistId, id]);
+      }
+    }
+
+    // Actualizar Dirección / Ciudad si se proporcionó
+    const dirVal = studentData.Direccion ?? studentData.address ?? studentData.direccion;
+    const ciudadVal = studentData.Ciudad ?? studentData.city ?? studentData.ciudad;
+    if (dirVal || ciudadVal) {
+      let ciudadId = null;
+      if (ciudadVal) {
+        const cRes = await db.query('SELECT "Id_ciudad" FROM "Ciudad" WHERE LOWER("nombre_ciudad") = LOWER($1)', [ciudadVal]);
+        if (cRes.rows.length > 0) {
+          ciudadId = cRes.rows[0].Id_ciudad;
+        }
+      }
+
+      const repUserId = existingStudent?.representative_user_id;
+      if (repUserId) {
+        const uDirRes = await db.query('SELECT "Id_direccion" FROM "Usuario" WHERE "Id_usuario" = $1', [repUserId]);
+        const currentDirId = uDirRes.rows[0]?.Id_direccion;
+        if (currentDirId) {
+          await db.query(
+            'UPDATE "Direccion" SET "nombre_direccion" = COALESCE($1, "nombre_direccion"), "Id_ciudad" = COALESCE($2, "Id_ciudad") WHERE "Id_direccion" = $3',
+            [dirVal, ciudadId, currentDirId]
+          );
+        } else if (dirVal) {
+          const insDir = await db.query(
+            'INSERT INTO "Direccion" ("nombre_direccion", "Id_ciudad") VALUES ($1, $2) RETURNING "Id_direccion"',
+            [dirVal, ciudadId]
+          );
+          await db.query('UPDATE "Usuario" SET "Id_direccion" = $1 WHERE "Id_usuario" = $2', [insDir.rows[0].Id_direccion, repUserId]);
+        }
+      }
+    }
+
+    const fullUpdated = await findById(id);
+    return fullUpdated || rows[0];
   } catch (error) {
     console.error("Error en update student:", error);
     throw error;

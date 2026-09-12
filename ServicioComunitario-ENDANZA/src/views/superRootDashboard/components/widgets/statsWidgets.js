@@ -37,54 +37,80 @@ const StatsWidgets = ({
   onOpenPeriodoInscripcion,
   onOpenSubidaNotas,
   onOpenValidacionNotas,
-  onOpenControlBoletines
+  onOpenControlBoletines,
+  isSecretaria = false
 }) => {
 
   const notasPendientesCount = notasPendientes.length;
   const boletinesDisponibles = boletines.filter(b => b.disponible).length;
   const puedeHabilitarBoletines = notasPendientesCount === 0;
 
-  // Acciones rápidas - 4 acciones esenciales
-  const quickActions = [
-    {
-      title: 'Validar Notas',
-      icon: cilCheckCircle,
-      color: '#F59E0B',
-      action: onOpenValidacionNotas,
-      badge: notasPendientesCount > 0 ? notasPendientesCount : null,
-      description: notasPendientesCount > 0
-        ? `${notasPendientesCount} pendiente${notasPendientesCount !== 1 ? 's' : ''}`
-        : 'Sin pendientes',
-      gradient: 'linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)'
-    },
-    {
-      title: 'Publicar Boletines',
-      icon: cilCloudDownload,
-      color: puedeHabilitarBoletines ? '#F28C0F' : '#64748B',
-      action: onOpenControlBoletines,
-      disabled: !puedeHabilitarBoletines && boletines.length > 0,
-      description: boletinesDisponibles > 0
-        ? `${boletinesDisponibles} disponible${boletinesDisponibles !== 1 ? 's' : ''}`
-        : 'Ninguno disponible',
-      gradient: 'linear-gradient(135deg, #F28C0F 0%, #F5A623 100%)'
-    },
-    {
-      title: 'Configurar Períodos',
-      icon: cilCalendar,
-      color: '#3B82F6',
-      action: onOpenPeriodoInscripcion,
-      description: periodoInscripcion.activo ? 'Activo' : 'Configurar',
-      gradient: 'linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%)'
-    },
-    {
-      title: 'Gestión de Notas',
-      icon: cilPencil,
-      color: periodoSubidaNotas.activo ? '#10B981' : '#64748B',
-      action: onOpenSubidaNotas,
-      description: periodoSubidaNotas.activo ? 'Habilitado' : 'Configurar',
-      gradient: 'linear-gradient(135deg, #10B981 0%, #34D399 100%)'
-    }
-  ];
+  // Acciones rápidas - filtradas según rol
+  const quickActions = isSecretaria
+    ? [
+        {
+          title: 'Período de Inscripción',
+          icon: cilCalendar,
+          color: '#3B82F6',
+          action: onOpenPeriodoInscripcion,
+          actionText: 'Consultar',
+          description: periodoInscripcion?.activo ? 'Inscripciones abiertas' : 'Inscripciones cerradas',
+          gradient: 'linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%)'
+        },
+        {
+          title: 'Período de Notas',
+          icon: cilPencil,
+          color: periodoSubidaNotas?.activo ? '#10B981' : '#64748B',
+          action: onOpenSubidaNotas,
+          actionText: 'Consultar',
+          description: periodoSubidaNotas?.activo ? 'Carga habilitada' : 'Carga cerrada',
+          gradient: 'linear-gradient(135deg, #10B981 0%, #34D399 100%)'
+        }
+      ]
+    : [
+        {
+          title: 'Validar Notas',
+          icon: cilCheckCircle,
+          color: '#F59E0B',
+          action: onOpenValidacionNotas,
+          actionText: 'Ejecutar',
+          badge: notasPendientesCount > 0 ? notasPendientesCount : null,
+          description: notasPendientesCount > 0
+            ? `${notasPendientesCount} pendiente${notasPendientesCount !== 1 ? 's' : ''}`
+            : 'Sin pendientes',
+          gradient: 'linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)'
+        },
+        {
+          title: 'Publicar Boletines',
+          icon: cilCloudDownload,
+          color: puedeHabilitarBoletines ? '#F28C0F' : '#64748B',
+          action: onOpenControlBoletines,
+          actionText: 'Ejecutar',
+          disabled: !puedeHabilitarBoletines && boletines.length > 0,
+          description: boletinesDisponibles > 0
+            ? `${boletinesDisponibles} disponible${boletinesDisponibles !== 1 ? 's' : ''}`
+            : 'Ninguno disponible',
+          gradient: 'linear-gradient(135deg, #F28C0F 0%, #F5A623 100%)'
+        },
+        {
+          title: 'Configurar Períodos',
+          icon: cilCalendar,
+          color: '#3B82F6',
+          action: onOpenPeriodoInscripcion,
+          actionText: 'Ejecutar',
+          description: periodoInscripcion?.activo ? 'Activo' : 'Configurar',
+          gradient: 'linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%)'
+        },
+        {
+          title: 'Gestión de Notas',
+          icon: cilPencil,
+          color: periodoSubidaNotas?.activo ? '#10B981' : '#64748B',
+          action: onOpenSubidaNotas,
+          actionText: 'Ejecutar',
+          description: periodoSubidaNotas?.activo ? 'Habilitado' : 'Configurar',
+          gradient: 'linear-gradient(135deg, #10B981 0%, #34D399 100%)'
+        }
+      ];
 
   return (
     <>
@@ -102,14 +128,16 @@ const StatsWidgets = ({
                   <h5 className="fw-bold mb-0 header-title-custom">
                     Panel de Control Rápido
                   </h5>
-                  <small className="text-muted-custom opacity-75 fw-medium">Acciones administrativas frecuentes</small>
+                  <small className="text-muted-custom opacity-75 fw-medium">
+                    {isSecretaria ? 'Consulta de períodos académicos' : 'Acciones administrativas frecuentes'}
+                  </small>
                 </div>
               </div>
 
               {/* Grid de acciones 2x2 */}
               <CRow className="g-3">
                 {quickActions.map((action, index) => (
-                  <CCol xs={12} md={6} key={`action-${index}`}>
+                  <CCol xs={12} md={isSecretaria ? 6 : 6} key={`action-${index}`}>
                     <div
                       className={`action-card-premium p-3 rounded-4 transition-all h-100 border border-light-custom ${action.disabled ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}
                       onClick={!action.disabled ? action.action : undefined}
@@ -147,7 +175,7 @@ const StatsWidgets = ({
 
                           <div className="d-flex align-items-center justify-content-end mt-auto">
                             <div className="d-flex align-items-center execute-link" style={{ fontSize: '0.7rem', color: action.color }}>
-                              <span className="fw-bold text-uppercase ls-1">Ejecutar</span>
+                              <span className="fw-bold text-uppercase ls-1">{action.actionText || 'Ejecutar'}</span>
                               <CIcon icon={cilArrowRight} size="sm" className="ms-1 animate-arrow" />
                             </div>
                           </div>

@@ -17,13 +17,19 @@ const RepItem = ({ icon, label, value, isCode }) => (
 )
 
 const RepresentativeTab = ({ student }) => {
+    // Formatear cédula
+    const rawCedula = student.representative_dni || student.RepresentanteCedula || student.MadreCedula || student.PadreCedula;
+    const cedulaFormateada = rawCedula
+        ? (String(rawCedula).startsWith('V-') ? rawCedula : `V-${rawCedula}`)
+        : 'N/A';
+
     // Datos del representante desde el backend
     const representante = {
-        nombre: student.representative || 'No asignado',
-        cedula: student.representative_dni || 'N/A',
-        telefono: student.representative_phone || 'N/A',
-        email: student.representative_email || 'N/A',
-        parentesco: student.representative_relationship || 'Representante'
+        nombre: student.representative || (student.representative_first_name ? `${student.representative_first_name} ${student.representative_last_name || ''}`.trim() : (student.RepresentanteNombre || student.MadreNombre || 'No asignado')),
+        cedula: cedulaFormateada,
+        telefono: student.representative_phone || student.RepresentanteTelefono || student.MadreTelefono || student.PadreTelefono || 'N/A',
+        email: student.representative_email || student.RepresentanteEmail || student.MadreEmail || student.PadreEmail || 'N/A',
+        parentesco: student.representative_relationship || student.RepresentanteParentesco || student.parentesco || 'Madre'
     }
 
     return (

@@ -27,6 +27,7 @@ import {
     cilCalendar
 } from '@coreui/icons'
 import { useNavigate } from 'react-router-dom'
+import { formatShortName } from '../../../utils/formatters'
 
 const TeacherSectionsList = ({ sections = [], teachers = [], currentYear, loading }) => {
     const navigate = useNavigate()
@@ -161,7 +162,7 @@ const TeacherSectionsList = ({ sections = [], teachers = [], currentYear, loadin
                                                         {teacher.first_name?.[0]}{teacher.last_name?.[0]}
                                                     </div>
                                                     <div>
-                                                        <div className="fw-bold header-title-custom mb-0" style={{ fontSize: '0.95rem' }}>{teacher.first_name} {teacher.last_name}</div>
+                                                        <div className="fw-bold header-title-custom mb-0" style={{ fontSize: '0.95rem' }}>{formatShortName(teacher.first_name, teacher.last_name)}</div>
                                                         <div className="text-primary text-uppercase fw-bold ls-1" style={{ fontSize: '0.6rem' }}>
                                                             DOCENTE ACTURANTE
                                                         </div>

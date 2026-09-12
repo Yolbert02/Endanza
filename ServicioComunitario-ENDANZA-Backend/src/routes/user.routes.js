@@ -11,6 +11,8 @@ import {
   migrateAllPasswords,
   listUsers,
   searchUsers,
+  searchDocenteCandidates,
+  assignDocenteRole,
   getProfile,
   profile,
   updateProfile,
@@ -23,7 +25,8 @@ import {
   updateUserRole,
   activateUser,
   deactivateUser,
-  deleteUser
+  deleteUser,
+  getDocentesPublic
 } from "../controllers/user.controller.js";
 import { verifyToken, verifyAdmin } from "../middlewares/jwt.middleware.js";
 import { autoVerifyRole } from "../middlewares/role.middleware.js";
@@ -40,6 +43,7 @@ router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
 router.post("/recover-password-security", recoverPasswordWithSecurity);
 router.get("/security-question/:username", getSecurityQuestion);
+router.get("/docentes", getDocentesPublic);
 
 // ============================================
 // RUTAS PROTEGIDAS CON AUTENTICACIÓN + AUTORIZACIÓN
@@ -50,6 +54,8 @@ router.post("/migrate-passwords", verifyToken, verifyAdmin, autoVerifyRole, migr
 // Rutas que requieren autenticación + verificación automática de roles
 router.get("/list", verifyToken, autoVerifyRole, listUsers);
 router.get("/search", verifyToken, autoVerifyRole, searchUsers);
+router.get("/docente-candidates", verifyToken, autoVerifyRole, searchDocenteCandidates);
+router.post("/assign-docente", verifyToken, verifyAdmin, autoVerifyRole, assignDocenteRole);
 router.get("/profile", verifyToken, autoVerifyRole, getProfile);
 router.put("/profile", verifyToken, autoVerifyRole, updateProfile);
 router.put("/profile/security", verifyToken, autoVerifyRole, updateProfileWithSecurity);

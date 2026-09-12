@@ -1,22 +1,29 @@
 // backend/controllers/representante.controller.js
 import { RepresentanteModel } from "../models/representante.model.js";
+import { UserModel } from "../models/user.model.js";
 import { db } from "../db/connection.database.js";
+import { capitalizeWords } from "../utils/formatters.js";
 
 export const RepresentanteController = {
   // Crear representante desde preinscripción (o agregar estudiantes a existente)
   createFromPreinscripcion: async (req, res) => {
     try {
-      const {
+      let {
         dni, first_name, last_name, phone, email,
         parentesco, parentesco_otro, direccion,
         estudiantes, // Array de estudiantes
         id_representante, // Si viene, es un representante existente
+        id_usuario_docente, // Si viene, es un docente vinculándose
         password // 🔐 RECIBIR CONTRASEÑA DEL FRONTEND
       } = req.body;
+
+      first_name = capitalizeWords(first_name);
+      last_name = capitalizeWords(last_name);
 
       console.log("📝 Recibida preinscripción:", {
         dni, email, parentesco, estudiantesCount: estudiantes?.length,
         esExistente: !!id_representante,
+        id_usuario_docente: !!id_usuario_docente,
         tienePassword: !!password
       });
 
@@ -31,8 +38,22 @@ export const RepresentanteController = {
       let representante;
       let esNuevoRepresentante = false;
 
-      // CASO 1: Buscar si ya existe por cédula
+      // CASO 1: Buscar si ya existe por cédula como representante
       const existing = await RepresentanteModel.findByCedula(dni);
+
+      // Si no existe como representante, verificar si existe como docente / usuario en general
+      let existingUser = null;
+      if (!existing) {
+        if (id_usuario_docente) {
+          existingUser = await UserModel.findOneById(id_usuario_docente);
+        }
+        if (!existingUser) {
+          existingUser = await UserModel.findByCedula(dni);
+        }
+        if (!existingUser && email) {
+          existingUser = await UserModel.findOneByEmail(email);
+        }
+      }
 
       if (existing) {
         // Representante EXISTENTE - solo usamos sus datos
@@ -47,8 +68,17 @@ export const RepresentanteController = {
           phone: existing.phone
         };
         esNuevoRepresentante = false;
+      } else if (existingUser) {
+        // CASO 2: Usuario EXISTENTE (Docente) - vincular como representante
+        console.log("🔗 Vinculando usuario existente como representante:", existingUser.id);
+        representante = await RepresentanteModel.linkExistingUserAsRepresentante(existingUser.id, {
+          parentesco,
+          parentesco_otro,
+          direccion
+        });
+        esNuevoRepresentante = false;
       } else {
-        // CASO 2: Representante NUEVO - crear usuario + representante
+        // CASO 3: Representante NUEVO - crear usuario + representante
         console.log("🆕 Creando nuevo representante...");
 
         // Validar que la contraseña exista para nuevos representantes
@@ -84,20 +114,23 @@ export const RepresentanteController = {
       // Crear estudiantes asociados (tanto para nuevo como existente)
       const estudiantesCreados = [];
       if (estudiantes && estudiantes.length > 0) {
-        for (const estudiante of estudiantes) {
-          // Mapear grado a Id_nivel
-          let Id_nivel = null;
-          const gradoMap = {
-            '1er Grado': 1,
-            '2do Grado': 2,
-            '3er Grado': 3,
-            '4to Grado': 4,
-            '5to Grado': 5,
-            '6to Grado': 6
-          };
+        // Mapeo de grados de danza a Id_nivel_danza (según tabla Nivel_Danza)
+        const nivelDanzaMap = {
+          'Pre-Ballet': 25,
+          'Preparatorio': 6,
+          '1er Grado': 7,  '1er Año': 7,
+          '2do Grado': 8,  '2do Año': 8,
+          '3er Grado': 9,  '3er Año': 9,
+          '4to Grado': 10, '4to Año': 10,
+          '5to Grado': 11, '5to Año': 11,
+          '6to Grado': 12, '6to Año': 12
+        };
 
+        for (const estudiante of estudiantes) {
+          // Mapear grado a Id_nivel_danza
+          let Id_nivel_danza = null;
           if (estudiante.gradeLevel) {
-            Id_nivel = gradoMap[estudiante.gradeLevel] || 1;
+            Id_nivel_danza = nivelDanzaMap[estudiante.gradeLevel] || null;
           }
 
           // Generar cédula única para el estudiante
@@ -117,14 +150,14 @@ export const RepresentanteController = {
                 "cedula" as dni
             `,
             values: [
-              estudiante.name,
-              estudiante.lastName,
+              capitalizeWords(estudiante.name),
+              capitalizeWords(estudiante.lastName),
               cedulaEstudiante,
               estudiante.birthDate,
               estudiante.gender,
               true, // seguro_escolar por defecto
-              Id_nivel,
-              Id_nivel,
+              null, // Id_nivel: tabla Nivel_Escolar vacía, se deja null
+              Id_nivel_danza,
               representante.id_representante
             ]
           };
@@ -143,7 +176,9 @@ export const RepresentanteController = {
         ok: true,
         msg: esNuevoRepresentante
           ? "Representante y estudiantes registrados exitosamente"
-          : "Estudiantes agregados al representante existente",
+          : (representante.isExistingDocente
+              ? "Docente vinculado como representante y estudiantes registrados exitosamente"
+              : "Estudiantes agregados al representante existente"),
         representante: {
           id_representante: representante.id_representante,
           id_usuario: representante.id_usuario,
@@ -153,7 +188,8 @@ export const RepresentanteController = {
           email: representante.email,
           phone: representante.phone,
           parentesco: parentesco,
-          parentesco_otro: parentesco_otro
+          parentesco_otro: parentesco_otro,
+          isExistingDocente: !!representante.isExistingDocente
         },
         estudiantes: estudiantesCreados
       };
@@ -165,6 +201,8 @@ export const RepresentanteController = {
           password: representante.plainPassword
         };
         response.msg = response.msg + " - Las credenciales se muestran una sola vez";
+      } else if (representante.isExistingDocente) {
+        response.msg = response.msg + " - Inicie sesión con su usuario y contraseña habitual de Docente";
       } else {
         response.msg = response.msg + " - Las credenciales existentes no han sido modificadas";
       }

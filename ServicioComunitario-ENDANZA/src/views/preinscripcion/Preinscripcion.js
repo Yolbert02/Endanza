@@ -17,11 +17,28 @@ import RegistroEstudiante from './RegistroEstudiante';
 import { createRepresentanteConEstudiantes } from '../../services/representanteService';
 import { listStudents } from '../../services/studentsService';
 import SystemMessageModal from '../../components/SystemMessageModal';
+import { capitalizeWords } from '../../utils/formatters';
+
+const DEFAULT_STUDENTS = [
+    {
+        firstName1: '',
+        firstName2: '',
+        lastName1: '',
+        lastName2: '',
+        name: '',
+        lastName: '',
+        gradeLevel: '',
+        section: 'A',
+        birthDate: '',
+        gender: ''
+    }
+];
 
 const Preinscripcion = () => {
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [representativeData, setRepresentativeData] = useState(null);
+    const [studentsData, setStudentsData] = useState(DEFAULT_STUDENTS);
     const [existingStudents, setExistingStudents] = useState([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [modalConfig, setModalConfig] = useState({});
@@ -54,38 +71,51 @@ const Preinscripcion = () => {
         }
     };
 
-    const handleBack = () => {
+    const handleBack = (currentStudents) => {
+        if (currentStudents && currentStudents.length > 0) {
+            setStudentsData(currentStudents);
+        }
         setStep(1);
         window.scrollTo(0, 0);
     };
 
     const handleFinalSave = async (studentsList) => {
+        if (studentsList && studentsList.length > 0) {
+            setStudentsData(studentsList);
+        }
         setLoading(true);
         try {
             // Preparar payload para el backend
             const payload = {
                 dni: representativeData.dni,
-                first_name: representativeData.first_name,
-                last_name: representativeData.last_name,
+                first_name: capitalizeWords(representativeData.first_name),
+                last_name: capitalizeWords(representativeData.last_name),
                 phone: representativeData.phone || '',
                 email: representativeData.email,
                 password: representativeData.password || '', // 🔑 CONTRASEÑA INCLUIDA
                 parentesco: representativeData.parentesco,
                 parentesco_otro: representativeData.parentesco_otro || '',
                 direccion: '', // Opcional
-                estudiantes: studentsList.filter(s => s.name.trim() !== '').map(s => ({
-                    name: s.name,
-                    lastName: s.lastName,
-                    gradeLevel: s.gradeLevel,
-                    section: s.section || 'A',
-                    birthDate: s.birthDate,
-                    gender: s.gender
-                }))
+                estudiantes: studentsList
+                    .filter(s => (s.name && s.name.trim() !== '') || (s.firstName1 && s.firstName1.trim() !== ''))
+                    .map(s => ({
+                        name: capitalizeWords(s.name || `${s.firstName1 || ''} ${s.firstName2 || ''}`),
+                        lastName: capitalizeWords(s.lastName || `${s.lastName1 || ''} ${s.lastName2 || ''}`),
+                        gradeLevel: s.gradeLevel,
+                        section: s.section || 'A',
+                        birthDate: s.birthDate,
+                        gender: s.gender
+                    }))
             };
 
             // Si ya tenemos id_representante, incluirlo (para representantes existentes)
             if (representativeData.id_representante) {
                 payload.id_representante = representativeData.id_representante;
+            }
+
+            // Si es un docente de la institución que se vincula como representante
+            if (representativeData.id_usuario_docente) {
+                payload.id_usuario_docente = representativeData.id_usuario_docente;
             }
 
             console.log("📤 Enviando preinscripción:", payload);
@@ -96,10 +126,13 @@ const Preinscripcion = () => {
             if (response?.ok) {
                 // Determinar si es nuevo representante (tiene credenciales)
                 const esNuevo = response.representante?.credenciales ? true : false;
+                const esDocenteVinculado = response.representante?.isExistingDocente || false;
 
                 setModalConfig({
                     type: 'success',
-                    title: esNuevo ? '✅ NUEVO REPRESENTANTE REGISTRADO' : '✅ ESTUDIANTES AGREGADOS',
+                    title: esDocenteVinculado
+                        ? '👨‍🏫 DOCENTE VINCULADO COMO REPRESENTANTE'
+                        : (esNuevo ? '✅ NUEVO REPRESENTANTE REGISTRADO' : '✅ ESTUDIANTES AGREGADOS'),
                     message: (
                         <div style={{ textAlign: 'left' }}>
                             <div style={{ marginBottom: '10px' }}>
@@ -123,28 +156,35 @@ const Preinscripcion = () => {
                                 </>
                             )}
 
-                            {!esNuevo && (
+                            {esDocenteVinculado ? (
+                                <div style={{ color: '#0d6efd', marginBottom: '10px' }}>
+                                    ℹ️ Cuenta de docente vinculada con éxito. Puede alternar entre el rol de Docente y Representante desde el menú de usuario usando sus credenciales habituales.
+                                </div>
+                            ) : (!esNuevo && (
                                 <div style={{ color: '#28a745', marginBottom: '10px' }}>
                                     ℹ️ Las credenciales existentes no han sido modificadas.
                                     El representante puede seguir usando su contraseña actual.
                                 </div>
-                            )}
+                            ))}
 
-                            <hr style={{ margin: '15px 0' }} />
+                            <div style={{ margin: '15px 0', borderTop: '1px solid #dee2e6' }} />
 
                             <div style={{ marginBottom: '10px' }}>
                                 <strong>Estudiantes registrados en esta sesión:</strong> {response.estudiantes?.length || 0}
                             </div>
 
                             {response.estudiantes?.length > 0 ? (
-                                <ul style={{ marginTop: '5px', paddingLeft: '20px' }}>
+                                <div style={{ marginTop: '8px', paddingLeft: '10px' }}>
                                     {response.estudiantes.map((e, i) => (
-                                        <li key={i}>
-                                            {e.first_name} {e.last_name}
-                                            {e.gradeLevel && ` - ${e.gradeLevel}`}
-                                        </li>
+                                        <div key={i} style={{ marginBottom: '6px', display: 'flex', alignItems: 'center' }}>
+                                            <span style={{ marginRight: '8px', color: '#f9b115', fontWeight: 'bold' }}>•</span>
+                                            <span>
+                                                {e.first_name} {e.last_name}
+                                                {e.gradeLevel && <span className="text-muted"> - {e.gradeLevel}</span>}
+                                            </span>
+                                        </div>
                                     ))}
-                                </ul>
+                                </div>
                             ) : (
                                 <div className="text-muted">No se registraron estudiantes nuevos</div>
                             )}
@@ -155,6 +195,8 @@ const Preinscripcion = () => {
                         setModalVisible(false);
                         setStep(1);
                         setRepresentativeData(null);
+                        setStudentsData(DEFAULT_STUDENTS);
+                        setExistingStudents([]);
                     }
                 });
                 setModalVisible(true);
@@ -247,28 +289,26 @@ const Preinscripcion = () => {
                     </div>
 
                     <div className="preinscripcion-content mx-auto" style={{ maxWidth: '900px' }}>
-                        {loading && (
-                            <div className="text-center py-5">
-                                <CSpinner color="warning" />
-                                <p className="mt-3 text-muted-custom fw-bold">PROCESANDO REGISTRO...</p>
-                            </div>
-                        )}
-
-                        {!loading && step === 1 && (
+                        <div style={{ display: step === 1 ? 'block' : 'none' }}>
                             <RegistroRepresentante
                                 onNext={handleRepresentativeNext}
                                 initialData={representativeData}
+                                onChange={setRepresentativeData}
+                                loading={loading}
                             />
-                        )}
+                        </div>
 
-                        {!loading && step === 2 && (
+                        <div style={{ display: step === 2 ? 'block' : 'none' }}>
                             <RegistroEstudiante
                                 representative={representativeData}
                                 existingStudents={existingStudents}
+                                initialStudents={studentsData}
+                                onChangeStudents={setStudentsData}
                                 onBack={handleBack}
                                 onSave={handleFinalSave}
+                                loading={loading}
                             />
-                        )}
+                        </div>
                     </div>
                 </CCol>
             </CRow>

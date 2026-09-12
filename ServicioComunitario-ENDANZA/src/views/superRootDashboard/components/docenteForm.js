@@ -30,13 +30,13 @@ const TeacherForm = ({ visible, onClose, onSave, initial = null, specialties = [
     useEffect(() => {
         if (visible) {
             if (initial) {
-                setDni(initial.dni || '');
-                setFirstName(initial.first_name || '');
-                setLastName(initial.last_name || '');
+                setDni(initial.dni || initial.cedula || '');
+                setFirstName(initial.first_name || initial.nombre || '');
+                setLastName(initial.last_name || initial.apellido || '');
                 setPassword('');
-                setPhone(initial.phone || '');
-                setEmail(initial.email || '');
-                setStatus(initial.status || 'active');
+                setPhone(initial.phone || initial.telefono || '');
+                setEmail(initial.email || initial.correo || '');
+                setStatus(initial.status || initial.estatus_usuario || initial.estado || 'active');
             } else {
                 setDni('V-');
                 setFirstName('');

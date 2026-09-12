@@ -19,6 +19,7 @@ import ConfirmacionInscripcion from "./steps/confirmacionInscripcion";
 import { generarCodigoInscripcion, validarFormularioCompleto } from "./utils/validators";
 import { generarPlanillaHTML } from "./utils/pdfGenerator";
 import { inscribirEstudiante } from "../../../../services/inscripcionService";
+import { capitalizeWords } from "../../../../utils/formatters";
 import "./styles/inscripcion.css";
 
 const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }) => {
@@ -28,7 +29,7 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
   const [errores, setErrores] = useState({});
   const [enviando, setEnviando] = useState(false);
 
-  // Estado inicial LIMPIO - sin teléfono de estudiante
+  // Estado inicial LIMPIO
   const [formData, setFormData] = useState({
     // Datos del estudiante
     id_estudiante: student?.id || null,
@@ -36,7 +37,6 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
     apellidos: student?.last_name || student?.lastName || "",
     fecha_nac: student?.birth_date || "",
     direccion_Habitacion: "",
-    // 👇 TELÉFONO DEL ESTUDIANTE ELIMINADO COMPLETAMENTE
     grado: student?.grade_level || student?.gradeLevel || "",
     especialidad: "",
     convivencia: "",
@@ -45,29 +45,49 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
     Seguro_Escolar: "",
     nombre_Seguro: "",
 
-    // Datos de los Padres
+    // Datos de la Madre (campos divididos + combinado para backend)
+    primer_nombre_Madre: "",
+    segundo_nombre_Madre: "",
+    primer_apellido_Madre: "",
+    segundo_apellido_Madre: "",
     nombre_Madre: "",
     apellido_Madre: "",
     cedula_Madre: "",
     ocupacion_Madre: "",
     trabajo_Madre: "",
     direccion_Trabajo_Madre: "",
+    telefono_Madre_prefix: "0414",
+    telefono_Madre_number: "",
     telefono_Madre: "",
+
+    // Datos del Padre (campos divididos + combinado para backend)
+    primer_nombre_Padre: "",
+    segundo_nombre_Padre: "",
+    primer_apellido_Padre: "",
+    segundo_apellido_Padre: "",
     nombre_Padre: "",
     apellido_Padre: "",
     cedula_Padre: "",
     ocupacion_Padre: "",
     trabajo_Padre: "",
     direccion_Trabajo_Padre: "",
+    telefono_Padre_prefix: "0414",
+    telefono_Padre_number: "",
     telefono_Padre: "",
 
     // Elección del representante
     quien_es_representante: "Madre",
     parentesco_Otro: "",
 
-    // Datos del representante - INICIALMENTE VACÍOS
+    // Datos del representante (campos divididos + combinado para backend)
+    primer_nombre_Rep: "",
+    segundo_nombre_Rep: "",
+    primer_apellido_Rep: "",
+    segundo_apellido_Rep: "",
     nombres_Representante: "",
     apellidos_Representante: "",
+    telefono_Rep_prefix: "0414",
+    telefono_Rep_number: "",
     telefono_Rep: "",
     telefonofijo_Rep: "",
     profesion_Rep: "",
@@ -149,36 +169,107 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
     return age > 0 ? age : "";
   };
 
+  // Mapa para limpiar errores de campos combinados
+  const combinedFieldMap = {
+    primer_nombre_Madre: 'nombre_Madre', segundo_nombre_Madre: 'nombre_Madre',
+    primer_apellido_Madre: 'apellido_Madre', segundo_apellido_Madre: 'apellido_Madre',
+    telefono_Madre_prefix: 'telefono_Madre', telefono_Madre_number: 'telefono_Madre',
+    primer_nombre_Padre: 'nombre_Padre', segundo_nombre_Padre: 'nombre_Padre',
+    primer_apellido_Padre: 'apellido_Padre', segundo_apellido_Padre: 'apellido_Padre',
+    telefono_Padre_prefix: 'telefono_Padre', telefono_Padre_number: 'telefono_Padre',
+    primer_nombre_Rep: 'nombres_Representante', segundo_nombre_Rep: 'nombres_Representante',
+    primer_apellido_Rep: 'apellidos_Representante', segundo_apellido_Rep: 'apellidos_Representante',
+    telefono_Rep_prefix: 'telefono_Rep', telefono_Rep_number: 'telefono_Rep',
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
 
     // Solo permitir números en cédulas y teléfonos
     let cleanValue = value;
     const numericFields = [
-      "cedula_Madre",
-      "cedula_Padre",
-      "telefono_Madre",
-      "telefono_Padre",
-      "telefono_Rep",
-      "telefonofijo_Rep"
+      "cedula_Madre", "cedula_Padre",
+      "telefono_Madre_number", "telefono_Padre_number",
+      "telefono_Rep_number", "telefonofijo_Rep"
     ];
     if (numericFields.includes(name)) {
       cleanValue = value.replace(/[^0-9]/g, "");
     }
 
+    // Función que combina los campos divididos en los campos que espera el backend
+    const buildUpdated = (prev) => {
+      const updated = { ...prev, [name]: cleanValue };
+
+      // ─── Madre: nombre ───
+      if (['primer_nombre_Madre', 'segundo_nombre_Madre'].includes(name)) {
+        const pn = name === 'primer_nombre_Madre' ? cleanValue : prev.primer_nombre_Madre;
+        const sn = name === 'segundo_nombre_Madre' ? cleanValue : prev.segundo_nombre_Madre;
+        updated.nombre_Madre = [pn, sn].filter(Boolean).join(' ');
+      }
+      if (['primer_apellido_Madre', 'segundo_apellido_Madre'].includes(name)) {
+        const pa = name === 'primer_apellido_Madre' ? cleanValue : prev.primer_apellido_Madre;
+        const sa = name === 'segundo_apellido_Madre' ? cleanValue : prev.segundo_apellido_Madre;
+        updated.apellido_Madre = [pa, sa].filter(Boolean).join(' ');
+      }
+      if (['telefono_Madre_prefix', 'telefono_Madre_number'].includes(name)) {
+        const prefix = name === 'telefono_Madre_prefix' ? cleanValue : prev.telefono_Madre_prefix;
+        const number = name === 'telefono_Madre_number' ? cleanValue : prev.telefono_Madre_number;
+        updated.telefono_Madre = number ? `${prefix}-${number}` : '';
+      }
+
+      // ─── Padre: nombre ───
+      if (['primer_nombre_Padre', 'segundo_nombre_Padre'].includes(name)) {
+        const pn = name === 'primer_nombre_Padre' ? cleanValue : prev.primer_nombre_Padre;
+        const sn = name === 'segundo_nombre_Padre' ? cleanValue : prev.segundo_nombre_Padre;
+        updated.nombre_Padre = [pn, sn].filter(Boolean).join(' ');
+      }
+      if (['primer_apellido_Padre', 'segundo_apellido_Padre'].includes(name)) {
+        const pa = name === 'primer_apellido_Padre' ? cleanValue : prev.primer_apellido_Padre;
+        const sa = name === 'segundo_apellido_Padre' ? cleanValue : prev.segundo_apellido_Padre;
+        updated.apellido_Padre = [pa, sa].filter(Boolean).join(' ');
+      }
+      if (['telefono_Padre_prefix', 'telefono_Padre_number'].includes(name)) {
+        const prefix = name === 'telefono_Padre_prefix' ? cleanValue : prev.telefono_Padre_prefix;
+        const number = name === 'telefono_Padre_number' ? cleanValue : prev.telefono_Padre_number;
+        updated.telefono_Padre = number ? `${prefix}-${number}` : '';
+      }
+
+      // ─── Representante Otro: nombre ───
+      if (['primer_nombre_Rep', 'segundo_nombre_Rep'].includes(name)) {
+        const pn = name === 'primer_nombre_Rep' ? cleanValue : prev.primer_nombre_Rep;
+        const sn = name === 'segundo_nombre_Rep' ? cleanValue : prev.segundo_nombre_Rep;
+        updated.nombres_Representante = [pn, sn].filter(Boolean).join(' ');
+      }
+      if (['primer_apellido_Rep', 'segundo_apellido_Rep'].includes(name)) {
+        const pa = name === 'primer_apellido_Rep' ? cleanValue : prev.primer_apellido_Rep;
+        const sa = name === 'segundo_apellido_Rep' ? cleanValue : prev.segundo_apellido_Rep;
+        updated.apellidos_Representante = [pa, sa].filter(Boolean).join(' ');
+      }
+      if (['telefono_Rep_prefix', 'telefono_Rep_number'].includes(name)) {
+        const prefix = name === 'telefono_Rep_prefix' ? cleanValue : prev.telefono_Rep_prefix;
+        const number = name === 'telefono_Rep_number' ? cleanValue : prev.telefono_Rep_number;
+        updated.telefono_Rep = number ? `${prefix}-${number}` : '';
+      }
+
+      return updated;
+    };
+
     if (name === "fecha_nac") {
       const calculatedAge = calculateAge(cleanValue);
-      setFormData(prev => ({
-        ...prev,
-        [name]: cleanValue,
-        edad: calculatedAge
-      }));
+      setFormData(prev => ({ ...buildUpdated(prev), edad: calculatedAge }));
     } else {
-      setFormData(prev => ({ ...prev, [name]: cleanValue }));
+      setFormData(buildUpdated);
     }
 
-    if (errores[name]) {
-      setErrores(prev => ({ ...prev, [name]: null }));
+    // Limpiar error del campo (y del campo combinado relacionado)
+    const combinedKey = combinedFieldMap[name];
+    if (errores[name] || errores[combinedKey]) {
+      setErrores(prev => {
+        const newErrs = { ...prev };
+        delete newErrs[name];
+        if (combinedKey) delete newErrs[combinedKey];
+        return newErrs;
+      });
     }
   };
 
@@ -278,9 +369,15 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
       return;
     }
 
-    // Limpiar formato de teléfonos (quitar guiones, espacios, etc.)
+    // Limpiar formato de teléfonos y capitalizar nombres
     const datosLimpios = {
       ...datosParaEnviar,
+      nombre_Madre: capitalizeWords(datosParaEnviar.nombre_Madre),
+      apellido_Madre: capitalizeWords(datosParaEnviar.apellido_Madre),
+      nombre_Padre: capitalizeWords(datosParaEnviar.nombre_Padre),
+      apellido_Padre: capitalizeWords(datosParaEnviar.apellido_Padre),
+      nombres_Representante: capitalizeWords(datosParaEnviar.nombres_Representante),
+      apellidos_Representante: capitalizeWords(datosParaEnviar.apellidos_Representante),
       telefono_Madre: formData.telefono_Madre?.replace(/[^\d]/g, '').slice(0, 11) || null,
       telefono_Padre: formData.telefono_Padre?.replace(/[^\d]/g, '').slice(0, 11) || null,
       telefono_Rep: formData.telefono_Rep?.replace(/[^\d]/g, '').slice(0, 11) || null,

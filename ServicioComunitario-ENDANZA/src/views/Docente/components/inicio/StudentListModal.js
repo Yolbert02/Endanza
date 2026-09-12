@@ -19,6 +19,7 @@ import {
 import CIcon from '@coreui/icons-react'
 import { cilPeople, cilCheckCircle, cilXCircle, cilCalendarCheck, cilPlus, cilArrowLeft, cilSave } from '@coreui/icons'
 import { saveAttendance, getStudentAttendance } from '../../../../services/attendanceService'
+import { formatShortName } from '../../../../utils/formatters'
 
 const StudentListModal = ({
     show,
@@ -261,7 +262,7 @@ const StudentListModal = ({
                                                     {student.name[0]}{student.lastName[0]}
                                                 </div>
                                                 <div className="overflow-hidden">
-                                                    <span className="fw-semibold d-block header-title-custom leading-tight text-truncate" style={{ maxWidth: '160px', fontSize: '0.85rem' }}>{student.fullName}</span>
+                                                    <span className="fw-semibold d-block header-title-custom leading-tight text-truncate" style={{ maxWidth: '160px', fontSize: '0.85rem' }}>{formatShortName(student.name || student.first_name || student.fullName, student.lastName || student.last_name)}</span>
                                                     {!isAttendanceMode && <small className="text-muted-custom fw-medium d-none d-sm-block" style={{ fontSize: '0.7rem' }}>{student.age} • {student.gender}</small>}
                                                 </div>
                                             </div>

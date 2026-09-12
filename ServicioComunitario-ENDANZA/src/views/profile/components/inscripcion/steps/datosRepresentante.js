@@ -1,7 +1,9 @@
 import React from "react";
-import { CForm, CFormInput, CRow, CCol, CButton, CFormTextarea } from "@coreui/react";
+import { CFormInput, CRow, CCol, CFormSelect, CInputGroup } from "@coreui/react";
 import CIcon from "@coreui/icons-react";
-import { cilBriefcase, cilUser, cilPhone, cilAddressBook, cilHeart, cilGroup } from "@coreui/icons";
+import { cilUser, cilHeart, cilGroup } from "@coreui/icons";
+
+const PHONE_PREFIXES = ["0414", "0424", "0416", "0426", "0412", "0422"];
 
 const SectionHeader = ({ icon, title, color = "primary" }) => (
   <div className={`p-4 rounded-4 step-section-bg border mb-4 text-start border-${color} border-opacity-10`}>
@@ -14,24 +16,55 @@ const SectionHeader = ({ icon, title, color = "primary" }) => (
   </div>
 );
 
+const PhoneInputGroup = ({ prefixName, numberName, prefixValue, numberValue, onChange, invalid, feedback }) => (
+  <div>
+    <CInputGroup>
+      <CFormSelect
+        name={prefixName}
+        value={prefixValue || "0414"}
+        onChange={onChange}
+        className="input-premium py-2"
+        style={{ maxWidth: '110px', flex: '0 0 110px' }}
+      >
+        {PHONE_PREFIXES.map(p => <option key={p} value={p}>{p}</option>)}
+      </CFormSelect>
+      <CFormInput
+        name={numberName}
+        value={numberValue || ""}
+        onChange={onChange}
+        placeholder="1234567"
+        maxLength={7}
+        className={`input-premium py-2 ${invalid ? 'is-invalid' : ''}`}
+      />
+    </CInputGroup>
+    {invalid && <div className="invalid-feedback d-block small">{feedback}</div>}
+  </div>
+);
+
+const NameLabel = ({ text, required }) => (
+  <span className="fw-bold step-label text-uppercase ls-1 small mb-1">
+    {text}{required && <span className="text-danger"> *</span>}
+  </span>
+);
+
 const DatosRepresentante = ({ formData, onChange, errores = {}, setErrores }) => {
 
   const handleRepChange = (val) => {
-    // Si cambia a Madre o Padre, limpiar los campos de "Otro"
     if (val === 'Madre' || val === 'Padre') {
       onChange({ target: { name: 'quien_es_representante', value: val } });
-      // Limpiar campos de "Otro"
-      onChange({ target: { name: 'nombres_Representante', value: '' } });
-      onChange({ target: { name: 'apellidos_Representante', value: '' } });
-      onChange({ target: { name: 'parentesco_Otro', value: '' } });
-      
-      // LIMPIAR ERRORES RELACIONADOS
+      // Limpiar campos del representante "Otro"
+      const fieldsToClear = [
+        'nombres_Representante', 'apellidos_Representante', 'parentesco_Otro',
+        'primer_nombre_Rep', 'segundo_nombre_Rep',
+        'primer_apellido_Rep', 'segundo_apellido_Rep',
+        'telefono_Rep', 'telefono_Rep_number'
+      ];
+      fieldsToClear.forEach(field => onChange({ target: { name: field, value: '' } }));
+      onChange({ target: { name: 'telefono_Rep_prefix', value: '0414' } });
+
       if (setErrores) {
         const nuevosErrores = { ...errores };
-        delete nuevosErrores.nombres_Representante;
-        delete nuevosErrores.apellidos_Representante;
-        delete nuevosErrores.parentesco_Otro;
-        delete nuevosErrores.telefono_Rep;
+        ['nombres_Representante', 'apellidos_Representante', 'parentesco_Otro', 'telefono_Rep'].forEach(k => delete nuevosErrores[k]);
         setErrores(nuevosErrores);
       }
     } else {
@@ -42,40 +75,76 @@ const DatosRepresentante = ({ formData, onChange, errores = {}, setErrores }) =>
   return (
     <div className="animate__animated animate__fadeIn">
 
-      {/* SECCIÓN MADRE */}
+      {/* ══════════ SECCIÓN MADRE ══════════ */}
       <SectionHeader icon={cilHeart} title="Información de la Madre" color="danger" />
       <CRow className="g-4 mb-5">
-        <CCol md={6}>
+        {/* Nombres */}
+        <CCol xs={12}>
+          <div className="d-flex align-items-center gap-2 mb-2">
+            <span className="badge bg-danger bg-opacity-10 text-danger fw-bold px-3 py-1 rounded-pill" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>
+              NOMBRES
+            </span>
+            <div className="flex-grow-1" style={{ height: '1px', background: 'linear-gradient(to right, rgba(220,53,69,0.2), transparent)' }} />
+          </div>
+        </CCol>
+        <CCol md={3}>
           <CFormInput
-            label={<span className="fw-bold step-label text-uppercase ls-1 small mb-1">Nombres de la Madre</span>}
-            name="nombre_Madre"
-            value={formData.nombre_Madre || ""}
+            label={<NameLabel text="1er Nombre" />}
+            name="primer_nombre_Madre"
+            value={formData.primer_nombre_Madre || ""}
             onChange={onChange}
-            placeholder="Ej: María Elena"
-            className={`input-premium py-2 ${errores.nombre_Madre ? 'is-invalid' : ''}`}
-            feedback={errores.nombre_Madre}
-            invalid={!!errores.nombre_Madre}
+            placeholder="Ej: María"
+            className="input-premium py-2"
           />
         </CCol>
-        <CCol md={6}>
+        <CCol md={3}>
           <CFormInput
-            label={<span className="fw-bold step-label text-uppercase ls-1 small mb-1">Apellidos de la Madre</span>}
-            name="apellido_Madre"
-            value={formData.apellido_Madre || ""}
+            label={<NameLabel text="2do Nombre" />}
+            name="segundo_nombre_Madre"
+            value={formData.segundo_nombre_Madre || ""}
             onChange={onChange}
-            placeholder="Ej: Rodríguez Pérez"
-            className={`input-premium py-2 ${errores.apellido_Madre ? 'is-invalid' : ''}`}
-            feedback={errores.apellido_Madre}
-            invalid={!!errores.apellido_Madre}
+            placeholder="Ej: Elena"
+            className="input-premium py-2"
           />
+        </CCol>
+        <CCol md={3}>
+          <CFormInput
+            label={<NameLabel text="1er Apellido" />}
+            name="primer_apellido_Madre"
+            value={formData.primer_apellido_Madre || ""}
+            onChange={onChange}
+            placeholder="Ej: Rodríguez"
+            className="input-premium py-2"
+          />
+        </CCol>
+        <CCol md={3}>
+          <CFormInput
+            label={<NameLabel text="2do Apellido" />}
+            name="segundo_apellido_Madre"
+            value={formData.segundo_apellido_Madre || ""}
+            onChange={onChange}
+            placeholder="Ej: Pérez"
+            className="input-premium py-2"
+          />
+        </CCol>
+
+        {/* Datos de contacto */}
+        <CCol xs={12}>
+          <div className="d-flex align-items-center gap-2 mb-1 mt-1">
+            <span className="badge bg-danger bg-opacity-10 text-danger fw-bold px-3 py-1 rounded-pill" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>
+              DATOS DE CONTACTO
+            </span>
+            <div className="flex-grow-1" style={{ height: '1px', background: 'linear-gradient(to right, rgba(220,53,69,0.2), transparent)' }} />
+          </div>
         </CCol>
         <CCol md={4}>
           <CFormInput
-            label={<span className="fw-bold step-label text-uppercase ls-1 small mb-1">Cédula</span>}
+            label={<NameLabel text="Cédula (V-)" />}
             name="cedula_Madre"
             value={formData.cedula_Madre || ""}
             onChange={onChange}
-            placeholder="V-12345678"
+            placeholder="Ej: 12345678"
+            maxLength={8}
             className={`input-premium py-2 ${errores.cedula_Madre ? 'is-invalid' : ''}`}
             feedback={errores.cedula_Madre}
             invalid={!!errores.cedula_Madre}
@@ -83,7 +152,7 @@ const DatosRepresentante = ({ formData, onChange, errores = {}, setErrores }) =>
         </CCol>
         <CCol md={4}>
           <CFormInput
-            label={<span className="fw-bold step-label text-uppercase ls-1 small mb-1">Ocupación / Profesión</span>}
+            label={<NameLabel text="Ocupación / Profesión" />}
             name="ocupacion_Madre"
             value={formData.ocupacion_Madre || ""}
             onChange={onChange}
@@ -92,20 +161,20 @@ const DatosRepresentante = ({ formData, onChange, errores = {}, setErrores }) =>
           />
         </CCol>
         <CCol md={4}>
-          <CFormInput
-            label={<span className="fw-bold step-label text-uppercase ls-1 small mb-1">Teléfono Móvil</span>}
-            name="telefono_Madre"
-            value={formData.telefono_Madre || ""}
+          <label className="fw-bold step-label text-uppercase ls-1 small mb-1 d-block">Teléfono Móvil</label>
+          <PhoneInputGroup
+            prefixName="telefono_Madre_prefix"
+            numberName="telefono_Madre_number"
+            prefixValue={formData.telefono_Madre_prefix}
+            numberValue={formData.telefono_Madre_number}
             onChange={onChange}
-            placeholder="0412-1234567"
-            className={`input-premium py-2 ${errores.telefono_Madre ? 'is-invalid' : ''}`}
-            feedback={errores.telefono_Madre}
             invalid={!!errores.telefono_Madre}
+            feedback={errores.telefono_Madre}
           />
         </CCol>
         <CCol md={6}>
           <CFormInput
-            label={<span className="fw-bold step-label text-uppercase ls-1 small mb-1">Lugar de Trabajo</span>}
+            label={<NameLabel text="Lugar de Trabajo" />}
             name="trabajo_Madre"
             value={formData.trabajo_Madre || ""}
             onChange={onChange}
@@ -115,7 +184,7 @@ const DatosRepresentante = ({ formData, onChange, errores = {}, setErrores }) =>
         </CCol>
         <CCol md={6}>
           <CFormInput
-            label={<span className="fw-bold step-label text-uppercase ls-1 small mb-1">Dirección del Trabajo</span>}
+            label={<NameLabel text="Dirección del Trabajo" />}
             name="direccion_Trabajo_Madre"
             value={formData.direccion_Trabajo_Madre || ""}
             onChange={onChange}
@@ -125,40 +194,76 @@ const DatosRepresentante = ({ formData, onChange, errores = {}, setErrores }) =>
         </CCol>
       </CRow>
 
-      {/* SECCIÓN PADRE */}
+      {/* ══════════ SECCIÓN PADRE ══════════ */}
       <SectionHeader icon={cilUser} title="Información del Padre" color="info" />
       <CRow className="g-4 mb-5">
-        <CCol md={6}>
+        {/* Nombres */}
+        <CCol xs={12}>
+          <div className="d-flex align-items-center gap-2 mb-2">
+            <span className="badge bg-info bg-opacity-10 text-info fw-bold px-3 py-1 rounded-pill" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>
+              NOMBRES
+            </span>
+            <div className="flex-grow-1" style={{ height: '1px', background: 'linear-gradient(to right, rgba(13,202,240,0.2), transparent)' }} />
+          </div>
+        </CCol>
+        <CCol md={3}>
           <CFormInput
-            label={<span className="fw-bold step-label text-uppercase ls-1 small mb-1">Nombres del Padre</span>}
-            name="nombre_Padre"
-            value={formData.nombre_Padre || ""}
+            label={<NameLabel text="1er Nombre" />}
+            name="primer_nombre_Padre"
+            value={formData.primer_nombre_Padre || ""}
             onChange={onChange}
-            placeholder="Ej: Juan Carlos"
-            className={`input-premium py-2 ${errores.nombre_Padre ? 'is-invalid' : ''}`}
-            feedback={errores.nombre_Padre}
-            invalid={!!errores.nombre_Padre}
+            placeholder="Ej: Juan"
+            className="input-premium py-2"
           />
         </CCol>
-        <CCol md={6}>
+        <CCol md={3}>
           <CFormInput
-            label={<span className="fw-bold step-label text-uppercase ls-1 small mb-1">Apellidos del Padre</span>}
-            name="apellido_Padre"
-            value={formData.apellido_Padre || ""}
+            label={<NameLabel text="2do Nombre" />}
+            name="segundo_nombre_Padre"
+            value={formData.segundo_nombre_Padre || ""}
             onChange={onChange}
-            placeholder="Ej: López García"
-            className={`input-premium py-2 ${errores.apellido_Padre ? 'is-invalid' : ''}`}
-            feedback={errores.apellido_Padre}
-            invalid={!!errores.apellido_Padre}
+            placeholder="Ej: Carlos"
+            className="input-premium py-2"
           />
+        </CCol>
+        <CCol md={3}>
+          <CFormInput
+            label={<NameLabel text="1er Apellido" />}
+            name="primer_apellido_Padre"
+            value={formData.primer_apellido_Padre || ""}
+            onChange={onChange}
+            placeholder="Ej: López"
+            className="input-premium py-2"
+          />
+        </CCol>
+        <CCol md={3}>
+          <CFormInput
+            label={<NameLabel text="2do Apellido" />}
+            name="segundo_apellido_Padre"
+            value={formData.segundo_apellido_Padre || ""}
+            onChange={onChange}
+            placeholder="Ej: García"
+            className="input-premium py-2"
+          />
+        </CCol>
+
+        {/* Datos de contacto */}
+        <CCol xs={12}>
+          <div className="d-flex align-items-center gap-2 mb-1 mt-1">
+            <span className="badge bg-info bg-opacity-10 text-info fw-bold px-3 py-1 rounded-pill" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>
+              DATOS DE CONTACTO
+            </span>
+            <div className="flex-grow-1" style={{ height: '1px', background: 'linear-gradient(to right, rgba(13,202,240,0.2), transparent)' }} />
+          </div>
         </CCol>
         <CCol md={4}>
           <CFormInput
-            label={<span className="fw-bold step-label text-uppercase ls-1 small mb-1">Cédula</span>}
+            label={<NameLabel text="Cédula (V-)" />}
             name="cedula_Padre"
             value={formData.cedula_Padre || ""}
             onChange={onChange}
-            placeholder="V-12345678"
+            placeholder="Ej: 12345678"
+            maxLength={8}
             className={`input-premium py-2 ${errores.cedula_Padre ? 'is-invalid' : ''}`}
             feedback={errores.cedula_Padre}
             invalid={!!errores.cedula_Padre}
@@ -166,7 +271,7 @@ const DatosRepresentante = ({ formData, onChange, errores = {}, setErrores }) =>
         </CCol>
         <CCol md={4}>
           <CFormInput
-            label={<span className="fw-bold step-label text-uppercase ls-1 small mb-1">Ocupación / Profesión</span>}
+            label={<NameLabel text="Ocupación / Profesión" />}
             name="ocupacion_Padre"
             value={formData.ocupacion_Padre || ""}
             onChange={onChange}
@@ -175,20 +280,20 @@ const DatosRepresentante = ({ formData, onChange, errores = {}, setErrores }) =>
           />
         </CCol>
         <CCol md={4}>
-          <CFormInput
-            label={<span className="fw-bold step-label text-uppercase ls-1 small mb-1">Teléfono Móvil</span>}
-            name="telefono_Padre"
-            value={formData.telefono_Padre || ""}
+          <label className="fw-bold step-label text-uppercase ls-1 small mb-1 d-block">Teléfono Móvil</label>
+          <PhoneInputGroup
+            prefixName="telefono_Padre_prefix"
+            numberName="telefono_Padre_number"
+            prefixValue={formData.telefono_Padre_prefix}
+            numberValue={formData.telefono_Padre_number}
             onChange={onChange}
-            placeholder="0412-1234567"
-            className={`input-premium py-2 ${errores.telefono_Padre ? 'is-invalid' : ''}`}
-            feedback={errores.telefono_Padre}
             invalid={!!errores.telefono_Padre}
+            feedback={errores.telefono_Padre}
           />
         </CCol>
         <CCol md={6}>
           <CFormInput
-            label={<span className="fw-bold step-label text-uppercase ls-1 small mb-1">Lugar de Trabajo</span>}
+            label={<NameLabel text="Lugar de Trabajo" />}
             name="trabajo_Padre"
             value={formData.trabajo_Padre || ""}
             onChange={onChange}
@@ -198,7 +303,7 @@ const DatosRepresentante = ({ formData, onChange, errores = {}, setErrores }) =>
         </CCol>
         <CCol md={6}>
           <CFormInput
-            label={<span className="fw-bold step-label text-uppercase ls-1 small mb-1">Dirección del Trabajo</span>}
+            label={<NameLabel text="Dirección del Trabajo" />}
             name="direccion_Trabajo_Padre"
             value={formData.direccion_Trabajo_Padre || ""}
             onChange={onChange}
@@ -208,7 +313,7 @@ const DatosRepresentante = ({ formData, onChange, errores = {}, setErrores }) =>
         </CCol>
       </CRow>
 
-      {/* ELECCIÓN DEL REPRESENTANTE */}
+      {/* ══════════ ELECCIÓN DEL REPRESENTANTE ══════════ */}
       <SectionHeader icon={cilGroup} title="Designación del Representante Legal" color="warning" />
       <div className="p-4 rounded-4 bg-light-custom bg-opacity-10 border border-light mb-4">
         <label className="fw-bold step-label text-uppercase ls-1 small mb-3 d-block text-center">
@@ -232,37 +337,76 @@ const DatosRepresentante = ({ formData, onChange, errores = {}, setErrores }) =>
         )}
       </div>
 
-      {/* CAMPOS CONDICIONALES PARA 'OTRO' */}
+      {/* ══════════ CAMPOS CONDICIONALES PARA 'OTRO' ══════════ */}
       {formData.quien_es_representante === 'Otro' && (
         <div className="animate__animated animate__fadeInUp">
           <CRow className="g-4 mb-4">
-            <CCol md={6}>
+            {/* Nombres del Representante */}
+            <CCol xs={12}>
+              <div className="d-flex align-items-center gap-2 mb-2">
+                <span className="badge bg-warning bg-opacity-10 text-warning fw-bold px-3 py-1 rounded-pill" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>
+                  NOMBRES DEL REPRESENTANTE
+                </span>
+                <div className="flex-grow-1" style={{ height: '1px', background: 'linear-gradient(to right, rgba(242,140,15,0.3), transparent)' }} />
+              </div>
+            </CCol>
+            <CCol md={3}>
               <CFormInput
-                label={<span className="fw-bold step-label text-uppercase ls-1 small mb-1">Nombres del Representante <span className="text-danger">*</span></span>}
-                name="nombres_Representante"
-                value={formData.nombres_Representante || ""}
+                label={<NameLabel text="1er Nombre" required />}
+                name="primer_nombre_Rep"
+                value={formData.primer_nombre_Rep || ""}
                 onChange={onChange}
-                placeholder="Nombre Representante"
+                placeholder="Nombre"
                 className={`input-premium py-2 ${errores.nombres_Representante ? 'is-invalid' : ''}`}
                 feedback={errores.nombres_Representante}
                 invalid={!!errores.nombres_Representante}
               />
             </CCol>
-            <CCol md={6}>
+            <CCol md={3}>
               <CFormInput
-                label={<span className="fw-bold step-label text-uppercase ls-1 small mb-1">Apellidos del Representante <span className="text-danger">*</span></span>}
-                name="apellidos_Representante"
-                value={formData.apellidos_Representante || ""}
+                label={<NameLabel text="2do Nombre" />}
+                name="segundo_nombre_Rep"
+                value={formData.segundo_nombre_Rep || ""}
                 onChange={onChange}
-                placeholder="Apellido del Representante"
+                placeholder="Segundo nombre"
+                className="input-premium py-2"
+              />
+            </CCol>
+            <CCol md={3}>
+              <CFormInput
+                label={<NameLabel text="1er Apellido" required />}
+                name="primer_apellido_Rep"
+                value={formData.primer_apellido_Rep || ""}
+                onChange={onChange}
+                placeholder="Apellido"
                 className={`input-premium py-2 ${errores.apellidos_Representante ? 'is-invalid' : ''}`}
                 feedback={errores.apellidos_Representante}
                 invalid={!!errores.apellidos_Representante}
               />
             </CCol>
+            <CCol md={3}>
+              <CFormInput
+                label={<NameLabel text="2do Apellido" />}
+                name="segundo_apellido_Rep"
+                value={formData.segundo_apellido_Rep || ""}
+                onChange={onChange}
+                placeholder="Segundo apellido"
+                className="input-premium py-2"
+              />
+            </CCol>
+
+            {/* Datos de contacto del Representante */}
+            <CCol xs={12}>
+              <div className="d-flex align-items-center gap-2 mb-1 mt-1">
+                <span className="badge bg-warning bg-opacity-10 text-warning fw-bold px-3 py-1 rounded-pill" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>
+                  DATOS DE CONTACTO
+                </span>
+                <div className="flex-grow-1" style={{ height: '1px', background: 'linear-gradient(to right, rgba(242,140,15,0.3), transparent)' }} />
+              </div>
+            </CCol>
             <CCol md={6}>
               <CFormInput
-                label={<span className="fw-bold step-label text-uppercase ls-1 small mb-1">Parentesco / Relación <span className="text-danger">*</span></span>}
+                label={<NameLabel text="Parentesco / Relación" required />}
                 name="parentesco_Otro"
                 value={formData.parentesco_Otro || ""}
                 onChange={onChange}
@@ -273,20 +417,22 @@ const DatosRepresentante = ({ formData, onChange, errores = {}, setErrores }) =>
               />
             </CCol>
             <CCol md={6}>
-              <CFormInput
-                label={<span className="fw-bold step-label text-uppercase ls-1 small mb-1">Teléfono Móvil <span className="text-danger">*</span></span>}
-                name="telefono_Rep"
-                value={formData.telefono_Rep || ""}
+              <label className="fw-bold step-label text-uppercase ls-1 small mb-1 d-block">
+                Teléfono Móvil <span className="text-danger">*</span>
+              </label>
+              <PhoneInputGroup
+                prefixName="telefono_Rep_prefix"
+                numberName="telefono_Rep_number"
+                prefixValue={formData.telefono_Rep_prefix}
+                numberValue={formData.telefono_Rep_number}
                 onChange={onChange}
-                placeholder="0412-1234567"
-                className={`input-premium py-2 ${errores.telefono_Rep ? 'is-invalid' : ''}`}
-                feedback={errores.telefono_Rep}
                 invalid={!!errores.telefono_Rep}
+                feedback={errores.telefono_Rep}
               />
             </CCol>
             <CCol md={6}>
               <CFormInput
-                label={<span className="fw-bold step-label text-uppercase ls-1 small mb-1">Lugar de Trabajo</span>}
+                label={<NameLabel text="Lugar de Trabajo" />}
                 name="trabajo_Rep"
                 value={formData.trabajo_Rep || ""}
                 onChange={onChange}
@@ -296,7 +442,7 @@ const DatosRepresentante = ({ formData, onChange, errores = {}, setErrores }) =>
             </CCol>
             <CCol md={6}>
               <CFormInput
-                label={<span className="fw-bold step-label text-uppercase ls-1 small mb-1">Dirección del Trabajo</span>}
+                label={<NameLabel text="Dirección del Trabajo" />}
                 name="direccion_Trabajo_Rep"
                 value={formData.direccion_Trabajo_Rep || ""}
                 onChange={onChange}

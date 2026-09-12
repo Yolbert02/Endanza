@@ -1,14 +1,18 @@
 import { db } from "../db/connection.database.js";
 import bcryptjs from "bcryptjs";
+import { capitalizeWords } from "../utils/formatters.js";
 
 export const RepresentanteModel = {
   // Crear representante con usuario simplificado
   create: async (data) => {
-    const {
+    let {
       dni, first_name, last_name, phone, email,
       parentesco, parentesco_otro, direccion,
       password // 🔐 RECIBIR CONTRASEÑA DEL FRONTEND
     } = data;
+
+    first_name = capitalizeWords(first_name);
+    last_name = capitalizeWords(last_name);
 
     try {
       // 1. Hashear la contraseña proporcionada
@@ -42,6 +46,12 @@ export const RepresentanteModel = {
       
       const userResult = await db.query(userQuery.text, userQuery.values);
       const usuarioId = userResult.rows[0].id;
+
+      // 3.1 Asignar rol 4 en Usuario_Rol (arquitectura de roles múltiples)
+      await db.query(
+        `INSERT INTO "Usuario_Rol" ("Id_usuario", "Id_rol") VALUES ($1, 4) ON CONFLICT DO NOTHING`,
+        [usuarioId]
+      );
 
       // 4. Insertar en tabla Representante
       const repQuery = {
@@ -83,6 +93,71 @@ export const RepresentanteModel = {
     }
   },
 
+  // Vincular usuario existente (ej. Docente) como Representante
+  linkExistingUserAsRepresentante: async (usuarioId, data = {}) => {
+    try {
+      await db.query('BEGIN');
+      
+      // 1. Verificar si ya existe en Representante
+      let repRes = await db.query(
+        'SELECT "Id_representante" as id FROM "Representante" WHERE "Id_usuario" = $1',
+        [usuarioId]
+      );
+      let repId;
+      if (repRes.rows.length === 0) {
+        const insertRep = await db.query(
+          `INSERT INTO "Representante" ("Id_usuario", "es_familiar", "profesion_rep", "direccion_trabajo_rep")
+           VALUES ($1, $2, $3, $4)
+           RETURNING "Id_representante" as id`,
+          [
+            usuarioId,
+            data.parentesco !== 'Otro',
+            data.profesion || null,
+            data.direccion || null
+          ]
+        );
+        repId = insertRep.rows[0].id;
+      } else {
+        repId = repRes.rows[0].id;
+      }
+
+      // 2. Asignar rol 4 en Usuario_Rol
+      await db.query(
+        `INSERT INTO "Usuario_Rol" ("Id_usuario", "Id_rol")
+         VALUES ($1, 4)
+         ON CONFLICT ("Id_usuario", "Id_rol") DO NOTHING`,
+        [usuarioId]
+      );
+
+      // 3. Obtener datos completos del usuario
+      const userRes = await db.query(
+        `SELECT "Id_usuario" as id, "cedula" as dni, "nombre" as first_name, "apellido" as last_name, "correo" as email, "telefono" as phone
+         FROM "Usuario" WHERE "Id_usuario" = $1`,
+        [usuarioId]
+      );
+
+      await db.query('COMMIT');
+
+      const u = userRes.rows[0];
+      return {
+        id_representante: repId,
+        id_usuario: usuarioId,
+        dni: u.dni,
+        first_name: u.first_name,
+        last_name: u.last_name,
+        email: u.email,
+        phone: u.phone,
+        parentesco: data.parentesco || 'Familiar',
+        parentesco_otro: data.parentesco_otro || null,
+        isExistingDocente: true
+      };
+    } catch (error) {
+      await db.query('ROLLBACK');
+      console.error("❌ Error en linkExistingUserAsRepresentante:", error);
+      throw error;
+    }
+  },
+
   // Buscar representante por cédula
   findByCedula: async (cedula) => {
     try {
@@ -102,7 +177,7 @@ export const RepresentanteModel = {
             u."estatus_usuario" as status
           FROM "Usuario" u
           INNER JOIN "Representante" r ON u."Id_usuario" = r."Id_usuario"
-          WHERE u."cedula" = $1 AND u."Id_rol" = 4
+          WHERE u."cedula" = $1
         `,
         values: [cedula]
       };
@@ -145,7 +220,7 @@ export const RepresentanteModel = {
             r."es_familiar"
           FROM "Usuario" u
           INNER JOIN "Representante" r ON u."Id_usuario" = r."Id_usuario"
-          WHERE u."correo" = $1 AND u."Id_rol" = 4
+          WHERE u."correo" = $1
         `,
         values: [email]
       };
@@ -180,13 +255,19 @@ export const RepresentanteModel = {
             r."es_familiar"
           FROM "Usuario" u
           INNER JOIN "Representante" r ON u."Id_usuario" = r."Id_usuario"
-          WHERE u."Id_rol" = 4
-            AND (
-              u."nombre" ILIKE $1 OR
-              u."apellido" ILIKE $1 OR
-              u."cedula" ILIKE $1 OR
-              u."correo" ILIKE $1
+          WHERE (
+            u."Id_rol" = 4 OR 
+            EXISTS (
+              SELECT 1 FROM "Usuario_Rol" ur 
+              WHERE ur."Id_usuario" = u."Id_usuario" AND ur."Id_rol" = 4
             )
+          )
+          AND (
+            u."nombre" ILIKE $1 OR
+            u."apellido" ILIKE $1 OR
+            u."cedula" ILIKE $1 OR
+            u."correo" ILIKE $1
+          )
           ORDER BY u."apellido", u."nombre"
           LIMIT 20
         `,
@@ -286,7 +367,13 @@ export const RepresentanteModel = {
             u."estatus_usuario" as status
           FROM "Usuario" u
           INNER JOIN "Representante" r ON u."Id_usuario" = r."Id_usuario"
-          WHERE u."Id_rol" = 4
+          WHERE (
+            u."Id_rol" = 4 OR 
+            EXISTS (
+              SELECT 1 FROM "Usuario_Rol" ur 
+              WHERE ur."Id_usuario" = u."Id_usuario" AND ur."Id_rol" = 4
+            )
+          )
           ORDER BY u."apellido", u."nombre"
         `
       };

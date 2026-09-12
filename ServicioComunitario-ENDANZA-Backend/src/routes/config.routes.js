@@ -64,7 +64,6 @@ router.get(
 router.get(
   "/enrollment-period/:yearId",
   verifyToken,
-  verifyAdmin,
   autoVerifyRole,
   ConfigController.getEnrollmentPeriod
 );

@@ -23,6 +23,7 @@ import AvatarLetter from 'src/components/AvatarLetter'
 import SearchInput from 'src/components/SearchInput'
 import Pagination from 'src/components/Pagination'
 import SystemMessageModal from 'src/components/SystemMessageModal'
+import { formatShortName } from '../../utils/formatters'
 
 const Users = () => {
     const navigate = useNavigate()
@@ -91,6 +92,9 @@ const Users = () => {
             if (editing) {
                 await UserService.updateUser(editing.id, payload)
                 showToast('Usuario actualizado correctamente')
+            } else if (payload.is_assign_existing) {
+                await UserService.assignDocenteRole(payload)
+                showToast('Rol Docente asignado exitosamente al usuario')
             } else {
                 await UserService.createUser(payload)
                 showToast('Usuario registrado exitosamente')
@@ -99,7 +103,7 @@ const Users = () => {
             setEditing(null)
             fetchData()
         } catch (error) {
-            showToast('Error al procesar la solicitud', 'danger')
+            showToast(error?.message || 'Error al procesar la solicitud', 'danger')
         }
     }
 
@@ -305,7 +309,7 @@ const Users = () => {
                                                         </div>
                                                         <div className="overflow-hidden">
                                                             <div className="fw-bold header-title-custom text-truncate" style={{ maxWidth: '180px' }}>
-                                                                {user.first_name} {user.last_name}
+                                                                {formatShortName(user.first_name, user.last_name)}
                                                             </div>
                                                             <div className="text-muted-custom small d-flex align-items-center">
                                                                 <CIcon icon={cilUser} size="sm" className="me-1 opacity-50" />
@@ -334,6 +338,17 @@ const Users = () => {
                                                             title="Ver información"
                                                         >
                                                             <CIcon icon={cilInfo} style={{ color: '#E07A00' }} />
+                                                        </CButton>
+
+                                                        {/* Botón Editar */}
+                                                        <CButton
+                                                            color="light"
+                                                            size="sm"
+                                                            onClick={() => { setEditing(user); setShowForm(true); }}
+                                                            className="px-3 border-0 btn-icon-premium bg-transparent"
+                                                            title="Editar usuario"
+                                                        >
+                                                            <CIcon icon={cilPencil} style={{ color: '#E07A00' }} />
                                                         </CButton>
 
                                                         {/* Botón Cambiar Rol */}

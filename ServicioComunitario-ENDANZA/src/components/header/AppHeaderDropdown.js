@@ -15,9 +15,11 @@ import {
   cilSettings,
   cilLockLocked,
   cilAccountLogout,
+  cilEducation,
+  cilPeople,
+  cilSpeedometer,
+  cilTask,
 } from '@coreui/icons'
-
-
 
 // ✅ IMPORTAR authService y authStorage
 import { authService } from '../../services/authService'
@@ -69,6 +71,42 @@ const AppHeaderDropdown = () => {
     }
   }
 
+  // Comprobar roles del usuario
+  const userRoles = userData?.roles || []
+  const hasMultipleRoles = userRoles.length > 1
+  const currentActiveRole = sessionStorage.getItem('activeRole') || (userRoles[0] || 'admin')
+
+  const roleMeta = {
+    admin: { label: 'Administrador', icon: cilSpeedometer, route: '#/dashboard' },
+    superadmin: { label: 'Administrador', icon: cilSpeedometer, route: '#/dashboard' },
+    docente: { label: 'Docente', icon: cilEducation, route: '#/docente/inicio' },
+    representante: { label: 'Representante', icon: cilPeople, route: '#/inicio' },
+    secretaria: { label: 'Secretaría', icon: cilTask, route: '#/dashboard' },
+  }
+
+  const handleSelectRole = (nextRole) => {
+    if (nextRole === currentActiveRole) return
+    sessionStorage.setItem('activeRole', nextRole)
+
+    try {
+      const stored = JSON.parse(sessionStorage.getItem('user') || '{}')
+      stored.rol = nextRole
+      stored.activeRole = nextRole
+      stored.esAdmin = nextRole === 'admin' || nextRole === 'superadmin'
+      stored.esDocente = nextRole === 'docente'
+      stored.esRepresentante = nextRole === 'representante'
+      stored.esSecretaria = nextRole === 'secretaria'
+      stored.esEstudiante = nextRole === 'estudiante'
+      sessionStorage.setItem('user', JSON.stringify(stored))
+    } catch (e) {
+      console.error('Error actualizando usuario en sessionStorage:', e)
+    }
+
+    const targetRoute = roleMeta[nextRole]?.route || '#/dashboard'
+    window.location.hash = targetRoute
+    window.location.reload()
+  }
+
   return (
     <>
       <CDropdown variant="nav-item" alignment="end" className="premium-dropdown">
@@ -100,6 +138,55 @@ const AppHeaderDropdown = () => {
             <CIcon icon={cilUser} className="me-3 icon-accent" />
             <span className="fw-semibold">Perfil</span>
           </CDropdownItem>
+
+          {/* Menú de alternancia de roles cuando el usuario tiene múltiples roles */}
+          {hasMultipleRoles && (
+            <>
+              <div className="dropdown-divider-custom my-2"></div>
+              <div className="px-3 py-1">
+                <span className="d-block fw-bold ls-1 text-uppercase text-muted" style={{ fontSize: '0.65rem' }}>
+                  Cambiar Rol de Sesión
+                </span>
+              </div>
+              {userRoles.map((roleKey) => {
+                const meta = roleMeta[roleKey] || { label: roleKey, icon: cilUser, route: '#/dashboard' }
+                const isActive = (currentActiveRole === roleKey) || (roleKey === 'admin' && currentActiveRole === 'superadmin')
+                return (
+                  <CDropdownItem
+                    key={roleKey}
+                    component="button"
+                    type="button"
+                    onClick={() => handleSelectRole(roleKey)}
+                    className="dropdown-item-premium d-flex align-items-center justify-content-between py-2 px-3 rounded-3 mb-1 role-switch-item"
+                    style={{
+                      cursor: isActive ? 'default' : 'pointer',
+                      background: isActive ? 'rgba(242, 140, 15, 0.12)' : 'transparent',
+                      border: isActive ? '1px solid rgba(242, 140, 15, 0.3)' : '1px solid transparent'
+                    }}
+                  >
+                    <div className="d-flex align-items-center">
+                      <CIcon
+                        icon={meta.icon}
+                        className={`me-3 ${isActive ? 'text-warning' : 'text-muted'}`}
+                      />
+                      <span className={`fw-semibold ${isActive ? 'text-warning' : ''}`} style={{ fontSize: '0.85rem' }}>
+                        {meta.label}
+                      </span>
+                    </div>
+                    {isActive ? (
+                      <span className="badge bg-warning text-dark px-2 py-1 rounded-pill" style={{ fontSize: '0.65rem' }}>
+                        Activo
+                      </span>
+                    ) : (
+                      <span className="small text-muted" style={{ fontSize: '0.7rem' }}>
+                        Cambiar
+                      </span>
+                    )}
+                  </CDropdownItem>
+                )
+              })}
+            </>
+          )}
 
           <CDropdownItem
             onClick={handleLogout}

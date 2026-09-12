@@ -1,3 +1,4 @@
+import "dotenv/config";
 import pkg from 'pg';
 const { Pool } = pkg;
 
@@ -5,7 +6,7 @@ const { Pool } = pkg;
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'endanz',
+  database: process.env.DB_NAME || 'prueba',
   password: process.env.DB_PASSWORD || 'Yoll0209',
   port: process.env.DB_PORT || 5434,
   max: 20, // número máximo de clientes en el pool

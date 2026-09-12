@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     CCard,
     CCardBody,
@@ -8,29 +8,57 @@ import {
     CButton,
     CRow,
     CCol,
-    CBadge
+    CBadge,
+    CSpinner
 } from '@coreui/react';
 import { cilSave, cilEducation, cilArrowLeft, cilPlus, cilTrash, cilUser } from '@coreui/icons';
 import CIcon from '@coreui/icons-react';
+import { capitalizeWords } from '../../utils/formatters';
 
-const RegistroEstudiante = ({ representative, existingStudents = [], onBack, onSave }) => {
-    const [newStudents, setNewStudents] = useState([
-        {
-            firstName1: '',
-            firstName2: '',
-            lastName1: '',
-            lastName2: '',
-            name: '',
-            lastName: '',
-            gradeLevel: '',
-            section: 'A',
-            birthDate: '',
-            gender: ''
+const RegistroEstudiante = ({
+    representative,
+    existingStudents = [],
+    initialStudents = null,
+    onChangeStudents,
+    onBack,
+    onSave,
+    loading = false
+}) => {
+    const [newStudents, setNewStudents] = useState(() => {
+        if (initialStudents && initialStudents.length > 0) {
+            return initialStudents;
         }
-    ]);
+        return [
+            {
+                firstName1: '',
+                firstName2: '',
+                lastName1: '',
+                lastName2: '',
+                name: '',
+                lastName: '',
+                gradeLevel: '',
+                section: 'A',
+                birthDate: '',
+                gender: ''
+            }
+        ];
+    });
+
+    useEffect(() => {
+        if (initialStudents && initialStudents.length > 0) {
+            setNewStudents(initialStudents);
+        }
+    }, [initialStudents]);
+
+    const updateStudents = (list) => {
+        setNewStudents(list);
+        if (onChangeStudents) {
+            onChangeStudents(list);
+        }
+    };
 
     const handleAddNewStudent = () => {
-        setNewStudents([...newStudents, {
+        const updated = [...newStudents, {
             firstName1: '',
             firstName2: '',
             lastName1: '',
@@ -41,34 +69,51 @@ const RegistroEstudiante = ({ representative, existingStudents = [], onBack, onS
             section: 'A',
             birthDate: '',
             gender: ''
-        }]);
+        }];
+        updateStudents(updated);
     };
 
     const handleRemoveNewStudent = (index) => {
         const list = [...newStudents];
         list.splice(index, 1);
-        setNewStudents(list);
+        updateStudents(list);
     };
 
     const handleStudentChange = (index, field, value) => {
-        const list = [...newStudents];
-        list[index][field] = value;
-        
-        // Actualizar el nombre completo basado en los campos individuales
-        if (['firstName1', 'firstName2'].includes(field)) {
-            list[index].name = `${list[index].firstName1 || ''} ${list[index].firstName2 || ''}`.trim();
-        }
-        if (['lastName1', 'lastName2'].includes(field)) {
-            list[index].lastName = `${list[index].lastName1 || ''} ${list[index].lastName2 || ''}`.trim();
-        }
-        
-        setNewStudents(list);
+        const list = newStudents.map((s, i) => {
+            if (i !== index) return s;
+            const updated = { ...s, [field]: value };
+            if (['firstName1', 'firstName2'].includes(field)) {
+                updated.name = `${updated.firstName1 || ''} ${updated.firstName2 || ''}`.trim();
+            }
+            if (['lastName1', 'lastName2'].includes(field)) {
+                updated.lastName = `${updated.lastName1 || ''} ${updated.lastName2 || ''}`.trim();
+            }
+            return updated;
+        });
+        updateStudents(list);
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        const formattedList = newStudents.map(s => {
+            const f1 = capitalizeWords(s.firstName1);
+            const f2 = capitalizeWords(s.firstName2);
+            const l1 = capitalizeWords(s.lastName1);
+            const l2 = capitalizeWords(s.lastName2);
+            return {
+                ...s,
+                firstName1: f1,
+                firstName2: f2,
+                lastName1: l1,
+                lastName2: l2,
+                name: `${f1} ${f2}`.trim() || capitalizeWords(s.name),
+                lastName: `${l1} ${l2}`.trim() || capitalizeWords(s.lastName)
+            };
+        });
+        updateStudents(formattedList);
         // Solo guardamos los nuevos. onSave los procesará.
-        onSave(newStudents.filter(s => s.name.trim() !== ''));
+        onSave(formattedList);
     };
 
     return (
@@ -240,8 +285,9 @@ const RegistroEstudiante = ({ representative, existingStudents = [], onBack, onS
                         type="button"
                         color="secondary"
                         variant="ghost"
-                        onClick={onBack}
+                        onClick={() => onBack(newStudents)}
                         className="px-5 d-flex align-items-center fw-bold text-muted-custom transition-all"
+                        disabled={loading}
                     >
                         <CIcon icon={cilArrowLeft} className="me-2" />
                         VOLVER A REPRESENTANTE
@@ -249,9 +295,19 @@ const RegistroEstudiante = ({ representative, existingStudents = [], onBack, onS
                     <CButton
                         type="submit"
                         className="btn-premium px-5 d-flex align-items-center fw-bold shadow-lg"
+                        disabled={loading}
                     >
-                        COMPLETE EL REGISTRO
-                        <CIcon icon={cilSave} className="ms-2" />
+                        {loading ? (
+                            <>
+                                <CSpinner size="sm" className="me-2" />
+                                PROCESANDO...
+                            </>
+                        ) : (
+                            <>
+                                COMPLETE EL REGISTRO
+                                <CIcon icon={cilSave} className="ms-2" />
+                            </>
+                        )}
                     </CButton>
                 </div>
             </CForm>

@@ -1,4 +1,3 @@
-// components/editPerfil.jsx - VERSIÓN CORREGIDA CON API
 import React, { useState, useEffect } from "react"
 import {
   CModal,
@@ -12,6 +11,8 @@ import {
   CCol,
   CFormLabel,
   CFormInput,
+  CFormSelect,
+  CInputGroup,
   CSpinner,
   CTab,
   CTabContent,
@@ -32,20 +33,22 @@ import {
   cilWarning,
   cilLocationPin
 } from "@coreui/icons"
+import { capitalizeWords } from "../../../utils/formatters";
+
+const PHONE_PREFIXES = ["0414", "0424", "0416", "0426", "0412", "0422"];
 
 const EditProfileModal = ({ visible, onClose, userData, onSave, loading }) => {
   const [activeTab, setActiveTab] = useState(1)
   const [formData, setFormData] = useState({
-    // Datos personales (mapeados del backend)
     nombre: "",
     apellido: "",
     cedula: "",
     fechaNacimiento: "",
     genero: "",
-    
-    // Contacto
     email: "",
     telefono: "",
+    telefonoPrefijo: "0414",
+    telefonoNumero: "",
     direccion: "",
   })
   
@@ -58,27 +61,41 @@ const EditProfileModal = ({ visible, onClose, userData, onSave, loading }) => {
       console.log('📝 Cargando datos en modal:', userData)
       
       // Formatear fecha para input type="date" (YYYY-MM-DD)
-      let fechaFormateada = userData.fechaNacimiento || ""
+      let fechaFormateada = userData.fechaNacimiento || userData.birth_date || userData.fecha_nacimiento || ""
       if (fechaFormateada && fechaFormateada.includes('/')) {
         const partes = fechaFormateada.split('/')
         if (partes.length === 3) {
           // Convertir de DD/MM/YYYY a YYYY-MM-DD
           fechaFormateada = `${partes[2]}-${partes[1]}-${partes[0]}`
         }
+      } else if (fechaFormateada && fechaFormateada.includes('T')) {
+        fechaFormateada = fechaFormateada.split('T')[0]
+      }
+
+      // Parsear teléfono en prefijo y número
+      let telefonoPrefijo = "0414";
+      let telefonoNumero = "";
+      const tel = userData.telefono || userData.phone || "";
+      const prefijos = ["0414", "0424", "0416", "0426", "0412", "0422"];
+      const prefEncontrado = prefijos.find(p => tel.startsWith(p + '-') || tel.startsWith(p));
+      if (prefEncontrado) {
+        telefonoPrefijo = prefEncontrado;
+        telefonoNumero = tel.replace(prefEncontrado + '-', '').replace(prefEncontrado, '');
+      } else if (tel) {
+        telefonoNumero = tel.replace(/[^0-9]/g, '').slice(0, 7);
       }
 
       setFormData({
-        // Datos personales
-        nombre: userData.nombre || "",
-        apellido: userData.apellido || "",
-        cedula: userData.cedula || "",
+        nombre: userData.nombre || userData.first_name || "",
+        apellido: userData.apellido || userData.last_name || "",
+        cedula: userData.cedula || userData.dni || "",
         fechaNacimiento: fechaFormateada,
-        genero: userData.genero || userData.sexo || "",
-        
-        // Contacto
-        email: userData.email || "",
-        telefono: userData.telefono || "",
-        direccion: userData.direccion?.nombre_direccion || "",
+        genero: userData.genero || userData.sexo || userData.gender || "",
+        email: userData.email || userData.correo || "",
+        telefono: userData.telefono || userData.phone || "",
+        telefonoPrefijo,
+        telefonoNumero,
+        direccion: (typeof userData.direccion === 'object' ? userData.direccion?.nombre_direccion : userData.direccion) || userData.address || "",
       })
     }
   }, [userData, visible])
@@ -86,23 +103,29 @@ const EditProfileModal = ({ visible, onClose, userData, onSave, loading }) => {
   const handleChange = (e) => {
     const { name, value } = e.target
     
-    // Solo permitir números en cédula y teléfono
+    // Solo permitir números en cédula
     let cleanValue = value
-    if (name === "cedula" || name === "telefono") {
-      cleanValue = value.replace(/[^0-9]/g, "")
+    if (name === "cedula") {
+      cleanValue = value.replace(/[^0-9]/g, "").slice(0, 8)
+    }
+    if (name === "telefonoNumero") {
+      cleanValue = value.replace(/[^0-9]/g, "").slice(0, 7)
     }
 
-    setFormData(prev => ({
-      ...prev,
-      [name]: cleanValue
-    }))
+    setFormData(prev => {
+      const updated = { ...prev, [name]: cleanValue }
+      // Auto-combinar prefijo + número -> telefono
+      if (name === 'telefonoPrefijo' || name === 'telefonoNumero') {
+        const prefix = name === 'telefonoPrefijo' ? cleanValue : prev.telefonoPrefijo
+        const number = name === 'telefonoNumero' ? cleanValue : prev.telefonoNumero
+        updated.telefono = number ? `${prefix}-${number}` : ''
+      }
+      return updated
+    })
     
     // Limpiar error del campo cuando el usuario escribe
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: null
-      }))
+    if (errors[name] || (name === 'telefonoNumero' && errors.telefono)) {
+      setErrors(prev => ({ ...prev, [name]: null, ...(name === 'telefonoNumero' ? { telefono: null } : {}) }))
     }
   }
 
@@ -117,19 +140,26 @@ const EditProfileModal = ({ visible, onClose, userData, onSave, loading }) => {
   const validateForm = () => {
     const newErrors = {}
     
-    // Validar datos personales
     if (!formData.nombre?.trim()) newErrors.nombre = "El nombre es requerido"
     if (!formData.apellido?.trim()) newErrors.apellido = "El apellido es requerido"
-    if (!formData.cedula?.trim()) newErrors.cedula = "La cédula es requerida"
+    
+    // Validar cédula: 7-8 dígitos
+    const cedulaDigits = String(formData.cedula || '').replace(/[^0-9]/g, '')
+    if (!cedulaDigits) {
+      newErrors.cedula = "La cédula es requerida"
+    } else if (cedulaDigits.length < 7 || cedulaDigits.length > 8) {
+      newErrors.cedula = "La cédula debe tener entre 7 y 8 dígitos"
+    }
+    
     if (!formData.email?.trim()) {
       newErrors.email = "El correo electrónico es requerido"
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = "Correo electrónico inválido"
     }
     
-    // Validar teléfono (opcional pero con formato)
-    if (formData.telefono && !/^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/.test(formData.telefono)) {
-      newErrors.telefono = "Formato de teléfono inválido"
+    // Validar teléfono (si se puso número)
+    if (formData.telefonoNumero && formData.telefonoNumero.length !== 7) {
+      newErrors.telefono = "El número debe tener 7 dígitos"
     }
     
     return newErrors
@@ -142,8 +172,8 @@ const EditProfileModal = ({ visible, onClose, userData, onSave, loading }) => {
     if (Object.keys(validationErrors).length === 0) {
       // Preparar datos para enviar al backend
       const datosActualizados = {
-        nombre: formData.nombre,
-        apellido: formData.apellido,
+        nombre: capitalizeWords(formData.nombre),
+        apellido: capitalizeWords(formData.apellido),
         cedula: formData.cedula,
         email: formData.email,
         telefono: formData.telefono,
@@ -319,16 +349,33 @@ const EditProfileModal = ({ visible, onClose, userData, onSave, loading }) => {
 
                 <CCol md={6}>
                   <CFormLabel className="fw-semibold">Teléfono Principal</CFormLabel>
-                  <CFormInput
-                    type="tel"
-                    name="telefono"
-                    value={formData.telefono}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    invalid={isFieldInvalid('telefono')}
-                    feedback={errors.telefono}
-                    placeholder="+58 414-1234567"
-                  />
+                  <CInputGroup>
+                    <CFormSelect
+                      name="telefonoPrefijo"
+                      value={formData.telefonoPrefijo || "0414"}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      style={{ maxWidth: '110px', flex: '0 0 110px' }}
+                    >
+                      {["0414", "0424", "0416", "0426", "0412", "0422"].map(p => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </CFormSelect>
+                    <CFormInput
+                      type="tel"
+                      name="telefonoNumero"
+                      value={formData.telefonoNumero || ""}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      invalid={isFieldInvalid('telefono')}
+                      feedback={errors.telefono}
+                      placeholder="1234567"
+                      maxLength={7}
+                    />
+                  </CInputGroup>
+                  {isFieldInvalid('telefono') && (
+                    <div className="invalid-feedback d-block">{errors.telefono}</div>
+                  )}
                 </CCol>
 
                 <CCol xs={12}>

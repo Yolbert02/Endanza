@@ -28,6 +28,7 @@ import AsignarEspecialidadGradosModal from './AsignarModal'
 
 // ✅ SERVICIOS
 import * as TeacherService from '../../../services/teacherService'
+import { formatShortName } from '../../../utils/formatters'
 import { getAvailableYears } from '../../../services/configService'
 
 const TeacherManagement = () => {
@@ -640,7 +641,7 @@ const TeacherManagement = () => {
                                                             }}
                                                         />
                                                         <div className="ms-3">
-                                                            <div className="fw-bold" style={{ color: '#1e293b' }}>{teacher.first_name} {teacher.last_name}</div>
+                                                            <div className="fw-bold" style={{ color: '#1e293b' }}>{formatShortName(teacher.first_name, teacher.last_name)}</div>
                                                             <div className="small" style={{ color: '#64748b' }}>{teacher.dni}</div>
                                                         </div>
                                                     </div>

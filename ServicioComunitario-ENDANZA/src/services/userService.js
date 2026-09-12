@@ -177,3 +177,29 @@ export const searchUsers = async (searchTerm) => {
         return [];
     }
 };
+
+export const searchDocenteCandidates = async (searchTerm) => {
+    try {
+        const response = await userAPI.searchDocenteCandidates(searchTerm);
+        if (response?.ok) {
+            return response.candidates || [];
+        }
+        return [];
+    } catch (error) {
+        console.error('❌ Error en searchDocenteCandidates:', error);
+        return [];
+    }
+};
+
+export const assignDocenteRole = async (data) => {
+    try {
+        const response = await userAPI.assignDocenteRole(data);
+        if (response?.ok) {
+            return response.user;
+        }
+        throw new Error(response?.msg || 'Error al asignar rol docente');
+    } catch (error) {
+        console.error('❌ Error en assignDocenteRole:', error);
+        throw error;
+    }
+};

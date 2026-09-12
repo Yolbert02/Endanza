@@ -72,7 +72,6 @@ export const searchRepresentantes = async (term) => {
   }
 };
 
-// NUEVA FUNCIÓN PARA LISTAR TODOS
 export const listRepresentantes = async () => {
   try {
     const response = await representanteAPI.list();
@@ -84,6 +83,20 @@ export const listRepresentantes = async () => {
     return [];
   } catch (error) {
     console.error('❌ Error en listRepresentantes:', error);
+    return [];
+  }
+};
+
+// Obtener lista pública de docentes para vinculación de rol dual en preinscripción
+export const getDocentesList = async () => {
+  try {
+    const response = await fetch.get('/api/users/docentes');
+    if (response && response.ok) {
+      return response.docentes || [];
+    }
+    return [];
+  } catch (error) {
+    console.error('❌ Error en getDocentesList:', error);
     return [];
   }
 };

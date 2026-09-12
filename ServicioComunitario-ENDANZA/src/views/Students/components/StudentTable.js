@@ -22,6 +22,7 @@ import {
 import CIcon from '@coreui/icons-react'
 import { cilSearch, cilUser, cilPencil, cilTrash, cilInfo,cilCircle } from '@coreui/icons'
 import PropTypes from 'prop-types'
+import { formatShortName } from '../../../utils/formatters'
 
 const StudentTable = ({
     loading,
@@ -170,7 +171,7 @@ const StudentTable = ({
                                                         </div>
                                                         <div className="overflow-hidden">
                                                             <div className="fw-bold header-title-custom text-truncate">
-                                                                {student.first_name} {student.last_name}
+                                                                {formatShortName(student.first_name, student.last_name)}
                                                             </div>
                                                             <div className="text-muted-custom small d-mobile-none">
                                                                 {student.dni}
@@ -188,7 +189,7 @@ const StudentTable = ({
                                                 </CTableDataCell>
                                                 <CTableDataCell className="border-bottom-light d-mobile-none">
                                                     <div className="header-title-custom fw-medium">
-                                                        {representante.nombre}
+                                                        {formatShortName(representante.nombre)}
                                                     </div>
                                                     <div className="text-muted-custom small">
                                                         {representante.telefono}

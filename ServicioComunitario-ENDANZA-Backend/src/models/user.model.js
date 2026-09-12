@@ -1,5 +1,6 @@
 import { db } from "../db/connection.database.js";
 import bcryptjs from "bcryptjs";
+import { capitalizeWords } from "../utils/formatters.js";
 
 // ============================================
 // FUNCIÓN PARA MIGRAR PASSWORD AUTOMÁTICAMENTE
@@ -116,7 +117,7 @@ const createProfesor = async (usuarioId) => {
   try {
     console.log(`👨‍🏫 Creando registro de profesor para usuario ${usuarioId}`);
     
-    // 1. Verificar si el usuario existe y es docente
+    // 1. Verificar si el usuario existe
     const userCheck = await db.query(
       'SELECT "Id_rol" FROM "Usuario" WHERE "Id_usuario" = $1',
       [usuarioId]
@@ -126,9 +127,11 @@ const createProfesor = async (usuarioId) => {
       throw new Error(`Usuario ${usuarioId} no existe`);
     }
     
-    if (userCheck.rows[0].Id_rol !== 2) {
-      throw new Error(`Usuario ${usuarioId} no es docente (rol: ${userCheck.rows[0].Id_rol})`);
-    }
+    // Asegurar que tenga el rol 2 en Usuario_Rol
+    await db.query(
+      'INSERT INTO "Usuario_Rol" ("Id_usuario", "Id_rol") VALUES ($1, 2) ON CONFLICT DO NOTHING',
+      [usuarioId]
+    );
     
     // 2. Verificar si ya existe en Profesor
     const checkQuery = {
@@ -179,6 +182,9 @@ const updateUserByAdmin = async (id, {
       hashedPassword = await bcryptjs.hash(password, salt);
     }
 
+    const formattedNombre = nombre !== undefined ? capitalizeWords(nombre) : undefined;
+    const formattedApellido = apellido !== undefined ? capitalizeWords(apellido) : undefined;
+
     const query = {
       text: `
         UPDATE "Usuario"
@@ -203,7 +209,7 @@ const updateUserByAdmin = async (id, {
           "estatus_usuario" as status,
           "Id_rol"
       `,
-      values: [cedula, nombre, apellido, telefono, email, Id_rol, status, hashedPassword, id]
+      values: [cedula, formattedNombre, formattedApellido, telefono, email, Id_rol, status, hashedPassword, id]
     };
 
     const { rows } = await db.query(query.text, query.values);
@@ -449,6 +455,9 @@ const create = async ({
     const salt = await bcryptjs.genSalt(10);
     const hashedPassword = await bcryptjs.hash(password, salt);
     
+    const formattedNombre = capitalizeWords(nombre);
+    const formattedApellido = capitalizeWords(apellido);
+
     const query = {
       text: `
         INSERT INTO "Usuario" (
@@ -480,7 +489,7 @@ const create = async ({
           "email_verified"
       `,
       values: [
-        cedula, nombre, apellido, hashedPassword, telefono, email,
+        cedula, formattedNombre, formattedApellido, hashedPassword, telefono, email,
         fecha_nacimiento, genero, foto_usuario, Id_rol, Id_direccion,
         username || email, security_word, respuesta_de_seguridad
       ],
@@ -552,7 +561,13 @@ const findOneByEmail = async (email) => {
       values: [email],
     };
     const { rows } = await db.query(query.text, query.values);
-    return rows[0];
+    const user = rows[0];
+    if (user) {
+      const userRoles = await getUserRoles(user.id);
+      user.roles = userRoles.roles;
+      user.roles_ids = userRoles.roles_ids;
+    }
+    return user;
   } catch (error) {
     console.error("Error in findOneByEmail:", error);
     throw error;
@@ -615,7 +630,13 @@ const findOneByUsername = async (username) => {
       values: [username],
     };
     const { rows } = await db.query(query.text, query.values);
-    return rows[0];
+    const user = rows[0];
+    if (user) {
+      const userRoles = await getUserRoles(user.id);
+      user.roles = userRoles.roles;
+      user.roles_ids = userRoles.roles_ids;
+    }
+    return user;
   } catch (error) {
     console.error("Error in findOneByUsername:", error);
     throw error;
@@ -678,7 +699,13 @@ const findOneById = async (id) => {
       values: [id],
     };
     const { rows } = await db.query(query.text, query.values);
-    return rows[0];
+    const user = rows[0];
+    if (user) {
+      const userRoles = await getUserRoles(user.id);
+      user.roles = userRoles.roles;
+      user.roles_ids = userRoles.roles_ids;
+    }
+    return user;
   } catch (error) {
     console.error("Error in findOneById:", error);
     throw error;
@@ -764,6 +791,9 @@ const updateProfile = async (id, {
   fecha_nacimiento, genero, foto_usuario, Id_direccion 
 }) => {
   try {
+    const formattedNombre = nombre !== undefined ? capitalizeWords(nombre) : undefined;
+    const formattedApellido = apellido !== undefined ? capitalizeWords(apellido) : undefined;
+
     const query = {
       text: `
         UPDATE "Usuario"
@@ -795,7 +825,7 @@ const updateProfile = async (id, {
           "foto_usuario",
           "Id_direccion"
       `,
-      values: [email, security_word, respuesta_de_seguridad, nombre, apellido, 
+      values: [email, security_word, respuesta_de_seguridad, formattedNombre, formattedApellido, 
                telefono, cedula, fecha_nacimiento, genero, foto_usuario, 
                Id_direccion, id],
     };
@@ -969,6 +999,11 @@ const findByCedula = async (cedula) => {
       values: [cedula],
     };
     const { rows } = await db.query(query.text, query.values);
+    if (rows[0]) {
+      const userRoles = await getUserRoles(rows[0].id);
+      rows[0].roles = userRoles.roles;
+      rows[0].roles_ids = userRoles.roles_ids;
+    }
     return rows[0];
   } catch (error) {
     console.error("Error in findByCedula:", error);
@@ -1012,6 +1047,129 @@ const searchByUsername = async (searchTerm) => {
     return rows;
   } catch (error) {
     console.error("Error in searchByUsername:", error);
+    throw error;
+  }
+};
+
+// ============================================
+// SEARCH CANDIDATES FOR DOCENTE ROLE (REPRESENTANTES / ESTUDIANTES)
+// ============================================
+const searchDocenteCandidates = async (searchTerm) => {
+  try {
+    const raw = (searchTerm || '').trim();
+    const term = `%${raw}%`;
+    const numOnly = raw.replace(/[^0-9]/g, '');
+    const numTerm = numOnly ? `%${numOnly}%` : term;
+    
+    // 1. Buscar en Usuario (Representantes, Estudiantes, etc. que no sean profesores todavía)
+    const userQuery = {
+      text: `
+        SELECT 
+          u."Id_usuario" as id,
+          NULL::integer as student_id,
+          u."nombre" as first_name,
+          u."apellido" as last_name,
+          u."cedula" as dni,
+          u."correo" as email,
+          u."telefono" as phone,
+          u."estatus_usuario" as status,
+          r."tipo_rol" as role_name,
+          CASE 
+            WHEN rep."Id_representante" IS NOT NULL THEN 'representante'
+            WHEN u."Id_rol" = 4 THEN 'representante'
+            WHEN u."Id_rol" = 3 THEN 'estudiante'
+            ELSE 'usuario'
+          END as source_type
+        FROM "Usuario" u
+        LEFT JOIN "Rol" r ON u."Id_rol" = r."Id_rol"
+        LEFT JOIN "Representante" rep ON rep."Id_usuario" = u."Id_usuario"
+        WHERE (
+          u."nombre" ILIKE $1 
+          OR u."apellido" ILIKE $1 
+          OR u."cedula" ILIKE $1 
+          OR u."cedula" ILIKE $2
+          OR u."correo" ILIKE $1
+        )
+        AND u."Id_rol" != 2
+        AND u."Id_usuario" NOT IN (
+          SELECT "Id_usuario" FROM "Profesor" WHERE "Id_usuario" IS NOT NULL
+        )
+        AND u."Id_usuario" NOT IN (
+          SELECT "Id_usuario" FROM "Usuario_Rol" WHERE "Id_rol" = 2
+        )
+        ORDER BY u."nombre" ASC
+        LIMIT 10
+      `,
+      values: [term, numTerm]
+    };
+    
+    const userResults = await db.query(userQuery.text, userQuery.values);
+    
+    // 2. Buscar en Estudiante (para estudiantes que no tengan cuenta de Usuario todavía)
+    const existingDnis = userResults.rows.map(r => r.dni).filter(Boolean);
+    let studentResults = { rows: [] };
+    
+    if (existingDnis.length > 0) {
+      const placeholders = existingDnis.map((_, i) => `$${i + 3}`).join(',');
+      const studentQuery = {
+        text: `
+          SELECT 
+            NULL::integer as id,
+            e."Id_estudiante" as student_id,
+            e."nombre" as first_name,
+            e."apellido" as last_name,
+            e."cedula" as dni,
+            NULL as email,
+            NULL as phone,
+            'activo' as status,
+            'estudiante' as role_name,
+            'estudiante' as source_type
+          FROM "Estudiante" e
+          WHERE (
+            e."nombre" ILIKE $1 
+            OR e."apellido" ILIKE $1 
+            OR e."cedula" ILIKE $1
+            OR e."cedula" ILIKE $2
+          )
+          AND e."cedula" NOT IN (${placeholders})
+          ORDER BY e."nombre" ASC
+          LIMIT 10
+        `,
+        values: [term, numTerm, ...existingDnis]
+      };
+      studentResults = await db.query(studentQuery.text, studentQuery.values);
+    } else {
+      const studentQuery = {
+        text: `
+          SELECT 
+            NULL::integer as id,
+            e."Id_estudiante" as student_id,
+            e."nombre" as first_name,
+            e."apellido" as last_name,
+            e."cedula" as dni,
+            NULL as email,
+            NULL as phone,
+            'activo' as status,
+            'estudiante' as role_name,
+            'estudiante' as source_type
+          FROM "Estudiante" e
+          WHERE (
+            e."nombre" ILIKE $1 
+            OR e."apellido" ILIKE $1 
+            OR e."cedula" ILIKE $1
+            OR e."cedula" ILIKE $2
+          )
+          ORDER BY e."nombre" ASC
+          LIMIT 10
+        `,
+        values: [term, numTerm]
+      };
+      studentResults = await db.query(studentQuery.text, studentQuery.values);
+    }
+    
+    return [...userResults.rows, ...studentResults.rows];
+  } catch (error) {
+    console.error("Error in searchDocenteCandidates:", error);
     throw error;
   }
 };
@@ -1064,6 +1222,9 @@ const updateProfileWithSecurity = async (
       throw new Error("Invalid security answer");
     }
 
+    const formattedNombre = nombre !== undefined ? capitalizeWords(nombre) : undefined;
+    const formattedApellido = apellido !== undefined ? capitalizeWords(apellido) : undefined;
+
     const query = {
       text: `
         UPDATE "Usuario"
@@ -1094,7 +1255,7 @@ const updateProfileWithSecurity = async (
           "genero",
           "Id_direccion"
       `,
-      values: [email, security_word, respuesta_de_seguridad, nombre, apellido, 
+      values: [email, security_word, respuesta_de_seguridad, formattedNombre, formattedApellido, 
                telefono, cedula, fecha_nacimiento, genero, foto_usuario, 
                Id_direccion, id],
     };
@@ -1243,6 +1404,71 @@ const isRepresentante = async (usuarioId) => {
 };
 
 // ============================================
+// OBTENER ROLES MULTIPLES DEL USUARIO
+// ============================================
+const getUserRoles = async (usuarioId) => {
+  try {
+    const res = await db.query(`
+      SELECT DISTINCT r."Id_rol", LOWER(r."tipo_rol") as rol_nombre
+      FROM "Usuario_Rol" ur
+      JOIN "Rol" r ON ur."Id_rol" = r."Id_rol"
+      WHERE ur."Id_usuario" = $1
+    `, [usuarioId]);
+
+    let roles = res.rows.map(r => {
+      const name = r.rol_nombre;
+      return name === 'administrador' ? 'admin' : name;
+    });
+    let roles_ids = res.rows.map(r => r.Id_rol);
+
+    // Verificar si está registrado en Profesor
+    const isProf = await isProfesor(usuarioId);
+    if (isProf && !roles.includes('docente')) {
+      roles.push('docente');
+      roles_ids.push(2);
+    }
+
+    // Verificar si está registrado en Representante
+    const isRep = await isRepresentante(usuarioId);
+    if (isRep && !roles.includes('representante')) {
+      roles.push('representante');
+      roles_ids.push(4);
+    }
+
+    // Si aún no tiene roles detectados, consultar el Id_rol de Usuario
+    if (roles.length === 0) {
+      const uRes = await db.query('SELECT u."Id_rol", LOWER(r."tipo_rol") as rol_nombre FROM "Usuario" u LEFT JOIN "Rol" r ON u."Id_rol" = r."Id_rol" WHERE u."Id_usuario" = $1', [usuarioId]);
+      if (uRes.rows.length > 0 && uRes.rows[0].rol_nombre) {
+        roles.push(uRes.rows[0].rol_nombre);
+        roles_ids.push(uRes.rows[0].Id_rol);
+      }
+    }
+
+    return { roles, roles_ids };
+  } catch (error) {
+    console.error("Error in getUserRoles:", error);
+    return { roles: [], roles_ids: [] };
+  }
+};
+
+// ============================================
+// AGREGAR ROL A USUARIO (M:N)
+// ============================================
+const addRoleToUser = async (usuarioId, roleId) => {
+  try {
+    await db.query(`
+      INSERT INTO "Usuario_Rol" ("Id_usuario", "Id_rol")
+      VALUES ($1, $2)
+      ON CONFLICT DO NOTHING
+    `, [usuarioId, roleId]);
+    return true;
+  } catch (error) {
+    console.error("Error in addRoleToUser:", error);
+    return false;
+  }
+};
+
+// ============================================
 // EXPORTAR TODOS LOS MÉTODOS
 // ============================================
 export const UserModel = {
@@ -1265,11 +1491,14 @@ export const UserModel = {
   removeProfesorCompleto,
   findByCedula,
   searchByUsername,
+  searchDocenteCandidates,
   verifySecurityAnswer,
   setEmailVerificationToken,
   verifyEmail,
   isProfesor,
   isRepresentante,
+  getUserRoles,
+  addRoleToUser,
   createProfesor,
   updateUserByAdmin,
   updateUserRole,

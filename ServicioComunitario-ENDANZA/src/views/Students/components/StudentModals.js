@@ -201,7 +201,7 @@ const StudentModals = ({
                                 <CFormInput 
                                     type="text" 
                                     className="input-premium py-2 px-3" 
-                                    defaultValue={selectedItem.first_name} 
+                                    defaultValue={selectedItem.first_name || selectedItem.nombre || selectedItem.NombreEstudiante || ''} 
                                 />
                             </CCol>
                             <CCol md={6}>
@@ -211,7 +211,7 @@ const StudentModals = ({
                                 <CFormInput 
                                     type="text" 
                                     className="input-premium py-2 px-3" 
-                                    defaultValue={selectedItem.last_name} 
+                                    defaultValue={selectedItem.last_name || selectedItem.apellido || selectedItem.ApellidoEstudiante || ''} 
                                 />
                             </CCol>
                             <CCol md={6}>
@@ -221,7 +221,7 @@ const StudentModals = ({
                                 <CFormInput 
                                     type="email" 
                                     className="input-premium py-2 px-3" 
-                                    defaultValue={selectedItem.representative_email} 
+                                    defaultValue={selectedItem.representative_email || selectedItem.email || selectedItem.correo || ''} 
                                 />
                             </CCol>
                             <CCol md={6}>
@@ -231,7 +231,7 @@ const StudentModals = ({
                                 <CFormInput 
                                     type="text" 
                                     className="input-premium py-2 px-3" 
-                                    defaultValue={selectedItem.representative_phone} 
+                                    defaultValue={selectedItem.representative_phone || selectedItem.phone || selectedItem.telefono || ''} 
                                 />
                             </CCol>
                             <CCol xs={12} className="mt-4 pt-2 border-top border-light-custom text-center">

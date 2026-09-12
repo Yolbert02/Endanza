@@ -19,7 +19,8 @@ const PeriodoInscripcionModal = ({
   visible,
   onClose,
   periodoInscripcion,
-  onSave
+  onSave,
+  readOnly = false
 }) => {
   const [localData, setLocalData] = useState({
     fechaInicio: '',
@@ -81,19 +82,33 @@ const PeriodoInscripcionModal = ({
             <CIcon icon={cilCalendarCheck} className="text-primary" size="xl" />
           </div>
           <div className="flex-grow-1">
-            <h4 className="mb-0 fw-black header-title-custom ls-tight">Configuración de Inscripción</h4>
-            <div className="small text-muted-custom fw-medium">Control maestro del ciclo de admisiones</div>
+            <h4 className="mb-0 fw-black header-title-custom ls-tight">
+              {readOnly ? 'Período de Inscripción' : 'Configuración de Inscripción'}
+            </h4>
+            <div className="small text-muted-custom fw-medium">
+              {readOnly ? 'Consulta del ciclo de admisiones (Solo Lectura)' : 'Control maestro del ciclo de admisiones'}
+            </div>
           </div>
-          <CButton
-            color={localData.activo ? 'success' : 'secondary'}
-            variant="outline"
-            className={`rounded-pill px-4 py-2 fw-bold ls-1 d-flex align-items-center transition-all ${localData.activo ? 'bg-success bg-opacity-10' : 'bg-secondary bg-opacity-10'}`}
-            onClick={() => setLocalData({ ...localData, activo: !localData.activo })}
-            style={{ fontSize: '0.75rem' }}
-          >
-            <CIcon icon={cilPowerStandby} className="me-2" />
-            {localData.activo ? 'SISTEMA ON' : 'SISTEMA OFF'}
-          </CButton>
+          {readOnly ? (
+            <div
+              className={`rounded-pill px-4 py-2 fw-bold ls-1 d-flex align-items-center ${localData.activo ? 'bg-success text-white' : 'bg-secondary bg-opacity-25 text-muted'}`}
+              style={{ fontSize: '0.75rem' }}
+            >
+              <CIcon icon={cilPowerStandby} className="me-2" />
+              {localData.activo ? 'PORTAL ACTIVO' : 'PORTAL CERRADO'}
+            </div>
+          ) : (
+            <CButton
+              color={localData.activo ? 'success' : 'secondary'}
+              variant="outline"
+              className={`rounded-pill px-4 py-2 fw-bold ls-1 d-flex align-items-center transition-all ${localData.activo ? 'bg-success bg-opacity-10' : 'bg-secondary bg-opacity-10'}`}
+              onClick={() => setLocalData({ ...localData, activo: !localData.activo })}
+              style={{ fontSize: '0.75rem' }}
+            >
+              <CIcon icon={cilPowerStandby} className="me-2" />
+              {localData.activo ? 'SISTEMA ON' : 'SISTEMA OFF'}
+            </CButton>
+          )}
         </CModalTitle>
       </CModalHeader>
 
@@ -112,6 +127,8 @@ const PeriodoInscripcionModal = ({
                     value={localData.fechaInicio}
                     onChange={(e) => setLocalData({ ...localData, fechaInicio: e.target.value })}
                     className="input-premium-clean p-0 border-0 fs-4 fw-bold header-title-custom bg-transparent outline-none"
+                    disabled={readOnly}
+                    readOnly={readOnly}
                   />
                 </div>
               </CCol>
@@ -126,6 +143,8 @@ const PeriodoInscripcionModal = ({
                     value={localData.fechaFin}
                     onChange={(e) => setLocalData({ ...localData, fechaFin: e.target.value })}
                     className="input-premium-clean p-0 border-0 fs-4 fw-bold header-title-custom bg-transparent outline-none"
+                    disabled={readOnly}
+                    readOnly={readOnly}
                   />
                 </div>
               </CCol>
@@ -147,13 +166,21 @@ const PeriodoInscripcionModal = ({
       </CModalBody>
 
       <CModalFooter className="border-0 p-4 pt-1">
-        <CButton variant="ghost" className="px-4 fw-bold text-muted-custom hover-lift shadow-none border-0" onClick={onClose}>
-          CANCELAR
-        </CButton>
-        <CButton onClick={() => onSave(localData)} className="btn-premium px-5 py-3 rounded-pill fw-bold ms-auto shadow-orange text-white">
-          <CIcon icon={cilSave} className="me-2" />
-          GUARDAR AJUSTES
-        </CButton>
+        {readOnly ? (
+          <CButton variant="ghost" className="px-5 py-2 fw-bold text-muted-custom hover-lift ms-auto border-0" onClick={onClose}>
+            CERRAR
+          </CButton>
+        ) : (
+          <>
+            <CButton variant="ghost" className="px-4 fw-bold text-muted-custom hover-lift shadow-none border-0" onClick={onClose}>
+              CANCELAR
+            </CButton>
+            <CButton onClick={() => onSave(localData)} className="btn-premium px-5 py-3 rounded-pill fw-bold ms-auto shadow-orange text-white">
+              <CIcon icon={cilSave} className="me-2" />
+              GUARDAR AJUSTES
+            </CButton>
+          </>
+        )}
       </CModalFooter>
 
       <style>{`

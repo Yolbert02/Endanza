@@ -57,6 +57,84 @@ const listStudents = async (req, res) => {
   }
 };
 
+const formatStudentPayload = (student, sections = []) => {
+  const repFullName = student.representative_first_name ?
+    `${student.representative_first_name} ${student.representative_last_name || ''}`.trim() : null;
+
+  return {
+    id: student.id,
+    first_name: student.first_name,
+    last_name: student.last_name,
+    full_name: `${student.first_name} ${student.last_name}`.trim(),
+    dni: student.dni,
+    birth_date: student.birth_date,
+    gender: student.gender,
+    school_insurance: student.school_insurance,
+    grade_level_id: student.grade_level_id,
+    grade_level_name: student.grade_level_name,
+    dance_level_id: student.dance_level_id,
+    dance_level_name: student.dance_level_name,
+    school_id: student.school_id,
+    school_name: student.school_name,
+    insurance_id: student.insurance_id,
+    insurance_name: student.insurance_name,
+    representative_id: student.representative_id,
+    representative: repFullName,
+    representative_first_name: student.representative_first_name,
+    representative_last_name: student.representative_last_name,
+    representative_dni: student.representative_dni,
+    representative_phone: student.representative_phone,
+    representative_email: student.representative_email,
+    representative_gender: student.representative_gender,
+    representative_occupation: student.representative_occupation,
+    representative_es_familiar: student.representative_es_familiar,
+    representative_relationship: student.representative_relationship || 'Madre',
+    parentesco: student.representative_relationship || 'Madre',
+    RepresentanteParentesco: student.representative_relationship || 'Madre',
+    RepresentanteCedula: student.representative_dni,
+    RepresentanteNombre: repFullName,
+    RepresentanteApellido: student.representative_last_name,
+    RepresentantePrimerNombre: student.representative_first_name,
+    RepresentantePrimerApellido: student.representative_last_name,
+    RepresentanteTelefono: student.representative_phone,
+    RepresentanteEmail: student.representative_email,
+    RepresentanteOcupacion: student.representative_occupation,
+    // Si el representante es Madre, proveer campos precargados
+    MadrePrimerNombre: student.representative_relationship === 'Madre' ? student.representative_first_name : null,
+    MadrePrimerApellido: student.representative_relationship === 'Madre' ? student.representative_last_name : null,
+    MadreNombre: student.representative_relationship === 'Madre' ? repFullName : null,
+    MadreCedula: student.representative_relationship === 'Madre' ? student.representative_dni : null,
+    MadreTelefono: student.representative_relationship === 'Madre' ? student.representative_phone : null,
+    MadreEmail: student.representative_relationship === 'Madre' ? student.representative_email : null,
+    MadreOcupacion: student.representative_relationship === 'Madre' ? student.representative_occupation : null,
+    // Si el representante es Padre, proveer campos precargados
+    PadrePrimerNombre: student.representative_relationship === 'Padre' ? student.representative_first_name : null,
+    PadrePrimerApellido: student.representative_relationship === 'Padre' ? student.representative_last_name : null,
+    PadreNombre: student.representative_relationship === 'Padre' ? repFullName : null,
+    PadreCedula: student.representative_relationship === 'Padre' ? student.representative_dni : null,
+    PadreTelefono: student.representative_relationship === 'Padre' ? student.representative_phone : null,
+    PadreEmail: student.representative_relationship === 'Padre' ? student.representative_email : null,
+    PadreOcupacion: student.representative_relationship === 'Padre' ? student.representative_occupation : null,
+    address: student.address,
+    city: student.city,
+    state: student.state,
+    status: student.status || 'Activo',
+    estatus: student.status || 'Activo',
+    blood_type: student.blood_type || null,
+    tipo_sangre: student.blood_type || null,
+    phone: student.representative_phone || null,
+    email: student.representative_email || null,
+    medical_history_id: student.medical_history_id,
+    sections: (sections || []).map(s => ({
+      id: s.id,
+      section_id: s.section_id,
+      section_name: s.section_name,
+      academic_year: s.academic_year_name,
+      period: s.period_name
+    }))
+  };
+};
+
 /**
  * Obtener un estudiante por ID
  */
@@ -75,41 +153,7 @@ const getStudent = async (req, res) => {
 
     // Obtener las secciones del estudiante
     const sections = await StudentModel.findSectionsByStudentId(id);
-
-    const transformed = {
-      id: student.id,
-      first_name: student.first_name,
-      last_name: student.last_name,
-      full_name: `${student.first_name} ${student.last_name}`.trim(),
-      dni: student.dni,
-      birth_date: student.birth_date,
-      gender: student.gender,
-      school_insurance: student.school_insurance,
-      grade_level_id: student.grade_level_id,
-      grade_level_name: student.grade_level_name,
-      dance_level_id: student.dance_level_id,
-      dance_level_name: student.dance_level_name,
-      school_id: student.school_id,
-      school_name: student.school_name,
-      insurance_id: student.insurance_id,
-      insurance_name: student.insurance_name,
-      representative_id: student.representative_id,
-      representative: student.representative_first_name ?
-        `${student.representative_first_name} ${student.representative_last_name}`.trim() : null,
-      representative_phone: student.representative_phone,
-      representative_email: student.representative_email,
-      address: student.address,
-      city: student.city,
-      state: student.state,
-      medical_history_id: student.medical_history_id,
-      sections: sections.map(s => ({
-        id: s.id,
-        section_id: s.section_id,
-        section_name: s.section_name,
-        academic_year: s.academic_year_name,
-        period: s.period_name
-      }))
-    };
+    const transformed = formatStudentPayload(student, sections);
 
     return res.json({
       ok: true,
@@ -174,6 +218,15 @@ const updateStudent = async (req, res) => {
     const { id } = req.params;
     const studentData = req.body;
 
+    console.log('📝 [CONTROLLER] updateStudent recibido:', {
+      id,
+      RepresentanteCedula: studentData.RepresentanteCedula,
+      MadreCedula: studentData.MadreCedula,
+      PadreCedula: studentData.PadreCedula,
+      representative_dni: studentData.representative_dni,
+      RepresentanteParentesco: studentData.RepresentanteParentesco,
+    });
+
     // Verificar si el estudiante existe
     const existing = await StudentModel.findById(id);
     if (!existing) {
@@ -195,11 +248,13 @@ const updateStudent = async (req, res) => {
     }
 
     const updated = await StudentModel.update(id, studentData);
+    const sections = await StudentModel.findSectionsByStudentId(id);
+    const formatted = formatStudentPayload(updated, sections);
 
     return res.json({
       ok: true,
       msg: "Estudiante actualizado",
-      data: updated
+      data: formatted
     });
   } catch (error) {
     console.error("Error en updateStudent:", error);

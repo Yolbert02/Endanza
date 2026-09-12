@@ -1,6 +1,7 @@
 import { db } from "../db/connection.database.js";
 import { RepresentanteModel } from "../models/representante.model.js";
 import { StudentModel } from "../models/student.model.js";
+import { capitalizeWords } from "../utils/formatters.js";
 
 export const InscripcionRepresentanteController = {
 
@@ -285,7 +286,9 @@ async function guardarPadresEnTablaPadre(id_estudiante, datos) {
     // 1. Insertar MADRE
     let id_madre = null;
     if (datos.nombre_Madre && datos.apellido_Madre) {
-      console.log("📝 Insertando madre:", datos.nombre_Madre, datos.apellido_Madre);
+      const nombreMadre = capitalizeWords(datos.nombre_Madre);
+      const apellidoMadre = capitalizeWords(datos.apellido_Madre);
+      console.log("📝 Insertando madre:", nombreMadre, apellidoMadre);
 
       const madreQuery = {
         text: `
@@ -295,8 +298,8 @@ async function guardarPadresEnTablaPadre(id_estudiante, datos) {
           RETURNING "Id_padre" as id
         `,
         values: [
-          datos.nombre_Madre,
-          datos.apellido_Madre,
+          nombreMadre,
+          apellidoMadre,
           datos.cedula_Madre || null,
           datos.ocupacion_Madre || null,
           datos.direccion_Trabajo_Madre || null,
@@ -311,7 +314,9 @@ async function guardarPadresEnTablaPadre(id_estudiante, datos) {
     // 2. Insertar PADRE
     let id_padre = null;
     if (datos.nombre_Padre && datos.apellido_Padre) {
-      console.log("📝 Insertando padre:", datos.nombre_Padre, datos.apellido_Padre);
+      const nombrePadre = capitalizeWords(datos.nombre_Padre);
+      const apellidoPadre = capitalizeWords(datos.apellido_Padre);
+      console.log("📝 Insertando padre:", nombrePadre, apellidoPadre);
 
       const padreQuery = {
         text: `
@@ -321,8 +326,8 @@ async function guardarPadresEnTablaPadre(id_estudiante, datos) {
           RETURNING "Id_padre" as id
         `,
         values: [
-          datos.nombre_Padre,
-          datos.apellido_Padre,
+          nombrePadre,
+          apellidoPadre,
           datos.cedula_Padre || null,
           datos.ocupacion_Padre || null,
           datos.direccion_Trabajo_Padre || null,

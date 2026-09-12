@@ -22,8 +22,17 @@ export const validarEmail = (email) => {
 
 export const validarTelefono = (telefono) => {
   if (!telefono) return false;
-  const re = /^[0-9\s\-\(\)\+]{7,15}$/;
-  return re.test(telefono);
+  // Acepta formato PREFIX-NUMERO (ej: 0414-1234567) o formato numérico 11 dígitos
+  const rePrefijo = /^04(14|24|16|26|12|22)-\d{7}$/;
+  const reNumerico = /^04(14|24|16|26|12|22)\d{7}$/;
+  return rePrefijo.test(telefono) || reNumerico.test(telefono);
+};
+
+export const validarCedula = (cedula) => {
+  if (!cedula) return false;
+  // Solo los dígitos (sin el prefijo V-)
+  const digits = String(cedula).replace(/[^0-9]/g, '');
+  return digits.length >= 7 && digits.length <= 8;
 };
 
 export const calcularEdad = (fechaNacimiento) => {

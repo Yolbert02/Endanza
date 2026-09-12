@@ -186,6 +186,8 @@ export const login = async (req, res) => {
         cedula: user.cedula,
         must_change_cedula: mustChangeCedula,
         tipo_rol: user.tipo_rol,
+        roles: user.roles || [user.tipo_rol?.toLowerCase() || 'estudiante'],
+        roles_ids: user.roles_ids || [user.Id_rol],
         es_profesor: !!profesorInfo,
         es_representante: !!representanteInfo,
         profesorId: profesorInfo?.Id_profesor || null,
@@ -216,6 +218,9 @@ export const login = async (req, res) => {
     }
 
     // Preparar respuesta del usuario
+    const userRoles = user.roles || [user.tipo_rol?.toLowerCase() || 'estudiante'];
+    const userRolesIds = user.roles_ids || [user.Id_rol];
+
     const userResponse = {
       id: user.id,
       username: user.username,
@@ -230,6 +235,8 @@ export const login = async (req, res) => {
       foto_usuario: user.foto_usuario,
       Id_rol: user.Id_rol,
       tipo_rol: user.tipo_rol,
+      roles: userRoles,
+      roles_ids: userRolesIds,
       Id_direccion: user.Id_direccion,
       nombre_direccion: user.nombre_direccion,
       nombre_ciudad: user.nombre_ciudad,
@@ -371,6 +378,8 @@ export const refreshToken = async (req, res) => {
           email: user.email,
           cedula: user.cedula,
           tipo_rol: user.tipo_rol,
+          roles: user.roles || [user.tipo_rol?.toLowerCase() || 'estudiante'],
+          roles_ids: user.roles_ids || [user.Id_rol],
           es_profesor: !!profesorInfo,
           es_representante: !!representanteInfo,
           profesorId: profesorInfo?.Id_profesor || null,
@@ -1665,6 +1674,185 @@ export const updateCedula = async (req, res) => {
   }
 };
 
+// ============================================
+// OBTENER LISTA PÚBLICA DE DOCENTES (para preinscripción / vinculación)
+// ============================================
+export const getDocentesPublic = async (req, res) => {
+  try {
+    const query = {
+      text: `
+        SELECT 
+          u."Id_usuario" as id,
+          u."cedula",
+          u."nombre",
+          u."apellido",
+          u."correo" as email,
+          u."telefono" as phone
+        FROM "Usuario" u
+        WHERE (u."estatus_usuario" ILIKE 'activo' OR u."estatus_usuario" IS NULL)
+          AND (
+            u."Id_rol" = 2 
+            OR EXISTS (
+              SELECT 1 FROM "Usuario_Rol" ur 
+              WHERE ur."Id_usuario" = u."Id_usuario" AND ur."Id_rol" = 2
+            )
+            OR EXISTS (
+              SELECT 1 FROM "Profesor" p 
+              WHERE p."Id_usuario" = u."Id_usuario"
+            )
+          )
+        ORDER BY u."apellido" ASC, u."nombre" ASC
+      `
+    };
+    const { rows } = await db.query(query.text);
+    return res.json({
+      ok: true,
+      docentes: rows
+    });
+  } catch (error) {
+    console.error("❌ Error en getDocentesPublic:", error);
+    return res.status(500).json({
+      ok: false,
+      msg: "Error al obtener lista de docentes",
+      error: error.message
+    });
+  }
+};
+
+// ============================================
+// SEARCH CANDIDATES FOR DOCENTE ROLE
+// ============================================
+export const searchDocenteCandidates = async (req, res) => {
+  try {
+    const { search } = req.query;
+    if (!search || search.trim().length < 2) {
+      return res.json({
+        ok: true,
+        candidates: [],
+        total: 0,
+      });
+    }
+
+    const candidates = await UserModel.searchDocenteCandidates(search.trim());
+
+    return res.json({
+      ok: true,
+      candidates,
+      total: candidates.length,
+    });
+  } catch (error) {
+    console.error("Error in searchDocenteCandidates:", error);
+    return res.status(500).json({
+      ok: false,
+      msg: "Error al buscar candidatos para docente",
+      error: error.message,
+    });
+  }
+};
+
+// ============================================
+// ASSIGN DOCENTE ROLE TO EXISTING USER / STUDENT
+// ============================================
+export const assignDocenteRole = async (req, res) => {
+  try {
+    const { userId, studentId, dni, first_name, last_name, email, phone, password, status } = req.body;
+
+    let targetUserId = userId;
+
+    if (!targetUserId && studentId) {
+      // Estudiante sin cuenta de Usuario previa
+      if (dni) {
+        const existByDni = await UserModel.findByCedula(dni);
+        if (existByDni) {
+          targetUserId = existByDni.id;
+        }
+      }
+      if (!targetUserId && email) {
+        const existByEmail = await UserModel.findOneByEmail(email);
+        if (existByEmail) {
+          targetUserId = existByEmail.id;
+        }
+      }
+
+      if (!targetUserId) {
+        if (!email) {
+          return res.status(400).json({ ok: false, msg: "El correo es obligatorio para crear el acceso" });
+        }
+        const username = email.split('@')[0];
+        const newUser = await UserModel.create({
+          username,
+          email,
+          password: password || '123456',
+          Id_rol: 2, // Docente
+          nombre: first_name,
+          apellido: last_name,
+          cedula: dni,
+          telefono: phone || null,
+          security_word: 'predeterminada',
+          respuesta_de_seguridad: 'predeterminada'
+        });
+        targetUserId = newUser.id;
+
+        // Asignar rol estudiante (3) y docente (2) en Usuario_Rol
+        await UserModel.addRoleToUser(targetUserId, 3);
+        await UserModel.addRoleToUser(targetUserId, 2);
+      }
+    }
+
+    if (!targetUserId) {
+      return res.status(400).json({ ok: false, msg: "ID de usuario o datos requeridos" });
+    }
+
+    // 1. Asignar rol docente (2) en Usuario_Rol
+    await UserModel.addRoleToUser(targetUserId, 2);
+
+    // 2. Crear registro en Profesor
+    await UserModel.createProfesor(targetUserId);
+
+    // 3. Actualizar datos opcionales
+    if (phone || email || status) {
+      try {
+        await db.query(`
+          UPDATE "Usuario"
+          SET 
+            "telefono" = COALESCE($1, "telefono"),
+            "correo" = COALESCE($2, "correo"),
+            "estatus_usuario" = COALESCE($3, "estatus_usuario"),
+            "actualizado_en" = CURRENT_TIMESTAMP
+          WHERE "Id_usuario" = $4
+        `, [phone || null, email || null, status === 'active' ? 'activo' : (status === 'inactive' ? 'inactivo' : null), targetUserId]);
+      } catch (err) {
+        console.warn("Could not update auxiliary fields on user:", err.message);
+      }
+    }
+
+    const updatedUser = await UserModel.findById(targetUserId);
+
+    return res.status(200).json({
+      ok: true,
+      msg: "Rol Docente asignado exitosamente",
+      user: {
+        id: updatedUser.id,
+        dni: updatedUser.cedula,
+        first_name: updatedUser.nombre,
+        last_name: updatedUser.apellido,
+        email: updatedUser.email,
+        phone: updatedUser.telefono || '',
+        role: 'docente',
+        status: updatedUser.is_active === 'activo' ? 'active' : 'inactive',
+        createdAt: updatedUser.created_at
+      }
+    });
+  } catch (error) {
+    console.error("Error in assignDocenteRole:", error);
+    return res.status(500).json({
+      ok: false,
+      msg: "Error al asignar rol docente",
+      error: error.message
+    });
+  }
+};
+
 export const UserController = {
   login,
   migrateAllPasswords,
@@ -1686,11 +1874,14 @@ export const UserController = {
   activateUser,
   deactivateUser,
   searchUsers,
+  searchDocenteCandidates,
+  assignDocenteRole,
   verifyEmail,
   recoverPasswordWithSecurity,
   getSecurityQuestion,
   register,
   updateCedula,
+  getDocentesPublic,
 };
 
 

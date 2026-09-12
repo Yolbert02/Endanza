@@ -48,9 +48,9 @@ const SystemMessageModal = ({
                 </CModalHeader>
 
                 <CModalBody className="text-center py-2 px-4">
-                    <p className="text-muted-custom mb-0 fs-6">
+                    <div className="text-muted-custom mb-0 fs-6">
                         {message}
-                    </p>
+                    </div>
                 </CModalBody>
 
                 <CModalFooter className="border-0 bg-transparent pb-4 pt-3 justify-content-center gap-3">

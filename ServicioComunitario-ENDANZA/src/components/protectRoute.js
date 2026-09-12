@@ -45,7 +45,11 @@ const ProtectedRoute = ({
     const loadUserData = () => {
       try {
         const user = getStoredUser() || {}
-        setUserRole(user.rol || '')
+        const savedActiveRole = sessionStorage.getItem('activeRole')
+        const effectiveRole = (savedActiveRole && user.roles?.includes(savedActiveRole))
+          ? savedActiveRole
+          : (user.rol || '')
+        setUserRole(effectiveRole)
       } catch (error) {
         console.error('Error loading user data:', error)
       } finally {

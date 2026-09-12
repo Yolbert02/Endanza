@@ -3,6 +3,7 @@ import { CCard, CCardBody, CBadge } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import { cilUser, cilSchool, cilCalendar, cilDrop } from '@coreui/icons'
 import PropTypes from 'prop-types'
+import { formatShortName } from '../../../../utils/formatters'
 
 const SummaryItem = ({ icon, label, value }) => (
     <div className="d-flex justify-content-between align-items-center mb-3 pb-3 summary-border last-no-border">
@@ -60,10 +61,17 @@ const ProfileSummary = ({ student }) => {
         )
     }
 
+    // Grado actual (usando nivel de danza/anterior si no hay grado escolar específico en la BD)
+    const gradoActual = student.grade_level_name || student.dance_level_name || student.grade_level || student.dance_level || 'N/A'
+
     // Obtener la primera sección si existe
     const seccionActual = student.sections && student.sections.length > 0 
         ? student.sections[0].section_name 
         : 'Sin asignar'
+
+    // Formatear representante a solo primer nombre y primer apellido
+    const repNombreCompleto = student.representative || (student.representative_first_name ? `${student.representative_first_name} ${student.representative_last_name || ''}`.trim() : '')
+    const repCorto = formatShortName(repNombreCompleto) || 'No definido'
 
     // Formatear fecha de nacimiento (YYYY-MM-DD)
     const formatFecha = (fechaStr) => {
@@ -95,7 +103,7 @@ const ProfileSummary = ({ student }) => {
                     <SummaryItem 
                         icon={cilSchool} 
                         label="Grado / Sección" 
-                        value={`${student.grade_level_name || 'N/A'} - ${seccionActual}`} 
+                        value={`${gradoActual} - ${seccionActual}`} 
                     />
                     <SummaryItem 
                         icon={cilCalendar} 
@@ -110,7 +118,7 @@ const ProfileSummary = ({ student }) => {
                     <SummaryItem 
                         icon={cilUser} 
                         label="Representante" 
-                        value={student.representative || 'No definido'} 
+                        value={repCorto} 
                     />
                     <SummaryItem 
                         icon={cilDrop} 

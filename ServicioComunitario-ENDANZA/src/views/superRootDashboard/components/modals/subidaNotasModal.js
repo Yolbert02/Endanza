@@ -20,7 +20,8 @@ const SubidaNotasModal = ({
     visible,
     onClose,
     periodoSubida,
-    onSave
+    onSave,
+    readOnly = false
 }) => {
     const [localData, setLocalData] = useState({
         fechaInicio: '',
@@ -136,16 +137,23 @@ const SubidaNotasModal = ({
                         <h4 className="mb-0 fw-black header-title-custom ls-tight">Control de Calificaciones</h4>
                         <div className="small text-muted-custom fw-medium">Gestión de tiempos para la subida de notas</div>
                     </div>
-                    <CButton
-                        color={localData.activo ? 'info' : 'secondary'}
-                        variant="outline"
-                        className={`rounded-pill px-4 py-2 fw-bold ls-1 d-flex align-items-center transition-all ${localData.activo ? 'bg-info bg-opacity-10' : 'bg-secondary bg-opacity-10'}`}
-                        onClick={() => setLocalData({ ...localData, activo: !localData.activo })}
-                        style={{ fontSize: '0.75rem' }}
-                    >
-                        <CIcon icon={cilPowerStandby} className="me-2" />
-                        {localData.activo ? 'RECEPCIÓN ON' : 'RECEPCIÓN OFF'}
-                    </CButton>
+                    {readOnly ? (
+                        <div className={`badge rounded-pill px-4 py-2 fw-bold ls-1 d-flex align-items-center ${localData.activo ? 'bg-info text-white' : 'bg-secondary text-white'}`} style={{ fontSize: '0.75rem' }}>
+                            <CIcon icon={cilPowerStandby} className="me-2" />
+                            {localData.activo ? 'RECEPCIÓN ACTIVA' : 'RECEPCIÓN INACTIVA'}
+                        </div>
+                    ) : (
+                        <CButton
+                            color={localData.activo ? 'info' : 'secondary'}
+                            variant="outline"
+                            className={`rounded-pill px-4 py-2 fw-bold ls-1 d-flex align-items-center transition-all ${localData.activo ? 'bg-info bg-opacity-10' : 'bg-secondary bg-opacity-10'}`}
+                            onClick={() => setLocalData({ ...localData, activo: !localData.activo })}
+                            style={{ fontSize: '0.75rem' }}
+                        >
+                            <CIcon icon={cilPowerStandby} className="me-2" />
+                            {localData.activo ? 'RECEPCIÓN ON' : 'RECEPCIÓN OFF'}
+                        </CButton>
+                    )}
                 </CModalTitle>
             </CModalHeader>
 
@@ -162,6 +170,8 @@ const SubidaNotasModal = ({
                                     <CFormInput
                                         type="date"
                                         value={localData.fechaInicio}
+                                        disabled={readOnly}
+                                        readOnly={readOnly}
                                         onChange={(e) => setLocalData({ ...localData, fechaInicio: e.target.value })}
                                         className="input-premium-clean p-0 border-0 fs-4 fw-bold header-title-custom bg-transparent outline-none"
                                     />
@@ -176,6 +186,8 @@ const SubidaNotasModal = ({
                                     <CFormInput
                                         type="date"
                                         value={localData.fechaFin}
+                                        disabled={readOnly}
+                                        readOnly={readOnly}
                                         onChange={(e) => setLocalData({ ...localData, fechaFin: e.target.value })}
                                         className="input-premium-clean p-0 border-0 fs-4 fw-bold header-title-custom bg-transparent outline-none"
                                     />
@@ -199,21 +211,32 @@ const SubidaNotasModal = ({
             </CModalBody>
 
             <CModalFooter className="border-0 p-4 pt-1">
-                <CButton variant="ghost" className="px-4 fw-bold text-muted-custom hover-lift shadow-none border-0" onClick={onClose}>
-                    CANCELAR
-                </CButton>
-                <CButton
-                    onClick={handleSave}
-                    disabled={loading}
-                    className="btn-premium px-5 py-3 rounded-pill fw-bold ms-auto shadow-sm text-white bg-info border-0"
-                >
-                    {loading ? (
-                        <CSpinner size="sm" className="me-2" />
-                    ) : (
-                        <CIcon icon={cilSave} className="me-2" />
-                    )}
-                    {loading ? 'GUARDANDO...' : 'ACTUALIZAR PERIODO'}
-                </CButton>
+                {readOnly ? (
+                    <CButton
+                        onClick={onClose}
+                        className="btn-premium px-5 py-3 rounded-pill fw-bold ms-auto shadow-sm text-white bg-secondary border-0"
+                    >
+                        CERRAR
+                    </CButton>
+                ) : (
+                    <>
+                        <CButton variant="ghost" className="px-4 fw-bold text-muted-custom hover-lift shadow-none border-0" onClick={onClose}>
+                            CANCELAR
+                        </CButton>
+                        <CButton
+                            onClick={handleSave}
+                            disabled={loading}
+                            className="btn-premium px-5 py-3 rounded-pill fw-bold ms-auto shadow-sm text-white bg-info border-0"
+                        >
+                            {loading ? (
+                                <CSpinner size="sm" className="me-2" />
+                            ) : (
+                                <CIcon icon={cilSave} className="me-2" />
+                            )}
+                            {loading ? 'GUARDANDO...' : 'ACTUALIZAR PERIODO'}
+                        </CButton>
+                    </>
+                )}
             </CModalFooter>
 
             <style>{`

@@ -32,10 +32,13 @@ import SystemMessageModal from '../../components/SystemMessageModal'
 
 // Hooks y servicios
 import useDashboardData from './hooks/useDashboardData'
+import useUserRole from '../../Hooks/useUserRole'
 import { getAvailableYears, addAcademicYear } from '../../services/configService'
+import { formatShortName } from '../../utils/formatters'
 
 export const SuperRootDashboard = () => {
   const navigate = useNavigate()
+  const { isSecretaria, isSuperadministrador } = useUserRole()
   const [currentYear, setCurrentYear] = useState(null)
   const [availableYears, setAvailableYears] = useState([])
   const [visibleCrearAnio, setVisibleCrearAnio] = useState(false)
@@ -225,7 +228,9 @@ export const SuperRootDashboard = () => {
                 <CIcon icon={cilSpeedometer} className="text-white" size="xl" />
               </div>
               <div className="overflow-hidden">
-                <h2 className="fw-black mb-0 header-title-custom ls-tight display-6 fs-3 fs-md-2 text-uppercase">Consola SuperRoot</h2>
+                <h2 className="fw-black mb-0 header-title-custom ls-tight display-6 fs-3 fs-md-2 text-uppercase">
+                  {isSecretaria ? 'Panel de Secretaría' : (isSuperadministrador ? 'Consola SuperRoot' : 'Consola Administrativa')}
+                </h2>
                 <div className="d-flex align-items-center gap-2 flex-wrap">
                   <span className="text-muted-custom fw-medium small text-uppercase ls-1">Gestión Administrativa de</span>
                   <span className="fw-bold px-2 py-0 rounded bg-orange-soft small ls-1" style={{ color: '#C35604' }}>ENDANZA</span>
@@ -256,14 +261,16 @@ export const SuperRootDashboard = () => {
               </CDropdownMenu>
             </CDropdown>
 
-            <CButton
-              className="rounded-pill px-4 py-2 fw-bold text-white shadow-sm d-flex align-items-center btn-premium-action border-0"
-              onClick={handleCreateNextYear}
-              style={{ height: '42px' }}
-            >
-              <CIcon icon={cilPlus} className="me-2" size="sm" />
-              <span className="text-nowrap ls-1">NUEVA GESTIÓN</span>
-            </CButton>
+            {!isSecretaria && (
+              <CButton
+                className="rounded-pill px-4 py-2 fw-bold text-white shadow-sm d-flex align-items-center btn-premium-action border-0"
+                onClick={handleCreateNextYear}
+                style={{ height: '42px' }}
+              >
+                <CIcon icon={cilPlus} className="me-2" size="sm" />
+                <span className="text-nowrap ls-1">NUEVA GESTIÓN</span>
+              </CButton>
+            )}
           </CCol>
         </CRow>
       </div>
@@ -282,6 +289,7 @@ export const SuperRootDashboard = () => {
           onOpenSubidaNotas={() => setVisibleSubidaNotas(true)}
           onOpenValidacionNotas={() => setVisibleValidacionNotas(true)}
           onOpenControlBoletines={() => setVisibleControlBoletines(true)}
+          isSecretaria={isSecretaria}
         />
 
         <CRow className="gy-4">
@@ -321,7 +329,7 @@ export const SuperRootDashboard = () => {
                         </div>
                         <div className="flex-grow-1 overflow-hidden">
                           <div className="fw-bold text-dark-custom text-truncate mb-0" style={{ fontSize: '0.9rem' }}>
-                            {u?.nombre} {u?.apellido}
+                            {formatShortName(u?.nombre, u?.apellido)}
                           </div>
                           <div className="text-muted-custom text-uppercase fw-bold ls-1" style={{ fontSize: '0.65rem' }}>
                             {u?.rol?.toUpperCase() || 'USUARIO'}
@@ -358,6 +366,7 @@ export const SuperRootDashboard = () => {
         onClose={() => setVisiblePeriodoInscripcion(false)}
         periodoInscripcion={periodoInscripcion}
         onSave={guardarPeriodoInscripcion}
+        readOnly={isSecretaria}
       />
 
       <SubidaNotasModal
@@ -365,31 +374,38 @@ export const SuperRootDashboard = () => {
         onClose={() => setVisibleSubidaNotas(false)}
         periodoSubida={periodoSubidaNotas}
         onSave={guardarPeriodoSubidaNotas}
+        readOnly={isSecretaria}
       />
 
-      <ValidacionNotasModal
-        visible={visibleValidacionNotas}
-        onClose={() => setVisibleValidacionNotas(false)}
-        notasPendientes={notasPendientes}
-        onAprobar={handleAprobarNota}
-        onRechazar={handleRechazarNota}
-      />
+      {!isSecretaria && (
+        <ValidacionNotasModal
+          visible={visibleValidacionNotas}
+          onClose={() => setVisibleValidacionNotas(false)}
+          notasPendientes={notasPendientes}
+          onAprobar={handleAprobarNota}
+          onRechazar={handleRechazarNota}
+        />
+      )}
 
-      <ControlBoletinesModal
-        visible={visibleControlBoletines}
-        onClose={() => setVisibleControlBoletines(false)}
-        boletines={boletines}
-        onToggleDisponible={handleToggleBoletin}
-        onHabilitarTodos={handleHabilitarTodosBoletines}
-      />
+      {!isSecretaria && (
+        <ControlBoletinesModal
+          visible={visibleControlBoletines}
+          onClose={() => setVisibleControlBoletines(false)}
+          boletines={boletines}
+          onToggleDisponible={handleToggleBoletin}
+          onHabilitarTodos={handleHabilitarTodosBoletines}
+        />
+      )}
 
-      <CrearAnioModal
-        visible={visibleCrearAnio}
-        onClose={() => setVisibleCrearAnio(false)}
-        onConfirm={confirmCreateYear}
-        currentYear={currentYear}
-        existingYears={availableYears}
-      />
+      {!isSecretaria && (
+        <CrearAnioModal
+          visible={visibleCrearAnio}
+          onClose={() => setVisibleCrearAnio(false)}
+          onConfirm={confirmCreateYear}
+          currentYear={currentYear}
+          existingYears={availableYears}
+        />
+      )}
 
       <SystemMessageModal
         visible={messageModal.visible}

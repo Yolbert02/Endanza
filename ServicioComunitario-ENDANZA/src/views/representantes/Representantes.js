@@ -16,6 +16,7 @@ import AvatarLetter from 'src/components/AvatarLetter'
 import SearchInput from 'src/components/SearchInput'
 import Pagination from 'src/components/Pagination'
 import InfoRepresentante from './components/InfoRepresentante'
+import { formatShortName } from '../../utils/formatters'
 
 const Representantes = () => {
     const [representatives, setRepresentatives] = useState([])
@@ -177,7 +178,7 @@ const Representantes = () => {
                                                         </div>
                                                         <div className="overflow-hidden">
                                                             <div className="fw-bold header-title-custom text-truncate" style={{ maxWidth: '180px' }}>
-                                                                {rep.first_name} {rep.last_name}
+                                                                {formatShortName(rep.first_name, rep.last_name)}
                                                             </div>
                                                             <div className="text-muted-custom small d-flex align-items-center">
                                                                 <CIcon icon={cilBadge} size="sm" className="me-1 opacity-50" />

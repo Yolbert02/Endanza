@@ -5,7 +5,12 @@ import { getStoredToken, getStoredUser, clearStoredAuth, setStoredAuth } from '.
 
 const useUserRole = () => {
   const cached = getStoredUser()
-  const [userRole, setUserRole] = useState(cached?.rol || null)
+  const savedActiveRole = sessionStorage.getItem('activeRole')
+  const initialRole = (savedActiveRole && cached?.roles?.includes(savedActiveRole))
+    ? savedActiveRole
+    : (cached?.rol || null)
+
+  const [userRole, setUserRole] = useState(initialRole)
   const [userId, setUserId] = useState(cached?.id || null)
   const [userData, setUserData] = useState(cached)
   const [isLoading, setIsLoading] = useState(!cached && !!getStoredToken())
@@ -42,25 +47,42 @@ const useUserRole = () => {
       if (!response.user) throw new Error('Respuesta inválida del servidor')
 
       const roleId = response.user.Id_rol
-      let roleName = roleMap[roleId] || 'estudiante'
+      let defaultRoleName = roleMap[roleId] || 'estudiante'
 
       // Identificar superadmin: todos los admins (Id_rol=1) son superadmin en este sistema
       if (roleId === 1 || response.user.username === 'superroot' || response.user.correo === 'superroot@gmail.com' || response.user.email === 'superroot@gmail.com') {
-        roleName = 'superadmin'
+        defaultRoleName = 'superadmin'
       }
 
-      console.log(`🔄 useUserRole - Usuario ID: ${roleId} → Rol: ${roleName}`)
+      // Soportar roles múltiples
+      const availableRoles = Array.isArray(response.user.roles) && response.user.roles.length > 0
+        ? response.user.roles
+        : [defaultRoleName]
+
+      // Determinar rol activo respetando la selección previa si es válida
+      const currentSavedRole = sessionStorage.getItem('activeRole')
+      const effectiveRole = (currentSavedRole && availableRoles.includes(currentSavedRole))
+        ? currentSavedRole
+        : defaultRoleName
+
+      sessionStorage.setItem('activeRole', effectiveRole)
+
+      console.log(`🔄 useUserRole - Rol Activo: ${effectiveRole}, Roles Disponibles:`, availableRoles)
 
       const completeUserData = {
         ...response.user,
-        rol: roleName,
+        rol: effectiveRole,
+        activeRole: effectiveRole,
+        roles: availableRoles,
+        roles_ids: response.user.roles_ids || [roleId],
+        primaryRole: defaultRoleName,
         Id_rol: roleId,
-        esAdmin: roleName === 'admin' || roleName === 'superadmin',
-        esSuperadministrador: roleName === 'superadmin',
-        esSecretaria: roleName === 'secretaria',
-        esDocente: roleName === 'docente',
-        esEstudiante: roleName === 'estudiante',
-        esRepresentante: roleName === 'representante'
+        esAdmin: effectiveRole === 'admin' || effectiveRole === 'superadmin',
+        esSuperadministrador: effectiveRole === 'superadmin',
+        esSecretaria: effectiveRole === 'secretaria',
+        esDocente: effectiveRole === 'docente',
+        esEstudiante: effectiveRole === 'estudiante',
+        esRepresentante: effectiveRole === 'representante'
       }
 
       // Actualizar usuario en sessionStorage
@@ -137,6 +159,9 @@ const useUserRole = () => {
     userData,
     isLoading,
     error,
+    roles: userData?.roles || (userRole ? [userRole] : []),
+    hasMultipleRoles: (userData?.roles?.length || 0) > 1,
+    activeRole: userRole,
     isAdmin: userRole === 'admin' || userRole === 'superadmin',
     isSuperadministrador: userRole === 'superadmin' || userData?.username === 'superroot' || userData?.correo === 'superroot@gmail.com' || userData?.email === 'superroot@gmail.com',
     isAdministrador: userRole === 'admin' || userRole === 'superadmin',
