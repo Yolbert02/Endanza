@@ -1,8 +1,10 @@
 // src/services/scheduleService.js - VERSIÓN CORREGIDA Y UNIFICADA
 import { scheduleAPI } from '../api/schedule.api';
-import { helpFetch } from '../api/helpFetch'; // Necesario para algunas funciones directas si no están en scheduleAPI
+import { helpFetch } from '../api/helpFetch';
 
-const fetch = helpFetch();
+// Instanciación del cliente HTTP asignado a 'api' y a 'fetch' para mantener compatibilidad
+const api = helpFetch();
+const fetch = api;
 
 // ============================================
 // GESTIÓN DE SECCIONES
@@ -24,25 +26,18 @@ export const getAllSections = async (academicYearId = null) => {
 // Alias para compatibilidad con código antiguo que usaba schedules.js
 export const listSections = async (filters = {}) => {
     try {
-        // Obtenemos todas y filtramos en cliente si es necesario
-        // O idealmente pasamos filtros al backend si lo soporta
-        let sections = await getAllSections(filters.academicYearId); // Asumimos que getAllSections ya maneja esto o trae todo
-
-        // El backend devuelve estructura plana o anidada, getAllSections puede devolver raw data
-        // Si necesitamos transformar, lo hacemos aquí o en getAllSections
+        let sections = await getAllSections(filters.academicYearId);
 
         if (filters.gradeLevel) {
             sections = sections.filter(s => s.grade_level === filters.gradeLevel || s.gradeLevel === filters.gradeLevel);
         }
 
-        // Mapeo para asegurar compatibilidad con componentes que esperan camelCase
         return sections.map(s => ({
             ...s,
-            // Asegurar campos esperados
             id: s.id,
             sectionName: s.section_name || s.sectionName,
             subjectName: s.subject_name || s.subjectName || 'Sin Materia',
-            gradeLevel: s.grade_level || s.gradeLevel || s.subject_name, // provisional
+            gradeLevel: s.grade_level || s.gradeLevel || s.subject_name,
             academicYear: s.academic_year_name || s.academicYear,
             schedules: (s.schedules || []).map(sched => ({
                 ...sched,
@@ -78,26 +73,38 @@ export const getSection = getSectionById; // Alias
 
 export const createSection = async (sectionData, academicYearId) => {
     try {
-        // Manejo flexible si academicYearId viene dentro de sectionData o aparte
-        const yearId = academicYearId || sectionData.academicYearId;
-        if (!yearId) throw new Error('El año académico es obligatorio');
+        const yearId = academicYearId || sectionData.academicYearId || sectionData.academic_year_id;
+        if (!yearId) {
+            throw new Error('El año académico es obligatorio para registrar la sección.');
+        }
 
         const payload = {
-            section_name: sectionData.sectionName || sectionData.section_name,
-            grade_level: sectionData.gradeLevel,
-            section_letter: sectionData.section,
-            capacity: sectionData.capacity || 30,
-            academic_year_id: yearId,
-            subject_id: sectionData.subject_id || null
+            section_name: (sectionData.sectionName || sectionData.section_name || '').trim(),
+            grade_level: sectionData.gradeLevel || sectionData.grade_level,
+            section_letter: sectionData.section || sectionData.section_letter || '',
+            capacity: Number(sectionData.capacity) || 30,
+            academic_year_id: Number(yearId),
+            subject_id: sectionData.subject_id ? Number(sectionData.subject_id) : null
         };
 
-        console.log('📤 Enviando payload con grade_level:', payload);
+        console.log('📤 Enviando payload estructurado a la API:', payload);
 
         const response = await scheduleAPI.createSection(payload);
-        if (response?.ok) return response.section || response.data;
-        throw new Error(response?.msg || 'Error al crear sección');
+
+        if (response?.ok || response?.status === 201 || response?.success) {
+            const rawData = response.section || response.data || response;
+
+            const normalizedSection = {
+                ...rawData,
+                id: Number(rawData.id || rawData.Id_seccion || rawData.section_id)
+            };
+
+            return normalizedSection;
+        }
+
+        throw new Error(response?.msg || response?.message || 'Error al crear la sección en el servidor.');
     } catch (error) {
-        console.error('❌ Error en createSection:', error);
+        console.error('❌ Error en createSection:', error.message || error);
         throw error;
     }
 };
@@ -115,11 +122,26 @@ export const updateSection = async (id, sectionData) => {
 
 export const deleteSection = async (id) => {
     try {
-        const response = await scheduleAPI.deleteSection(id);
-        if (response?.ok) return response;
-        throw new Error(response?.msg || 'Error al eliminar sección');
+        const sectionId = Number(id);
+        if (!sectionId || isNaN(sectionId)) {
+            throw new Error('El identificador de la sección proporcionado no es válido.');
+        }
+
+        console.log(`📤 Enviando solicitud para eliminar la sección con ID: ${sectionId}`);
+
+        const response = await scheduleAPI.deleteSection(sectionId);
+
+        const isSuccess = response?.ok || response?.status === 200 || response?.status === 204 || response?.success;
+
+        if (isSuccess) {
+            return response?.data || response;
+        }
+
+        const errorMessage = response?.msg || response?.message || response?.error || 'No se pudo eliminar la sección en el servidor.';
+        throw new Error(errorMessage);
+
     } catch (error) {
-        console.error('❌ Error en deleteSection:', error);
+        console.error(`❌ Error en deleteSection (ID: ${id}):`, error.message || error);
         throw error;
     }
 };
@@ -130,22 +152,24 @@ export const deleteSection = async (id) => {
 
 export const addScheduleToSection = async (sectionId, scheduleData) => {
     try {
-        const response = await scheduleAPI.addSchedule(sectionId, scheduleData);
-        if (response?.ok) return response.schedule || response.data;
-        throw new Error(response?.msg || 'Error al agregar horario');
-    } catch (error) {
-        console.error('❌ Error en addScheduleToSection:', error);
-        throw error;
-    }
-};
+        const targetSectionId = Number(sectionId);
+        if (!targetSectionId || isNaN(targetSectionId)) {
+            throw new Error('El identificador de la sección no es válido.');
+        }
 
-export const removeSchedule = async (scheduleId) => {
-    try {
-        const response = await scheduleAPI.deleteSchedule(scheduleId);
-        if (response?.ok) return response;
-        throw new Error(response?.msg || 'Error al eliminar horario');
+        console.log(`📤 Enviando payload a POST /api/sections/${targetSectionId}/schedules:`, scheduleData);
+
+        // Ahora api.post se ejecuta correctamente
+        const data = await api.post(`/api/sections/${targetSectionId}/schedules`, scheduleData);
+
+        if (!data.ok && !data._ok) {
+            const backendError = data.message || data.error || data.details || data.msg || `Error ${data._status || ''}: No se pudo registrar el horario`;
+            throw new Error(backendError);
+        }
+
+        return data;
     } catch (error) {
-        console.error('❌ Error en removeSchedule:', error);
+        console.error('❌ Error detallado en addScheduleToSection:', error.message || error);
         throw error;
     }
 };
@@ -158,21 +182,13 @@ export const removeScheduleFromSection = async (sectionId, scheduleId) => {
 // VALIDACIÓN Y CATÁLOGOS
 // ============================================
 
-export const checkAvailability = async (params) => { // Puede recibir objeto params o argumentos posicionales (legacy)
-    // Soporte para argumentos posicionales: (academicYear, day, start, end, classroom, excludeSectionId)
-    // Si params es string, asumimos que es el academicYearName
+export const checkAvailability = async (params) => {
     if (typeof params === 'string') {
         const [academicYear, day, start, end, classroom, excludeSectionId] = arguments;
 
-        // Necesitamos convertir nombre de año a ID si la API espera ID
-        // Por ahora intentamos usar lógica similar a schedules.js
         try {
-            const years = await getAvailableYears(); // Son strings
-            // Pero checkAvailability de backend espera ID en params generalmente.
-            // Si scheduleAPI.checkAvailability maneja query params del backend:
-            // const { academicYearId, day, startTime, endTime, classroom, excludeSectionId } = req.query;
+            const years = await getAvailableYears();
 
-            // Necesitamos el ID.
             const allYearsRes = await fetch.get('/api/config/academic-years');
             let yearId = null;
             if (allYearsRes.ok && allYearsRes.data) {
@@ -189,10 +205,7 @@ export const checkAvailability = async (params) => { // Puede recibir objeto par
                 classroom,
                 excludeSectionId
             }
-            const response = await scheduleAPI.checkAvailability({ ...queryParams }); // Adaptar a lo que espera scheduleAPI
-            // scheduleAPI.checkAvailability espera objeto q se convierte en query string?
-            // "checkAvailability: (params) => get(`/sections/schedules/check-availability`, params)" ?
-            // Asumiremos que scheduleAPI maneja el objeto.
+            const response = await scheduleAPI.checkAvailability({ ...queryParams });
             return response?.ok
                 ? { available: response.data?.available ?? response.available, message: response.message, conflict: response.conflict }
                 : { available: false, message: 'Error al verificar disponibilidad' };
@@ -214,9 +227,7 @@ export const checkAvailability = async (params) => { // Puede recibir objeto par
     }
 };
 
-// Compatibilidad nombre
 export const checkClassroomAvailability = checkAvailability;
-
 
 export const getClassrooms = async () => {
     try {
@@ -248,13 +259,10 @@ export const getBlocks = async () => {
     }
 };
 
-// Nuevas funciones traídas de schedules.js
 export const getAvailableYears = async () => {
     try {
         const response = await fetch.get('/api/config/academic-years');
         if (response.ok && response.data) {
-            // Mapeamos a solo nombres para compatibilidad con el frontend actual
-            // Ordenamos por nombre descendente (más reciente primero)
             const years = response.data.map(y => y.name).sort().reverse();
             return years;
         }
@@ -278,19 +286,17 @@ export const addAcademicYear = async (year) => {
     }
 };
 
-
 // ============================================
-// CONVERSIONES DE FORMATO - ¡VERSIÓN CORREGIDA!
+// CONVERSIONES DE FORMATO
 // ============================================
 
 export const adaptSectionFromDB = (dbSection) => {
     if (!dbSection) return null;
 
-    // Adaptar los horarios individuales
     const schedules = (dbSection.schedules || []).map(s => {
         return {
             id: s.id,
-            subject: s.subject_name || 'Sin materia',
+            subject: s.subject_name || s.subject || dbSection.subject_name || 'Sin materia',
             teacherName: s.teacher_name || 'Sin asignar',
             teacherId: s.teacher_user_id,
             dayOfWeek: s.day_name?.toUpperCase() || 'LUNES',
@@ -299,26 +305,22 @@ export const adaptSectionFromDB = (dbSection) => {
             classroom: s.classroom_name || 'Sin aula',
             dayId: s.day_id,
             blockId: s.block_id,
-            classroomId: s.classroom_id  // ← ESTO ES CRÍTICO PARA AULAS
+            classroomId: s.classroom_id
         };
     });
 
-    // Extraer elementos únicos para los resúmenes
     const uniqueSubjects = [...new Set(schedules.map(s => s.subject))];
     const uniqueTeachers = [...new Set(schedules.map(s => s.teacherName))];
     const uniqueClassrooms = [...new Set(schedules.map(s => s.classroom))];
 
-    // Determinar el nivel académico
     const gradeLevel = dbSection.grade_level || 'Sin materia';
 
-    // Construir el nombre completo de la sección
     let sectionName = dbSection.section_name || 'Sin nombre';
     if (dbSection.section_letter && !sectionName.includes(dbSection.section_letter)) {
         sectionName = `${sectionName} ${dbSection.section_letter}`;
     }
 
     return {
-        // Para ScheduleCard e InfoHorario
         id: dbSection.id,
         sectionName: sectionName,
         gradeLevel: gradeLevel,
@@ -326,17 +328,11 @@ export const adaptSectionFromDB = (dbSection) => {
         status: 'Active',
         academicYear: dbSection.academic_year_name || 'Desconocido',
         academicYearId: dbSection.academic_year_id,
-        totalHoursPerWeek: Math.round(dbSection.total_hours || 0),
-
-        // Horarios detallados
+        totalHoursPerWeek: parseFloat(dbSection.total_hours || 0),
         schedules: schedules,
-
-        // Resúmenes para InfoHorario
         uniqueSubjects: uniqueSubjects,
         uniqueTeachers: uniqueTeachers,
         uniqueClassrooms: uniqueClassrooms,
-
-        // Mantener originales para compatibilidad
         section_name: sectionName,
         subject_name: gradeLevel,
         academic_year_name: dbSection.academic_year_name,

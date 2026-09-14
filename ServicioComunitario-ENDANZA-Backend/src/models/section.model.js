@@ -202,23 +202,22 @@ const findSchedulesBySectionId = async (sectionId) => {
   }
 };
 
-const addSchedule = async (sectionId, scheduleData) => {
+export const addSchedule = async (scheduleData) => {
   try {
-    const { Id_aula, Id_profesor, Id_bloque, Id_dia } = scheduleData;
-
     const query = {
       text: `
-        INSERT INTO "Horario" ("Id_seccion", "Id_aula", "Id_profesor", "Id_bloque", "Id_dia")
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO "Horario" ("Id_seccion", "Id_aula", "Id_profesor", "Id_bloque", "Id_dia", "Id_materia")
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING 
           "Id_horario" as id,
           "Id_seccion" as section_id,
           "Id_aula" as classroom_id,
           "Id_profesor" as teacher_id,
           "Id_bloque" as block_id,
-          "Id_dia" as day_id
+          "Id_dia" as day_id,
+          "Id_materia" as subject_id
       `,
-      values: [sectionId, Id_aula, Id_profesor, Id_bloque, Id_dia]
+      values: [sectionId, aula, prof, bloque, dia, materia]
     };
 
     const { rows } = await db.query(query.text, query.values);

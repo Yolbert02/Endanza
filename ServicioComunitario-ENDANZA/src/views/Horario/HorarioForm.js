@@ -36,12 +36,13 @@ import {
 
 // SERVICIOS REALES
 import * as TeacherService from '../../services/teacherService'
-import { 
-    getClassrooms, 
-    getDays, 
-    getBlocks, 
+import {
+    getClassrooms,
+    getDays,
+    getBlocks,
     checkAvailability,
     createSection,
+    updateSection,
     addScheduleToSection
 } from '../../services/scheduleService'
 
@@ -108,7 +109,7 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
     // ============================================
     // EFECTOS
     // ============================================
-    
+
     // Cargar datos cuando se abre el modal
     useEffect(() => {
         if (visible) {
@@ -131,15 +132,15 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
                     blockId: ''
                 })
             }
-            
+
             // Cargar catálogos si hay año académico seleccionado
             if (academicYear) {
                 loadCatalogData()
             } else {
                 console.warn('⚠️ No hay año académico seleccionado')
-                setErrorModal({ 
-                    visible: true, 
-                    message: 'Error: No hay año académico seleccionado. Por favor, selecciona un año primero.' 
+                setErrorModal({
+                    visible: true,
+                    message: 'Error: No hay año académico seleccionado. Por favor, selecciona un año primero.'
                 })
             }
         }
@@ -148,7 +149,7 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
     // ============================================
     // FUNCIONES AUXILIARES
     // ============================================
-    
+
     const addMinutes = (time, minsToAdd) => {
         try {
             const [h, m] = time.split(':').map(Number);
@@ -174,7 +175,7 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
     // ============================================
     // CARGA DE DATOS DESDE BD
     // ============================================
-    
+
     const loadCatalogData = async () => {
         setLoadingCatalogs(true)
         try {
@@ -182,17 +183,17 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
             const teachersRes = await TeacherService.getAll(academicYear.id)
             console.log('👨‍🏫 Profesores cargados:', teachersRes)
             setTeachers(teachersRes || [])
-            
+
             // Cargar aulas
             const classroomsRes = await getClassrooms()
             console.log('🏫 Aulas cargadas:', classroomsRes)
             setClassrooms(classroomsRes || [])
-            
+
             // Cargar días
             const daysRes = await getDays()
             console.log('📅 Días cargados:', daysRes)
             setDays(daysRes || [])
-            
+
             // Cargar bloques
             const blocksRes = await getBlocks()
             console.log('⏰ Bloques cargados:', blocksRes)
@@ -208,19 +209,19 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
     // ============================================
     // MANEJADORES DE HORARIOS
     // ============================================
-    
+
     const handleAddSchedule = async () => {
         // Validar que hay año académico
         if (!academicYear || !academicYear.id) {
-            setErrorModal({ 
-                visible: true, 
-                message: 'Error: No hay año académico seleccionado' 
+            setErrorModal({
+                visible: true,
+                message: 'Error: No hay año académico seleccionado'
             })
             return
         }
 
         // Validar campos requeridos
-        if (!newSchedule.subject || !newSchedule.teacherId || !newSchedule.classroomId || 
+        if (!newSchedule.subject || !newSchedule.teacherId || !newSchedule.classroomId ||
             !newSchedule.dayId || !newSchedule.blockId) {
             setErrorModal({ visible: true, message: 'Por favor complete todos los campos del horario.' })
             return
@@ -243,9 +244,9 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
 
             if (hasLocalConflict) {
                 const classroom = classrooms.find(c => c.id === parseInt(newSchedule.classroomId))
-                setErrorModal({ 
-                    visible: true, 
-                    message: `Conflicto Local: El aula ${classroom?.name || 'seleccionada'} ya está asignada en este horario para esta misma sección.` 
+                setErrorModal({
+                    visible: true,
+                    message: `Conflicto Local: El aula ${classroom?.name || 'seleccionada'} ya está asignada en este horario para esta misma sección.`
                 })
                 return
             }
@@ -279,7 +280,7 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
 
             // 5. Crear ID temporal para el horario en memoria
             const scheduleId = Math.max(...schedules.map(s => s.id), 0) + 1
-            
+
             // 6. Agregar a la lista local con SUBJECT_ID
             setSchedules([...schedules, {
                 id: scheduleId,
@@ -316,9 +317,9 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
     const handleSubjectChange = (e) => {
         const selectedValue = e.target.value;
         const selectedSubject = SUBJECTS.find(s => s.value === selectedValue);
-        
-        setNewSchedule({ 
-            ...newSchedule, 
+
+        setNewSchedule({
+            ...newSchedule,
             subject: selectedValue,
             subjectId: selectedSubject?.id || null
         });
@@ -331,7 +332,7 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
     // ============================================
     // CÁLCULOS
     // ============================================
-    
+
     const calculateTotalHours = () => {
         if (schedules.length === 0) return 0
         let totalMinutes = 0
@@ -349,15 +350,15 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
     // ============================================
     // VALIDACIÓN Y ENVÍO - VERSIÓN CORREGIDA CON NIVEL ACADÉMICO
     // ============================================
-    
+
     const validateForm = () => {
-        if (!sectionName.trim()) { 
+        if (!sectionName.trim()) {
             setErrorModal({ visible: true, message: 'El nombre de la sección es obligatorio' })
-            return false 
+            return false
         }
-        if (!gradeLevel) { 
+        if (!gradeLevel) {
             setErrorModal({ visible: true, message: 'El grado es obligatorio' })
-            return false 
+            return false
         }
         return true
     }
@@ -365,49 +366,63 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
     const handleSubmit = async (e) => {
         e.preventDefault()
         e.stopPropagation()
-        
+
         if (saving) return
-        
+
         if (!validateForm()) return
-        
+
         if (!academicYear || !academicYear.id) {
-            setErrorModal({ 
-                visible: true, 
-                message: 'Error: No hay año académico seleccionado. Por favor, selecciona un año primero.' 
+            setErrorModal({
+                visible: true,
+                message: 'Error: No hay año académico seleccionado. Por favor, selecciona un año primero.'
             })
             return
         }
-        
+
         setSaving(true)
-        
+
         try {
-            // PASO 1: Crear la sección con el NIVEL ACADÉMICO incluido
+            // Detectar si estamos en modo edición verificando la existencia del ID en 'initial'
+            const isEditing = Boolean(initial?.id || initial?.section_id)
+            const targetSectionId = initial?.id || initial?.section_id
+
+            // Datos de la sección a procesar
             const sectionData = {
                 sectionName: sectionName.trim(),
-                gradeLevel: gradeLevel,  // ← IMPORTANTE: Incluir el nivel académico
-                section: section,         // ← La letra de la sección
+                gradeLevel: gradeLevel,  // Nivel académico
+                section: section,         // Letra de la sección
                 capacity: 30
             }
-            
-            console.log('📤 Creando sección con nivel académico:', { 
-                sectionData, 
-                academicYearId: academicYear.id,
-                gradeLevel: gradeLevel 
-            })
-            
-            const newSection = await createSection(sectionData, academicYear.id)
-            console.log('✅ Sección creada:', newSection)
-            
-            // PASO 2: Si hay horarios en la lista local, guardarlos UNO POR UNO CON SUBJECT_ID
-            if (schedules.length > 0) {
-                console.log(`📤 Guardando ${schedules.length} horarios para la sección ${newSection.id}...`)
-                
+
+            let currentSection = null
+
+            if (isEditing) {
+                // PASO 1A: Actualizar la sección existente si es edición
+                console.log(`📝 Actualizando sección ID ${targetSectionId}:`, sectionData)
+                const updatedSection = await updateSection(targetSectionId, sectionData)
+                currentSection = updatedSection || { id: targetSectionId, ...sectionData }
+            } else {
+                // PASO 1B: Crear la sección si es un registro nuevo
+                console.log('📤 Creando nueva sección:', {
+                    sectionData,
+                    academicYearId: academicYear.id,
+                    gradeLevel: gradeLevel
+                })
+                currentSection = await createSection(sectionData, academicYear.id)
+                console.log('✅ Sección creada:', currentSection)
+            }
+
+            const activeSectionId = currentSection.id || targetSectionId
+
+            // PASO 2: Si hay horarios en la lista local, guardarlos
+            if (schedules.length > 0 && activeSectionId) {
+                console.log(`📤 Guardando ${schedules.length} horarios para la sección ${activeSectionId}...`)
+
                 let horariosGuardados = 0
                 let horariosConError = 0
-                
+
                 for (const schedule of schedules) {
                     try {
-                        // Preparar datos del horario para el backend - INCLUYE SUBJECT_ID
                         const scheduleData = {
                             classroom_id: schedule.classroomId,
                             teacher_id: schedule.teacherId,
@@ -415,49 +430,49 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
                             day_id: schedule.dayId,
                             subject_id: schedule.subjectId
                         }
-                        
+
                         console.log('📤 Guardando horario:', scheduleData)
-                        
-                        // Llamar al API para agregar el horario
-                        await addScheduleToSection(newSection.id, scheduleData)
+
+                        // Agregar el horario a la sección activa (nueva o editada)
+                        await addScheduleToSection(activeSectionId, scheduleData)
                         horariosGuardados++
-                        
+
                     } catch (error) {
                         console.error('❌ Error guardando horario:', error)
                         horariosConError++
                     }
                 }
-                
+
                 console.log(`✅ Horarios guardados: ${horariosGuardados}, Errores: ${horariosConError}`)
-                
+
                 if (horariosConError > 0) {
                     setErrorModal({
                         visible: true,
-                        message: `Se creó la sección pero ${horariosConError} horarios no pudieron guardarse.`
+                        message: `Se procesó la sección pero ${horariosConError} horarios no pudieron guardarse.`
                     })
                 }
             }
-            
-            // Crear un objeto con los datos completos para pasar al onSave
+
+            // Objeto de respuesta completo para enviar a la función del padre
             const sectionCompleta = {
-                ...newSection,
-                gradeLevel: gradeLevel,  // ← Incluir el nivel académico
+                ...currentSection,
+                id: activeSectionId,
+                gradeLevel: gradeLevel,
                 sectionName: sectionName.trim(),
                 section: section
             }
-            
-            // Llamar al onSave del padre si existe
+
             if (onSave) {
                 await onSave(sectionCompleta)
             }
-            
+
             onClose()
-            
+
         } catch (error) {
             console.error('❌ Error en handleSubmit:', error)
-            setErrorModal({ 
-                visible: true, 
-                message: error.message || 'Error al crear la sección' 
+            setErrorModal({
+                visible: true,
+                message: error.message || 'Error al procesar la sección'
             })
         } finally {
             setSaving(false)
@@ -467,7 +482,7 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
     // ============================================
     // RENDER
     // ============================================
-    
+
     return (
         <>
             <CModal size="xl" visible={visible} onClose={onClose} backdrop="static" className="premium-modal">
@@ -482,7 +497,7 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
                         )}
                     </CModalTitle>
                 </CModalHeader>
-                
+
                 <CForm onSubmit={handleSubmit}>
                     <CModalBody className="p-4 bg-light-custom bg-opacity-10" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
 
@@ -538,7 +553,7 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
                                     {loadingCatalogs && <CSpinner size="sm" className="ms-2" style={{ color: '#E07A00' }} />}
                                 </h6>
                             </div>
-                            
+
                             <CCardBody className="p-4 bg-light-custom bg-opacity-10">
                                 <div className="p-4 bg-light-custom bg-opacity-25 rounded-4 mb-4 border border-light-custom shadow-sm">
                                     <CRow className="g-3 align-items-end">
@@ -555,7 +570,7 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
                                                 ))}
                                             </CFormSelect>
                                         </CCol>
-                                        
+
                                         {/* Profesor (desde BD) */}
                                         <CCol md={3}>
                                             <CFormSelect
@@ -566,14 +581,17 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
                                                 disabled={loadingCatalogs}
                                             >
                                                 <option value="">Seleccionar profesor...</option>
-                                                {teachers.map(teacher => (
-                                                    <option key={teacher.id} value={teacher.id}>
-                                                        {teacher.first_name} {teacher.last_name}
-                                                    </option>
-                                                ))}
+                                                {teachers
+                                                    .filter((teacher, index, self) => self.findIndex(t => t.id === teacher.id) === index)
+                                                    .map(teacher => (
+                                                        <option key={teacher.id} value={teacher.id}>
+                                                            {teacher.first_name} {teacher.last_name}
+                                                        </option>
+                                                    ))
+                                                }
                                             </CFormSelect>
                                         </CCol>
-                                        
+
                                         {/* Día (desde BD) */}
                                         <CCol md={2}>
                                             <CFormSelect
@@ -591,7 +609,7 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
                                                 ))}
                                             </CFormSelect>
                                         </CCol>
-                                        
+
                                         {/* Bloque (desde BD) */}
                                         <CCol md={2}>
                                             <CFormSelect
@@ -604,12 +622,12 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
                                                 <option value="">Seleccionar bloque...</option>
                                                 {blocks.map(block => (
                                                     <option key={block.id} value={block.id}>
-                                                        {block.name} ({block.start_time?.substring(0,5)} - {block.end_time?.substring(0,5)})
+                                                        {block.name} ({block.start_time?.substring(0, 5)} - {block.end_time?.substring(0, 5)})
                                                     </option>
                                                 ))}
                                             </CFormSelect>
                                         </CCol>
-                                        
+
                                         {/* Aula (desde BD) */}
                                         <CCol md={2}>
                                             <CFormSelect
@@ -627,7 +645,7 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
                                                 ))}
                                             </CFormSelect>
                                         </CCol>
-                                        
+
                                         {/* Botón Agregar */}
                                         <CCol md={1}>
                                             <CButton
@@ -635,7 +653,7 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
                                                 className="w-100 fw-bold py-2 btn-premium shadow-sm"
                                                 disabled={loadingCatalogs || saving}
                                             >
-                                                <CIcon icon={cilPlus} /> 
+                                                <CIcon icon={cilPlus} />
                                             </CButton>
                                         </CCol>
                                     </CRow>
@@ -672,10 +690,10 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
                                                             </CBadge>
                                                         </CTableDataCell>
                                                         <CTableDataCell className="text-end pe-4 border-0">
-                                                            <CButton 
-                                                                size="sm" 
-                                                                color="transparent" 
-                                                                className="text-danger hover-lift shadow-sm bg-light-custom bg-opacity-10 border-light-custom" 
+                                                            <CButton
+                                                                size="sm"
+                                                                color="transparent"
+                                                                className="text-danger hover-lift shadow-sm bg-light-custom bg-opacity-10 border-light-custom"
                                                                 onClick={() => handleRemoveSchedule(schedule.id)}
                                                                 disabled={saving}
                                                             >
@@ -699,16 +717,16 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
                         {/* RESUMEN */}
                         <div className="d-flex justify-content-end text-muted-custom fw-bold small ls-1 text-uppercase">
                             <span className="me-4 d-flex align-items-center">
-                                <div className="bg-primary rounded-circle me-2" style={{ width: '8px', height: '8px' }}></div> 
+                                <div className="bg-primary rounded-circle me-2" style={{ width: '8px', height: '8px' }}></div>
                                 Total Clases: <strong className="ms-1 header-title-custom">{schedules.length}</strong>
                             </span>
                             <span className="d-flex align-items-center">
-                                <div className="bg-success rounded-circle me-2" style={{ width: '8px', height: '8px' }}></div> 
+                                <div className="bg-success rounded-circle me-2" style={{ width: '8px', height: '8px' }}></div>
                                 Carga Horaria: <strong className="ms-1 header-title-custom">{calculateTotalHours()} hrs/sem</strong>
                             </span>
                         </div>
                     </CModalBody>
-                    
+
                     <CModalFooter className="bg-light-custom bg-opacity-10 border-top border-light-custom border-opacity-10">
                         <CButton
                             onClick={onClose}
@@ -794,5 +812,5 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
         </>
     )
 }
- 
+
 export default HorarioForm

@@ -41,7 +41,9 @@ const findAllSections = async (academicYearId = null) => {
                                         'classroom_name', au."nombre_aula",
                                         'teacher_id', h."Id_profesor",
                                         'teacher_name', CONCAT(u."nombre", ' ', u."apellido"),
-                                        'teacher_user_id', u."Id_usuario"
+                                        'teacher_user_id', u."Id_usuario",
+                                        'subject_id', COALESCE(h."Id_materia", s."Id_materia"),
+                                        'subject_name', COALESCE(mat."nombre_materia", m."nombre_materia", 'Sin materia')
                                     )
                                     ORDER BY d."Id_dia", b."inicio_bloque"
                                 )
@@ -51,6 +53,7 @@ const findAllSections = async (academicYearId = null) => {
                                 LEFT JOIN "Aula" au ON h."Id_aula" = au."Id_aula"
                                 LEFT JOIN "Profesor" p ON h."Id_profesor" = p."Id_profesor"
                                 LEFT JOIN "Usuario" u ON p."Id_usuario" = u."Id_usuario"
+                                LEFT JOIN "Materia" mat ON h."Id_materia" = mat."Id_materia"
                                 WHERE h."Id_seccion" = s."Id_seccion"
                             ),
                             '[]'::json
@@ -107,7 +110,9 @@ const findAllSections = async (academicYearId = null) => {
                                         'classroom_name', au."nombre_aula",
                                         'teacher_id', h."Id_profesor",
                                         'teacher_name', CONCAT(u."nombre", ' ', u."apellido"),
-                                        'teacher_user_id', u."Id_usuario"
+                                        'teacher_user_id', u."Id_usuario",
+                                        'subject_id', COALESCE(h."Id_materia", s."Id_materia"),
+                                        'subject_name', COALESCE(mat."nombre_materia", m."nombre_materia", 'Sin materia')
                                     )
                                     ORDER BY d."Id_dia", b."inicio_bloque"
                                 )
@@ -117,6 +122,7 @@ const findAllSections = async (academicYearId = null) => {
                                 LEFT JOIN "Aula" au ON h."Id_aula" = au."Id_aula"
                                 LEFT JOIN "Profesor" p ON h."Id_profesor" = p."Id_profesor"
                                 LEFT JOIN "Usuario" u ON p."Id_usuario" = u."Id_usuario"
+                                LEFT JOIN "Materia" mat ON h."Id_materia" = mat."Id_materia"
                                 WHERE h."Id_seccion" = s."Id_seccion"
                             ),
                             '[]'::json
@@ -181,7 +187,9 @@ const findSectionById = async (id) => {
                                     'classroom_name', au."nombre_aula",
                                     'teacher_id', h."Id_profesor",
                                     'teacher_name', CONCAT(u."nombre", ' ', u."apellido"),
-                                    'teacher_user_id', u."Id_usuario"
+                                    'teacher_user_id', u."Id_usuario",
+                                    'subject_id', COALESCE(h."Id_materia", s."Id_materia"),
+                                    'subject_name', COALESCE(mat."nombre_materia", m."nombre_materia", 'Sin materia')
                                 )
                                 ORDER BY d."Id_dia", b."inicio_bloque"
                             )
@@ -191,6 +199,7 @@ const findSectionById = async (id) => {
                             LEFT JOIN "Aula" au ON h."Id_aula" = au."Id_aula"
                             LEFT JOIN "Profesor" p ON h."Id_profesor" = p."Id_profesor"
                             LEFT JOIN "Usuario" u ON p."Id_usuario" = u."Id_usuario"
+                            LEFT JOIN "Materia" mat ON h."Id_materia" = mat."Id_materia"
                             WHERE h."Id_seccion" = s."Id_seccion"
                         ),
                         '[]'::json
@@ -506,7 +515,8 @@ const createSchedule = async (scheduleData) => {
             blockId: block_id,
             classroomId: classroom_id,
             teacherId: profesorId,
-            excludeScheduleId: null
+            excludeScheduleId: null,
+            excludeSectionId: section_id
         });
 
         if (!isAvailable.available) {
@@ -521,17 +531,19 @@ const createSchedule = async (scheduleData) => {
                     "Id_aula", 
                     "Id_profesor", 
                     "Id_bloque", 
-                    "Id_dia"
-                ) VALUES ($1, $2, $3, $4, $5)
+                    "Id_dia",
+                    "Id_materia"
+                ) VALUES ($1, $2, $3, $4, $5, $6)
                 RETURNING 
                     "Id_horario" as id,
                     "Id_seccion" as section_id,
                     "Id_aula" as classroom_id,
                     "Id_profesor" as teacher_id,
                     "Id_bloque" as block_id,
-                    "Id_dia" as day_id
+                    "Id_dia" as day_id,
+                    "Id_materia" as subject_id
             `,
-            values: [section_id, classroom_id, profesorId, block_id, day_id]
+            values: [section_id, classroom_id, profesorId, block_id, day_id, subject_id || null]
         };
 
         const { rows } = await db.query(query.text, query.values);
@@ -546,7 +558,7 @@ const createSchedule = async (scheduleData) => {
 
 const updateSchedule = async (id, scheduleData) => {
     try {
-        const { classroom_id, teacher_id, block_id, day_id } = scheduleData;
+        const { classroom_id, teacher_id, block_id, day_id, subject_id } = scheduleData;
 
         const currentSchedule = await db.query(
             `SELECT h.*, s."Id_ano" as academic_year_id
@@ -580,17 +592,19 @@ const updateSchedule = async (id, scheduleData) => {
                     "Id_aula" = COALESCE($1, "Id_aula"),
                     "Id_profesor" = COALESCE($2, "Id_profesor"),
                     "Id_bloque" = COALESCE($3, "Id_bloque"),
-                    "Id_dia" = COALESCE($4, "Id_dia")
-                WHERE "Id_horario" = $5
+                    "Id_dia" = COALESCE($4, "Id_dia"),
+                    "Id_materia" = COALESCE($5, "Id_materia")
+                WHERE "Id_horario" = $6
                 RETURNING 
                     "Id_horario" as id,
                     "Id_seccion" as section_id,
                     "Id_aula" as classroom_id,
                     "Id_profesor" as teacher_id,
                     "Id_bloque" as block_id,
-                    "Id_dia" as day_id
+                    "Id_dia" as day_id,
+                    "Id_materia" as subject_id
             `,
-            values: [classroom_id, teacher_id, block_id, day_id, id]
+            values: [classroom_id, teacher_id, block_id, day_id, subject_id !== undefined ? subject_id : null, id]
         };
 
         const { rows } = await db.query(query.text, query.values);
@@ -619,7 +633,15 @@ const deleteSchedule = async (id) => {
 // ============================================
 // VALIDACIÓN DE DISPONIBILIDAD
 // ============================================
-const checkAvailability = async ({ academicYearId, dayId, blockId, classroomId, teacherId, excludeScheduleId = null }) => {
+const checkAvailability = async ({
+    academicYearId,
+    dayId,
+    blockId,
+    classroomId,
+    teacherId,
+    excludeScheduleId = null,
+    excludeSectionId = null // 👈 1. ACEPTAR EXCLUDE SECTION ID
+}) => {
     try {
         console.log('🔍 Verificando disponibilidad:', {
             academicYearId,
@@ -627,7 +649,8 @@ const checkAvailability = async ({ academicYearId, dayId, blockId, classroomId, 
             blockId,
             classroomId,
             teacherId,
-            excludeScheduleId
+            excludeScheduleId,
+            excludeSectionId
         });
 
         // 1. Verificar disponibilidad del aula
@@ -647,10 +670,19 @@ const checkAvailability = async ({ academicYearId, dayId, blockId, classroomId, 
         `;
 
         const classroomValues = [classroomId, dayId, blockId, academicYearId];
+        let classroomParamIdx = 5;
 
         if (excludeScheduleId) {
-            classroomQuery += ` AND h."Id_horario" != $5`;
+            classroomQuery += ` AND h."Id_horario" != $${classroomParamIdx}`;
             classroomValues.push(excludeScheduleId);
+            classroomParamIdx++;
+        }
+
+        // 👈 2. IGNORAR HORARIOS DE LA MISMA SECCIÓN AL EDITAR
+        if (excludeSectionId) {
+            classroomQuery += ` AND h."Id_seccion" != $${classroomParamIdx}`;
+            classroomValues.push(excludeSectionId);
+            classroomParamIdx++;
         }
 
         const classroomConflict = await db.query(classroomQuery, classroomValues);
@@ -683,10 +715,19 @@ const checkAvailability = async ({ academicYearId, dayId, blockId, classroomId, 
         `;
 
         const teacherValues = [teacherId, dayId, blockId, academicYearId];
+        let teacherParamIdx = 5;
 
         if (excludeScheduleId) {
-            teacherQuery += ` AND h."Id_horario" != $5`;
+            teacherQuery += ` AND h."Id_horario" != $${teacherParamIdx}`;
             teacherValues.push(excludeScheduleId);
+            teacherParamIdx++;
+        }
+
+        // 👈 3. IGNORAR SI EL PROFESOR TIENE CLASE EN LA MISMA SECCIÓN
+        if (excludeSectionId) {
+            teacherQuery += ` AND h."Id_seccion" != $${teacherParamIdx}`;
+            teacherValues.push(excludeSectionId);
+            teacherParamIdx++;
         }
 
         const teacherConflict = await db.query(teacherQuery, teacherValues);

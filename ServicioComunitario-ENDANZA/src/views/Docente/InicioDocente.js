@@ -46,10 +46,10 @@ const InicioDocente = () => {
     }, [isSuperadministrador])
 
     useEffect(() => {
-        if (selectedYear && selectedTeacher) {
+        if (selectedYearId) {
             fetchDashboardData()
         }
-    }, [selectedTeacher, selectedYear, selectedYearId, currentUser])
+    }, [selectedYearId, selectedTeacher, currentUser])
 
     const loadInitialData = async () => {
         try {
@@ -88,11 +88,21 @@ const InicioDocente = () => {
 
     const extractTeachers = (sectionsData) => {
         const teachers = new Set()
+
         sectionsData.forEach(section => {
-            section.schedules.forEach(sched => {
-                if (sched.teacherName) teachers.add(sched.teacherName)
+            // 🟢 1. Asegurar que 'schedules' exista antes de iterar
+            const schedules = section.schedules || []
+
+            schedules.forEach(sched => {
+                // 🟢 2. Evaluar 'teacher_name' (PostgreSQL) y 'teacherName' como fallback
+                const teacherName = sched.teacher_name || sched.teacherName
+
+                if (teacherName && teacherName.trim() !== '') {
+                    teachers.add(teacherName.trim())
+                }
             })
         })
+
         return Array.from(teachers).sort()
     }
 
@@ -100,79 +110,99 @@ const InicioDocente = () => {
         setLoading(true)
         console.log("🔍 DASHBOARD: Buscando datos para:", { teacher: selectedTeacher, year: selectedYear, yearId: selectedYearId })
         try {
-            // Pasamos el ID del año al backend para que filtre allí directamente
             const allSections = await listSections({ academicYearId: selectedYearId })
-            console.log("📦 DASHBOARD: Secciones del backend:", allSections.length)
+            console.log("📦 DASHBOARD: Secciones obtenidas del backend:", allSections)
 
-            // Por si acaso, filtramos también en cliente por el nombre para asegurar coincidencia visual
+            // 1. Filtrado por año académico
             const normalizedSelectedYear = (selectedYear || '').trim()
             const yearFiltered = allSections.filter(s => {
-                const sYear = (s.academicYear || '').trim()
-                return sYear === normalizedSelectedYear
+                const sYear = (s.academic_year_name || s.academicYear || '').trim()
+                return !normalizedSelectedYear || sYear === normalizedSelectedYear
             })
 
-            // Poblar lista de profesores
+            // Extraer lista global de profesores para los filtros
             const teachers = extractTeachers(yearFiltered)
             setFullTeachersList(teachers)
 
-            // 3. Filtrar secciones donde el profesor sea el usuario logueado
-            // Asegurar obtener el ID del usuario actual, incluso si el estado currentUser tiene latencia
-            const userStr = localStorage.getItem('user');
-            const localUser = userStr ? JSON.parse(userStr) : null;
-            const currentUserId = currentUser?.id || currentUser?.Id_usuario || localUser?.id || localUser?.Id_usuario;
-            const currentTeacherName = (selectedTeacher || '').trim().toLowerCase();
+            // 2. Datos del usuario autenticado
+            const userStr = localStorage.getItem('user')
+            const localUser = userStr ? JSON.parse(userStr) : null
+            const currentUserId = Number(currentUser?.id || currentUser?.Id_usuario || localUser?.id || localUser?.Id_usuario)
 
-            console.log("👤 DASHBOARD: Perfil para filtrado:", {
+            // Función auxiliar para normalizar cadenas (elimina tildes y espacios extra)
+            const normalizeText = (text) =>
+                (text || '')
+                    .toLowerCase()
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .replace(/\s+/g, ' ')
+                    .trim()
+
+            const currentTeacherName = normalizeText(selectedTeacher)
+
+            console.log("👤 DASHBOARD: Datos para filtrado del docente:", {
                 currentUserId,
-                currentTeacherName,
-                userInState: !!currentUser,
-                userInLocal: !!localUser
-            });
+                currentTeacherName
+            })
 
+            // 3. Filtrar secciones asignadas al profesor
             const teacherGroups = yearFiltered.filter(section => {
-                const hasMatch = section.schedules?.some(s => {
-                    // Normalización de datos del horario
-                    const schedUserId = s.teacherUserId ? Number(s.teacherUserId) : null;
-                    const schedTeacherName = (s.teacherName || '').trim().toLowerCase();
+                const schedulesList = section.schedules || []
 
-                    // Prioridad 1: Match por ID de Usuario
-                    if (currentUserId && schedUserId) {
-                        const idMatch = Number(currentUserId) === schedUserId;
-                        if (idMatch) {
-                            console.log(`✅ MATCH ID [${section.sectionName}]: User ${currentUserId} coincide con horario.`);
-                            return true;
+                const hasMatch = schedulesList.some(s => {
+                    // Extracción de IDs posibles
+                    const schedUserId = Number(s.teacher_user_id || s.teacherUserId || s.user_id)
+                    const schedProfId = Number(s.teacher_id || s.teacherId || s.Id_profesor)
+
+                    // Validación A: Por ID de Usuario
+                    if (currentUserId && schedUserId && currentUserId === schedUserId) {
+                        console.log(`✅ MATCH POR USER ID en [${section.sectionName || section.nombre_seccion}]`)
+                        return true
+                    }
+
+                    // Validación B: Por ID de Profesor (si el usuario local guarda Id_profesor)
+                    const localProfId = Number(currentUser?.Id_profesor || localUser?.Id_profesor)
+                    if (localProfId && schedProfId && localProfId === schedProfId) {
+                        console.log(`✅ MATCH POR PROFESOR ID en [${section.sectionName || section.nombre_seccion}]`)
+                        return true
+                    }
+
+                    // Validación C: Por Nombre completo flexible
+                    const schedName = normalizeText(s.teacher_name || s.teacherName || s.profesor_nombre)
+
+                    if (schedName && currentTeacherName) {
+                        // Verificación directa o por contención
+                        if (schedName === currentTeacherName || schedName.includes(currentTeacherName) || currentTeacherName.includes(schedName)) {
+                            console.log(`✅ MATCH POR NOMBRE EXACTO/PARCIAL en [${section.sectionName || section.nombre_seccion}]: "${schedName}" vs "${currentTeacherName}"`)
+                            return true
+                        }
+
+                        // Verificación por coincidencia de palabras (Nombre O Apellido)
+                        const currentTokens = currentTeacherName.split(' ').filter(t => t.length > 2)
+                        const schedTokens = schedName.split(' ').filter(t => t.length > 2)
+
+                        const tokenMatch = currentTokens.some(token => schedTokens.includes(token))
+                        if (tokenMatch) {
+                            console.log(`✅ MATCH POR COINCIDENCIA DE TOKEN en [${section.sectionName || section.nombre_seccion}]`)
+                            return true
                         }
                     }
 
-                    // Prioridad 2: Match por Nombre (fallback)
-                    if (currentTeacherName && schedTeacherName) {
-                        const nameMatch = schedTeacherName === currentTeacherName || schedTeacherName.includes(currentTeacherName);
-                        if (nameMatch) {
-                            console.log(`✅ MATCH NAME [${section.sectionName}]: "${schedTeacherName}" coincide con "${currentTeacherName}".`);
-                            return true;
-                        }
-                    }
+                    return false
+                })
 
-                    return false;
-                });
+                return hasMatch
+            })
 
-                if (!hasMatch) {
-                    const firstSched = section.schedules?.[0];
-                    console.log(`❌ NO MATCH [${section.sectionName}]: SchedTeacherID=${firstSched?.teacherUserId}, SchedName="${firstSched?.teacherName}"`);
-                }
-
-                return hasMatch;
-            });
-
-            console.log("🎯 DASHBOARD: Grupos finales asignados:", teacherGroups.length);
-            setSections(teacherGroups);
+            console.log("🎯 DASHBOARD: Secciones finales asignadas:", teacherGroups.length)
+            setSections(teacherGroups)
 
         } catch (error) {
-            console.error("Error fetching teacher dashboard:", error);
+            console.error("Error fetching teacher dashboard:", error)
         } finally {
-            setLoading(false);
+            setLoading(false)
         }
-    };
+    }
 
     const handleSeeStudents = async (section) => {
         setSelectedSection(section)

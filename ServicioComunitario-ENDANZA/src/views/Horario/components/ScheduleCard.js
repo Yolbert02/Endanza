@@ -21,8 +21,57 @@ const ScheduleCard = ({ section, onShowInfo, onEdit, onDelete }) => {
     const teachers = [...new Set(safeSection.schedules?.map(s => s.teacherName) || [])]
     const subjects = [...new Set(safeSection.schedules?.map(s => s.subject) || [])]
 
-    // Obtener la primera letra para el avatar (usando el grado)
-    const firstLetter = safeSection.gradeLevel.charAt(0) || '?';
+    // Formatear duración de clases en horas y minutos
+    const getDurationInfo = (totalHours, schedules = []) => {
+        let totalMinutes = 0;
+        if (Array.isArray(schedules) && schedules.length > 0) {
+            totalMinutes = schedules.reduce((acc, s) => {
+                const start = s.startTime || s.start_time;
+                const end = s.endTime || s.end_time;
+                if (!start || !end) return acc;
+                const [sh, sm] = start.substring(0, 5).split(':').map(Number);
+                const [eh, em] = end.substring(0, 5).split(':').map(Number);
+                if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return acc;
+                const diff = (eh * 60 + em) - (sh * 60 + sm);
+                return acc + (diff > 0 ? diff : 0);
+            }, 0);
+        }
+
+        if (totalMinutes === 0 && totalHours) {
+            const parsed = parseFloat(totalHours);
+            if (!isNaN(parsed) && parsed > 0) {
+                totalMinutes = Math.round(parsed * 60);
+            }
+        }
+
+        if (totalMinutes === 0) {
+            return { value: '0', label: 'HORAS/SEM', fullText: '0 horas' };
+        }
+
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+
+        if (hours === 0) {
+            return { value: `${minutes} min`, label: 'MIN/SEM', fullText: `${minutes} min` };
+        } else if (minutes === 0) {
+            return {
+                value: `${hours} ${hours === 1 ? 'hora' : 'horas'}`,
+                label: hours === 1 ? 'HORA/SEM' : 'HORAS/SEM',
+                fullText: `${hours} ${hours === 1 ? 'hora' : 'horas'}`
+            };
+        } else {
+            return {
+                value: `${hours}h ${minutes}m`,
+                label: 'TOTAL/SEM',
+                fullText: `${hours}h ${minutes}m`
+            };
+        }
+    };
+
+    const durationInfo = getDurationInfo(safeSection.totalHoursPerWeek, safeSection.schedules);
+
+    // Obtener la primera letra para el avatar (usando el nombre principal)
+    const firstLetter = (safeSection.sectionName?.charAt(0) || safeSection.gradeLevel?.charAt(0) || '?').toUpperCase();
 
     return (
         <CCol lg={4} md={6}>
@@ -53,13 +102,13 @@ const ScheduleCard = ({ section, onShowInfo, onEdit, onDelete }) => {
                                 </div>
                             </div>
                             <div className="ms-3">
-                                {/* CAMBIO AQUÍ: Usar gradeLevel en lugar de sectionName */}
+                                {/* Grado como título principal */}
                                 <CCardTitle className="mb-1 fw-bold header-title-custom" style={{ fontSize: '1.25rem' }}>
-                                    {safeSection.gradeLevel}
+                                    {safeSection.sectionName}
                                 </CCardTitle>
                                 <div className="d-flex align-items-center gap-2">
                                     <span className="badge bg-light-custom text-muted-custom border border-light-custom fw-normal" style={{ fontSize: '0.7rem' }}>
-                                        {safeSection.sectionName} • ID #{safeSection.id}
+                                        {safeSection.gradeLevel} • ID #{safeSection.id}
                                     </span>
                                 </div>
                             </div>
@@ -86,8 +135,8 @@ const ScheduleCard = ({ section, onShowInfo, onEdit, onDelete }) => {
                         <div className="col-6">
                             <div className="p-3 rounded-4 text-center h-100 border border-light-custom bg-light-custom bg-opacity-10 shadow-sm">
                                 <CIcon icon={cilClock} className="text-primary mb-2" size="lg" />
-                                <div className="fw-bold header-title-custom h4 mb-0">{safeSection.totalHoursPerWeek || 0}</div>
-                                <div className="text-muted-custom small fw-bold text-uppercase ls-1" style={{ fontSize: '0.6rem' }}>Horas/Sem</div>
+                                <div className="fw-bold header-title-custom h4 mb-0">{durationInfo.value}</div>
+                                <div className="text-muted-custom small fw-bold text-uppercase ls-1" style={{ fontSize: '0.6rem' }}>{durationInfo.label}</div>
                             </div>
                         </div>
                     </div>

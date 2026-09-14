@@ -63,6 +63,54 @@ const InfoHorario = ({ visible, onClose, section }) => {
 
     const formatTime = (time) => time ? time.substring(0, 5) : '00:00';
 
+    const getDurationInfo = (totalHours, schedules = []) => {
+        let totalMinutes = 0;
+        if (Array.isArray(schedules) && schedules.length > 0) {
+            totalMinutes = schedules.reduce((acc, s) => {
+                const start = s.startTime || s.start_time;
+                const end = s.endTime || s.end_time;
+                if (!start || !end) return acc;
+                const [sh, sm] = start.substring(0, 5).split(':').map(Number);
+                const [eh, em] = end.substring(0, 5).split(':').map(Number);
+                if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return acc;
+                const diff = (eh * 60 + em) - (sh * 60 + sm);
+                return acc + (diff > 0 ? diff : 0);
+            }, 0);
+        }
+
+        if (totalMinutes === 0 && totalHours) {
+            const parsed = parseFloat(totalHours);
+            if (!isNaN(parsed) && parsed > 0) {
+                totalMinutes = Math.round(parsed * 60);
+            }
+        }
+
+        if (totalMinutes === 0) {
+            return { value: '0', label: 'Horas/sem', fullText: '0 horas' };
+        }
+
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+
+        if (hours === 0) {
+            return { value: `${minutes} min`, label: 'Minutos/sem', fullText: `${minutes} min` };
+        } else if (minutes === 0) {
+            return {
+                value: `${hours} ${hours === 1 ? 'hora' : 'horas'}`,
+                label: hours === 1 ? 'Hora/sem' : 'Horas/sem',
+                fullText: `${hours} ${hours === 1 ? 'hora' : 'horas'}`
+            };
+        } else {
+            return {
+                value: `${hours}h ${minutes}m`,
+                label: 'Tiempo/sem',
+                fullText: `${hours}h ${minutes}m`
+            };
+        }
+    };
+
+    const durationInfo = getDurationInfo(safeSection.totalHoursPerWeek, safeSection.schedules);
+
     const calculateDuration = (startTime, endTime) => {
         if (!startTime || !endTime) return 0;
         const start = new Date(`2000-01-01T${startTime}:00`);
@@ -135,8 +183,8 @@ const InfoHorario = ({ visible, onClose, section }) => {
                                     {/* Horas/sem - Cuarto card */}
                                     <CCol md={3} xs={6}>
                                         <div className="d-flex flex-column p-3 bg-light-custom bg-opacity-10 rounded-4 border border-light-custom shadow-sm">
-                                            <span className="text-muted-custom small text-uppercase fw-bold ls-1">Horas/sem</span>
-                                            <strong className="fs-5 text-primary">{safeSection.totalHoursPerWeek}</strong>
+                                            <span className="text-muted-custom small text-uppercase fw-bold ls-1">{durationInfo.label}</span>
+                                            <strong className="fs-5 text-primary">{durationInfo.fullText}</strong>
                                         </div>
                                     </CCol>
                                 </CRow>
