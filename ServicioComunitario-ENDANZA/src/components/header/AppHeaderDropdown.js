@@ -1,4 +1,4 @@
-// src/components/AppHeaderDropdown.js - VERSIÓN CORREGIDA
+// src/components/AppHeaderDropdown.js - VERSIÓN CORREGIDA CON HASH
 import React, { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -21,7 +21,7 @@ import {
   cilTask,
 } from '@coreui/icons'
 
-// ✅ IMPORTAR authService y authStorage
+// Importar authService y authStorage
 import { authService } from '../../services/authService'
 import { getStoredToken, clearStoredAuth } from '../../utils/authStorage'
 
@@ -131,9 +131,15 @@ const AppHeaderDropdown = () => {
 
           <div className="dropdown-divider-custom mb-2"></div>
 
+          {/* Botón de Perfil corregido con window.location.hash */}
           <CDropdownItem
-            href="#/perfil"
-            className="dropdown-item-premium d-flex align-items-center py-2 px-3 rounded-3 mb-1"
+            component="button"
+            type="button"
+            onClick={() => {
+              window.location.hash = '#/perfil'
+            }}
+            className="dropdown-item-premium d-flex align-items-center py-2 px-3 rounded-3 mb-1 border-0 bg-transparent w-100 text-start"
+            style={{ cursor: 'pointer' }}
           >
             <CIcon icon={cilUser} className="me-3 icon-accent" />
             <span className="fw-semibold">Perfil</span>

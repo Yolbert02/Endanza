@@ -29,8 +29,6 @@ router.get("/catalog/specialties",
 );
 
 router.get("/catalog/grades", 
-    verifyToken, 
-    autoVerifyRole,
     TeacherController.listGrades
 );
 

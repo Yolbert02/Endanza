@@ -14,6 +14,7 @@ import {
 import { cilSave, cilEducation, cilArrowLeft, cilPlus, cilTrash, cilUser } from '@coreui/icons';
 import CIcon from '@coreui/icons-react';
 import { capitalizeWords } from '../../utils/formatters';
+import { getGradosEndanza, GRADOS_ENDANZA } from '../../services/representanteService';
 
 const RegistroEstudiante = ({
     representative,
@@ -24,6 +25,20 @@ const RegistroEstudiante = ({
     onSave,
     loading = false
 }) => {
+        const [availableGrades, setAvailableGrades] = useState(GRADOS_ENDANZA);
+
+    useEffect(() => {
+        let isMounted = true;
+        getGradosEndanza().then(grades => {
+            if (isMounted && grades && grades.length > 0) {
+                setAvailableGrades(grades);
+            }
+        }).catch(err => {
+            console.error('Error al cargar grados en RegistroEstudiante:', err);
+        });
+        return () => { isMounted = false; };
+    }, []);
+
     const [newStudents, setNewStudents] = useState(() => {
         if (initialStudents && initialStudents.length > 0) {
             return initialStudents;
@@ -233,12 +248,9 @@ const RegistroEstudiante = ({
                                         required
                                     >
                                         <option value="" disabled>Seleccione Grado</option>
-                                        <option value="1er Grado">1er Grado</option>
-                                        <option value="2do Grado">2do Grado</option>
-                                        <option value="3er Grado">3er Grado</option>
-                                        <option value="4to Grado">4to Grado</option>
-                                        <option value="5to Grado">5to Grado</option>
-                                        <option value="6to Grado">6to Grado</option>
+                                        {availableGrades.map(g => (
+                                            <option key={g.value} value={g.value}>{g.label}</option>
+                                        ))}
                                     </CFormSelect>
                                 </CCol>
                                 <CCol md={4}>

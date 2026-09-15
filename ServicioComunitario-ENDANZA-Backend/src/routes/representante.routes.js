@@ -12,6 +12,12 @@ const router = express.Router();
 // ============================================
 
 
+// Catálogo de grados (público para preinscripción)
+router.get(
+  "/catalog/grades",
+  RepresentanteController.listGrades
+);
+
 // Preinscripción (público para nuevos registros)
 router.post(
   "/preinscripcion",

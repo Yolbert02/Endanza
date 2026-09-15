@@ -100,3 +100,50 @@ export const getDocentesList = async () => {
     return [];
   }
 };
+
+// Grados oficiales de Endanza (usados en Preinscripción, Inscripción y Horarios)
+export const GRADOS_ENDANZA = [
+  { value: 'Preparatorio', label: 'Preparatorio' },
+  { value: '1er Grado', label: '1er Grado' },
+  { value: '2do Grado', label: '2do Grado' },
+  { value: '3er Grado', label: '3er Grado' },
+  { value: '4to Grado', label: '4to Grado' },
+  { value: '5to Grado', label: '5to Grado' },
+  { value: '6to Grado', label: '6to Grado' },
+  { value: '7mo Grado', label: '7mo Grado' },
+  { value: '8vo Grado', label: '8vo Grado' }
+];
+
+export const getGradosEndanza = async () => {
+  try {
+    let response = await fetch.get('/api/representantes/catalog/grades');
+    if (!response?.ok) {
+      response = await fetch.get('/api/teachers/catalog/grades');
+    }
+    if (response?.ok && Array.isArray(response.grades) && response.grades.length > 0) {
+      const dbGrades = [];
+      const seen = new Set();
+      
+      response.grades.forEach(g => {
+        let baseName = g.name.replace('Año', 'Grado').split(' - ')[0].trim();
+        if (!seen.has(baseName)) {
+          seen.add(baseName);
+          dbGrades.push({
+            value: baseName,
+            label: baseName,
+            level: g.level,
+            id: g.id
+          });
+        }
+      });
+      
+      if (dbGrades.length > 0) {
+        return dbGrades;
+      }
+    }
+    return GRADOS_ENDANZA;
+  } catch (error) {
+    console.error('❌ Error en getGradosEndanza:', error);
+    return GRADOS_ENDANZA;
+  }
+};

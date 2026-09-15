@@ -1,6 +1,7 @@
 // backend/controllers/representante.controller.js
 import { RepresentanteModel } from "../models/representante.model.js";
 import { UserModel } from "../models/user.model.js";
+import { TeacherModel } from "../models/teacher.model.js";
 import { db } from "../db/connection.database.js";
 import { capitalizeWords } from "../utils/formatters.js";
 
@@ -123,7 +124,9 @@ export const RepresentanteController = {
           '3er Grado': 9,  '3er Año': 9,
           '4to Grado': 10, '4to Año': 10,
           '5to Grado': 11, '5to Año': 11,
-          '6to Grado': 12, '6to Año': 12
+          '6to Grado': 12, '6to Año': 12,
+          '7mo Grado': 13, '7mo Año': 13,
+          '8vo Grado': 14, '8vo Año': 14
         };
 
         for (const estudiante of estudiantes) {
@@ -131,6 +134,19 @@ export const RepresentanteController = {
           let Id_nivel_danza = null;
           if (estudiante.gradeLevel) {
             Id_nivel_danza = nivelDanzaMap[estudiante.gradeLevel] || null;
+            if (!Id_nivel_danza) {
+              try {
+                const ndRes = await db.query(
+                  'SELECT "Id_nivel_danza" FROM "Nivel_Danza" WHERE LOWER("nivel_danza") = LOWER($1) OR LOWER("nivel_danza") LIKE LOWER($2) LIMIT 1',
+                  [estudiante.gradeLevel, `${estudiante.gradeLevel.replace('Grado', 'Año')}%`]
+                );
+                if (ndRes.rows.length > 0) {
+                  Id_nivel_danza = ndRes.rows[0].Id_nivel_danza;
+                }
+              } catch (e) {
+                console.error("Error buscando nivel_danza:", e);
+              }
+            }
           }
 
           // Generar cédula única para el estudiante
@@ -305,4 +321,21 @@ export const RepresentanteController = {
     }
   },
 
+  // Listar catálogo de grados
+  listGrades: async (req, res) => {
+    try {
+      const grades = await TeacherModel.getAllGrades();
+      res.json({
+        ok: true,
+        grades
+      });
+    } catch (error) {
+      console.error("❌ Error en RepresentanteController.listGrades:", error);
+      res.status(500).json({
+        ok: false,
+        msg: "Error al listar grados",
+        error: error.message
+      });
+    }
+  },
 };

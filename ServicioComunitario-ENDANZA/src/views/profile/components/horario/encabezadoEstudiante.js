@@ -9,7 +9,7 @@ const EncabezadoEstudiante = ({ estudiante, estadisticas }) => {
     <CCard className="premium-card border-0 overflow-hidden mb-5">
       <AcademicHeader
         title={`Horario de ${estudiante.grado || 'Mi Grado'}`}
-        subtitle={`Escuela de Danza Endanza • ${estudiante.anoAcademico}`}
+        subtitle={`Nivel Académico: ${estudiante.nivelSeccion} • ${estudiante.anoAcademico}`}
         studentCode={estudiante.codigo}
         icon={cilCalendar}
         colorClass="warning"
@@ -32,7 +32,8 @@ const EncabezadoEstudiante = ({ estudiante, estadisticas }) => {
               <CRow className="g-2 g-md-3">
                 <CCol xs={12} sm={6}>
                   <label className="header-label label-micro mb-1 d-block">Grado y Sección</label>
-                  <div className="fw-bold fs-6 fs-sm-5 text-warning">{estudiante.grado} <span className="header-label fw-normal small">Secc {estudiante.seccion}</span></div>
+                  <div className="fw-bold fs-6 fs-sm-5 text-warning mb-1">{estudiante.grado} <span className="header-label fw-normal small">Secc {estudiante.seccion}</span></div>
+                  <div className="small text-muted" style={{ fontSize: '0.75rem' }}>{estudiante.nivelSeccion}</div>
                 </CCol>
                 <CCol xs={12} sm={6}>
                   <label className="header-label label-micro mb-1 d-block">Año Académico</label>

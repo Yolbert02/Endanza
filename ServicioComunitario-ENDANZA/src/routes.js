@@ -11,7 +11,7 @@ const Login = React.lazy(() => import('./views/pages/login/Login'))
 const Users = React.lazy(() => import('./views/users/users'))
 const profile = React.lazy(() => import('./views/profile/Profile'))
 
-const perfilRepresentanteEstudiante = React.lazy(()=> import('./views/profile/perfilRepresentanteEstudiante'))
+const perfilRepresentanteEstudiante = React.lazy(() => import('./views/profile/perfilRepresentanteEstudiante'))
 
 const docenteAsignacion = React.lazy(() => import('./views/superRootDashboard/components/docenteAsignacion'))
 

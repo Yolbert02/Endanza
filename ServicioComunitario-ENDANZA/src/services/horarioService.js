@@ -77,7 +77,8 @@ const getDatosBasicosEstudiante = async (estudianteId) => {
                 id: data.id || estudianteId,
                 nombre: data.first_name || data.nombre || 'Estudiante',
                 apellido: data.last_name || data.apellido || '',
-                cedula: data.dni || data.cedula || ''
+                cedula: data.dni || data.cedula || '',
+                grado_real: data.grade_level_name || data.grade_level || 'Sin Grado'
             };
         }
 
@@ -96,7 +97,8 @@ const getDatosBasicosEstudiante = async (estudianteId) => {
                     id: estudiante.id,
                     nombre: estudiante.first_name || estudiante.nombre || 'Estudiante',
                     apellido: estudiante.last_name || estudiante.apellido || '',
-                    cedula: estudiante.dni || estudiante.cedula || ''
+                    cedula: estudiante.dni || estudiante.cedula || '',
+                    grado_real: estudiante.grade_level_name || estudiante.grade_level || 'Sin Grado'
                 };
             }
         }
@@ -157,9 +159,19 @@ const transformarHorarioParaFrontend = (estudiante, seccion, horarios) => {
             return;
         }
 
-        // Formatear hora
-        const horaInicio = h.start_time ? h.start_time.substring(0, 5) : '00:00';
-        const horaFin = h.end_time ? h.end_time.substring(0, 5) : '00:00';
+        // Formatear hora (AM/PM)
+        const formatTimeAMPM = (timeStr) => {
+            if (!timeStr) return '00:00 AM';
+            let [hours, minutes] = timeStr.split(':');
+            hours = parseInt(hours, 10);
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12; // 0 debe ser 12
+            return `${hours.toString().padStart(2, '0')}:${minutes} ${ampm}`;
+        };
+
+        const horaInicio = formatTimeAMPM(h.start_time);
+        const horaFin = formatTimeAMPM(h.end_time);
 
         const clase = {
             materia: h.subject_name || 'Materia General',
@@ -219,8 +231,9 @@ const transformarHorarioParaFrontend = (estudiante, seccion, horarios) => {
         estudiante: {
             nombre: nombreCompleto,
             codigo: estudiante.cedula || `EST-${estudiante.id}`,
-            grado: seccion.nivel_academico || 'Grado General',
+            grado: estudiante.grado_real || 'Mi Grado',
             seccion: seccion.nombre_seccion || 'A',
+            nivelSeccion: seccion.nivel_academico || 'General',
             anoAcademico: seccion.academic_year_name || '2024-2025',
             representante: 'Representante Legal'
         },

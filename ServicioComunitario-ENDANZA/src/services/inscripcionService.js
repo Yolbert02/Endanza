@@ -29,11 +29,21 @@ export const inscribirEstudiante = async (data) => {
       id_ano_academico: data.id_ano_academico,
       datos_completos: data.datos_completos
     });
+
+    console.log("📦 Respuesta completa de inscripción:", response);
     
-    if (response.ok) {
-      return response.data;
+    // helpFetch devuelve el JSON del backend directamente
+    // El backend devuelve { ok: true/false, msg, data }
+    // helpFetch añade _ok (HTTP status ok) y _status
+    const isOk = response.ok || response._ok;
+    
+    if (isOk) {
+      // Los datos vienen en response.data (del JSON del backend)
+      return response.data || response;
     } else {
-      throw new Error(response.msg || 'Error al procesar la inscripción');
+      const errorMsg = response.msg || response.message || 'Error al procesar la inscripción';
+      console.error("❌ Error del servidor:", errorMsg);
+      throw new Error(errorMsg);
     }
   } catch (error) {
     console.error("❌ Error en inscribirEstudiante:", error);

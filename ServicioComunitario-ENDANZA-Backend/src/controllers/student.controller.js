@@ -746,7 +746,7 @@ const getScheduleByGrade = async (req, res) => {
                 s."nombre_seccion" as section_name
             FROM "Horario" h
             JOIN "Seccion" s ON h."Id_seccion" = s."Id_seccion"
-            JOIN "Materia" m ON s."Id_materia" = m."Id_materia"
+            JOIN "Materia" m ON COALESCE(h."Id_materia", s."Id_materia") = m."Id_materia"
             JOIN "Grado" g ON m."ano_materia" = g."Id_grado"
             JOIN "Dia" d ON h."Id_dia" = d."Id_dia"
             JOIN "Bloque_Horario" b ON h."Id_bloque" = b."Id_bloque"

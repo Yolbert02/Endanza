@@ -159,7 +159,29 @@ export const InscripcionRepresentanteController = {
         }
 
         // 9. Buscar o crear sección para el grado del estudiante
-        const id_seccion = await obtenerOCrearSeccion(id_ano_academico, student.grade_level_name);
+        await db.query(`
+          ALTER TABLE "Seccion" 
+          ADD COLUMN IF NOT EXISTS "nivel_academico" VARCHAR(50)
+        `);
+        const nivelAcademico = datos_completos.grado || student.dance_level_name || student.grade_level_name || 'Preparatorio';
+        const id_seccion = await obtenerOCrearSeccion(id_ano_academico, nivelAcademico);
+
+        if (datos_completos.grado) {
+          try {
+            const ndRes = await db.query(
+              'SELECT "Id_nivel_danza" FROM "Nivel_Danza" WHERE LOWER("nivel_danza") = LOWER($1) OR LOWER("nivel_danza") LIKE LOWER($2) LIMIT 1',
+              [datos_completos.grado, `${datos_completos.grado.replace('Grado', 'Año')}%`]
+            );
+            if (ndRes.rows.length > 0) {
+              await db.query(
+                'UPDATE "Estudiante" SET "Id_nivel_danza" = $1 WHERE "Id_estudiante" = $2',
+                [ndRes.rows[0].Id_nivel_danza, id_estudiante]
+              );
+            }
+          } catch (err) {
+            console.error("Error actualizando Id_nivel_danza en inscripción:", err);
+          }
+        }
 
         // 10. Inscribir al estudiante en la sección
         const inscripcionQuery = {

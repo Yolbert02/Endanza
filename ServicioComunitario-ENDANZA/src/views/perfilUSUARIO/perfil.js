@@ -1,4 +1,4 @@
-// PerfilUsuarioGeneral.jsx - VERSIÓN COMPLETA CON API
+// PerfilUsuarioGeneral.jsx - VERSIÓN COMPLETA CORREGIDA
 import React, { useEffect, useState } from "react"
 import {
   CCard,
@@ -37,9 +37,10 @@ import {
   cilWarning
 } from "@coreui/icons"
 
-// Servicios
+// Servicios y Utilidades
 import { profileService } from '../../services/profileService'
 import { authService } from '../../services/authService'
+import { getStoredToken } from '../../utils/authStorage' // 👈 Validación centralizada corregida
 
 // Componentes
 import ProfileSummary from "./components/profileSumary"
@@ -99,8 +100,8 @@ const PerfilUsuarioGeneral = () => {
   }
 
   useEffect(() => {
-    // Verificar autenticación
-    if (!localStorage.getItem('accessToken')) {
+    // Verificar autenticación mediante authStorage
+    if (!getStoredToken()) {
       navigate('/login')
       return
     }
@@ -129,9 +130,7 @@ const PerfilUsuarioGeneral = () => {
       const response = await profileService.updateProfile(updatedData)
 
       if (response.success) {
-        // Recargar perfil para obtener datos actualizados
         await loadProfile()
-
         showToast("success", "Perfil Actualizado", "Tus datos se han guardado correctamente")
         setEditModalVisible(false)
       } else {
@@ -166,16 +165,6 @@ const PerfilUsuarioGeneral = () => {
     }
   }
 
-  const handleLogout = async () => {
-    try {
-      await authService.logout()
-      navigate('/login?logout=success')
-    } catch (error) {
-      console.error('Error en logout:', error)
-      navigate('/login')
-    }
-  }
-
   if (loading) {
     return (
       <CContainer className="py-5 text-center">
@@ -201,7 +190,6 @@ const PerfilUsuarioGeneral = () => {
     )
   }
 
-  // Mapear datos para mostrar en la UI
   const userDisplay = {
     ...user,
     fechaNacimiento: user.fechaNacimiento ? new Date(user.fechaNacimiento).toLocaleDateString('es-ES') : 'No registrada',
@@ -213,7 +201,6 @@ const PerfilUsuarioGeneral = () => {
 
   return (
     <CContainer className="py-2 profile-container pb-5 animate__animated animate__fadeIn">
-      {/* Header Premium */}
       <div className="bg-glass-premium p-4 rounded-4 border border-light-custom shadow-sm mb-5 mt-3 no-print">
         <CRow className="align-items-center">
           <CCol xs={12} md={6}>
@@ -254,7 +241,6 @@ const PerfilUsuarioGeneral = () => {
         </CRow>
       </div>
 
-      {/* Alerta de Cédula Obligatoria si falta */}
       {(!user?.cedula || user?.cedula === 'No registrada' || user?.must_change_cedula || String(user?.cedula || '').startsWith('V-1000')) && (
         <CAlert color="warning" className="d-flex align-items-center mb-4 p-3 shadow-sm border-warning rounded-4 bg-warning bg-opacity-10 text-dark">
           <CIcon icon={cilWarning} size="xl" className="me-3 flex-shrink-0 text-warning" />
@@ -270,7 +256,6 @@ const PerfilUsuarioGeneral = () => {
         </CAlert>
       )}
 
-      {/* Main Content Grid */}
       <CRow className="g-4">
         <CCol xs={12} lg={4}>
           <ProfileSummary user={userDisplay} />
@@ -335,7 +320,6 @@ const PerfilUsuarioGeneral = () => {
         </CCol>
       </CRow>
 
-      {/* Modals y Toasters */}
       <EditProfileModal
         visible={editModalVisible}
         onClose={() => setEditModalVisible(false)}
@@ -375,8 +359,6 @@ const PerfilUsuarioGeneral = () => {
       <style>{`
         .ls-1 { letter-spacing: 1px; }
         .transition-all { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        
-        /* Header & Back Button */
         .premium-back-btn { 
           color: #64748b; 
           border: 1px solid rgba(0,0,0,0.05); 
@@ -389,8 +371,6 @@ const PerfilUsuarioGeneral = () => {
           transform: translateX(-3px);
           box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
         }
-
-        /* Buttons */
         .btn-premium-action {
           background: linear-gradient(135deg, #F28C0F 0%, #F8A13E 100%);
           color: white;
@@ -404,7 +384,6 @@ const PerfilUsuarioGeneral = () => {
           box-shadow: 0 8px 20px rgba(242, 140, 15, 0.35);
           filter: brightness(1.05);
         }
-
         .premium-outline-btn {
           border: 2px solid #e2e8f0;
           color: #64748b;
@@ -417,8 +396,6 @@ const PerfilUsuarioGeneral = () => {
           color: white !important;
           transform: translateY(-2px);
         }
-
-        /* Information Boxes */
         .premium-info-box {
           background: #f8fafc;
           border: 1px solid rgba(0,0,0,0.03);
@@ -433,7 +410,6 @@ const PerfilUsuarioGeneral = () => {
           color: #F28C0F;
           font-size: 1.1rem;
         }
-
         .premium-role-badge {
           background: linear-gradient(135deg, #F28C0F 0%, #fbbf24 100%) !important;
           font-weight: 800;
@@ -441,7 +417,6 @@ const PerfilUsuarioGeneral = () => {
           letter-spacing: 0.5px;
           color: white !important;
         }
-
         .header-icon-container {
           width: 36px;
           height: 36px;
@@ -452,7 +427,6 @@ const PerfilUsuarioGeneral = () => {
           color: #F28C0F;
           border-radius: 10px;
         }
-
         .pulse-dot {
           width: 8px;
           height: 8px;
@@ -461,13 +435,11 @@ const PerfilUsuarioGeneral = () => {
           box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
           animation: pulse-dot 2s infinite;
         }
-
         @keyframes pulse-dot {
           0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
           70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
           100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
         }
-
         [data-coreui-theme="dark"] .bg-glass-premium { 
           background: rgba(30, 41, 59, 0.7) !important; 
           backdrop-filter: blur(15px);
@@ -494,7 +466,6 @@ const PerfilUsuarioGeneral = () => {
         [data-coreui-theme="dark"] .text-dark-custom { color: #e2e8f0; }
         [data-coreui-theme="dark"] .text-muted-custom { color: #94a3b8; }
         [data-coreui-theme="dark"] .info-box-icon { background: rgba(242, 140, 15, 0.15); }
-
         @media print { .no-print { display: none !important; } .premium-card { box-shadow: none !important; border: 1px solid #eee !important; } }
       `}</style>
     </CContainer>

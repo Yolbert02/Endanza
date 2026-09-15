@@ -20,6 +20,8 @@ export const routeGuard = () => {
         '/api/users/recover-password-security',
         '/api/representantes/search',
         '/api/representantes/preinscripcion',
+        '/api/representantes/catalog/grades',
+        '/api/teachers/catalog/grades',
       ];
 
       const currentPath = req.path;
