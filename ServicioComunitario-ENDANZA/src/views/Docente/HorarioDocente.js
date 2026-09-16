@@ -29,15 +29,15 @@ import {
 import CIcon from "@coreui/icons-react"
 import { cilCalendar, cilUser, cilSchool, cilRoom, cilClock, cilChevronBottom, cilPeople, cilCloudDownload } from "@coreui/icons"
 import useUserRole from '../../Hooks/useUserRole'
-import { listSections, getAvailableYears } from 'src/services/scheduleService'
-import { getActiveYear } from 'src/services/configService'
+import { listSections } from 'src/services/scheduleService'
+import { getAvailableYears, getActiveYear } from 'src/services/configService'
+import { getStoredUser } from 'src/utils/authStorage'
 
 // Componentes estéticos
 import VistaSemanalDocente from './components/horario/VistaSemanalDocente'
-// VistaSemanalDocente eliminado
 
 const HorarioDocente = () => {
-    const { user, isDocente, isSuperadministrador } = useUserRole()
+    const { user, isDocente, isSuperadministrador, userData, userId } = useUserRole()
     const [loading, setLoading] = useState(true)
     const [sections, setSections] = useState([])
     const [academicYears, setAcademicYears] = useState([])
@@ -83,27 +83,30 @@ const HorarioDocente = () => {
             const activeYearObj = await getActiveYear()
 
             if (isSuperadministrador) {
-                setAcademicYears(years)
+                setAcademicYears(years.map(y => typeof y === 'object' ? y.name : y))
                 if (activeYearObj) {
                     setSelectedYear(activeYearObj.name)
                 } else if (years.length > 0) {
-                    setSelectedYear(years[0])
+                    const first = years[0]
+                    setSelectedYear(typeof first === 'object' ? first.name : first)
                 }
             } else {
-                // Usuarios normales (docentes, representantes, etc.) o admin normal si existiera, solo ven el año activo
+                // Usuarios normales (docentes, representantes, etc.) solo ven el año activo
                 if (activeYearObj) {
                     setAcademicYears([activeYearObj.name])
                     setSelectedYear(activeYearObj.name)
                 } else if (years.length > 0) {
-                    setAcademicYears([years[0]])
-                    setSelectedYear(years[0])
+                    const first = years[0]
+                    const firstName = typeof first === 'object' ? first.name : first
+                    setAcademicYears([firstName])
+                    setSelectedYear(firstName)
                 }
 
                 if (isDocente) {
-                    // Setear nombre del docente logueado
-                    const userObj = JSON.parse(localStorage.getItem('user'))
-                    if (userObj) {
-                        setSelectedTeacher(`${userObj.nombre} ${userObj.apellido}`.trim())
+                    const activeUser = userData || user || getStoredUser()
+                    if (activeUser) {
+                        const fullName = `${activeUser.nombre || ''} ${activeUser.apellido || ''}`.trim()
+                        if (fullName) setSelectedTeacher(fullName)
                     }
                 }
             }
@@ -118,17 +121,17 @@ const HorarioDocente = () => {
             const data = await listSections({ academicYear: selectedYear })
             setSections(data)
 
-            // Lógica de selección automática de docente (solo si no es docente)
+            // Lógica de selección automática de docente
             if (!isDocente) {
                 const allTeachers = extractTeachers(data)
                 if (allTeachers.length > 0 && !selectedTeacher) {
                     setSelectedTeacher(allTeachers[0])
                 }
             } else {
-                // Forzar nombre del docente de nuevo por si acaso
-                const userObj = JSON.parse(localStorage.getItem('user'))
-                if (userObj) {
-                    setSelectedTeacher(`${userObj.nombre} ${userObj.apellido}`.trim())
+                const activeUser = userData || user || getStoredUser()
+                if (activeUser) {
+                    const fullName = `${activeUser.nombre || ''} ${activeUser.apellido || ''}`.trim()
+                    if (fullName) setSelectedTeacher(fullName)
                 }
             }
 
@@ -163,23 +166,57 @@ const HorarioDocente = () => {
     }
 
     const teacherSchedules = useMemo(() => {
-        if (!selectedTeacher) return {}
+        const activeUser = userData || user || getStoredUser()
+        const currentUserId = Number(userId || activeUser?.id || activeUser?.Id_usuario)
+        const currentProfId = Number(activeUser?.Id_profesor || activeUser?.profesor_id || activeUser?.teacher_id)
+
+        const normalizeStr = (str) =>
+            (str || '')
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/\s+/g, ' ')
+                .trim()
+
+        const targetTeacherNormalized = normalizeStr(selectedTeacher || (activeUser ? `${activeUser.nombre || ''} ${activeUser.apellido || ''}` : ''))
 
         const scheduleMap = {
             'LUNES': [], 'MARTES': [], 'MIÉRCOLES': [], 'JUEVES': [], 'VIERNES': []
         }
 
+        const dayAliasMap = {
+            'LUNES': 'LUNES',
+            'MARTES': 'MARTES',
+            'MIERCOLES': 'MIÉRCOLES',
+            'MIÉRCOLES': 'MIÉRCOLES',
+            'JUEVES': 'JUEVES',
+            'VIERNES': 'VIERNES'
+        }
+
         sections.forEach(section => {
-            section.schedules.forEach(sched => {
-                if (sched.teacherName === selectedTeacher) {
-                    const dia = (sched.dayName || sched.day_name || '').toUpperCase()
+            (section.schedules || []).forEach(sched => {
+                const schedTeacherName = sched.teacherName || sched.teacher_name || ''
+                const schedUserId = Number(sched.teacherUserId || sched.teacher_user_id || sched.user_id)
+                const schedProfId = Number(sched.teacherId || sched.teacher_id || sched.Id_profesor)
+
+                const isMatchByUser = isDocente && currentUserId && schedUserId && currentUserId === schedUserId
+                const isMatchByProf = isDocente && currentProfId && schedProfId && currentProfId === schedProfId
+                const isMatchByName = targetTeacherNormalized && (
+                    normalizeStr(schedTeacherName) === targetTeacherNormalized ||
+                    normalizeStr(schedTeacherName).includes(targetTeacherNormalized) ||
+                    targetTeacherNormalized.includes(normalizeStr(schedTeacherName))
+                )
+
+                if (isMatchByUser || isMatchByProf || isMatchByName) {
+                    const rawDia = normalizeStr(sched.dayName || sched.day_name || '').toUpperCase()
+                    const dia = dayAliasMap[rawDia] || rawDia
                     scheduleMap[dia]?.push({
                         ...sched,
-                        sectionName: section.sectionName,
-                        subjectName: section.subjectName,
-                        gradeLevel: section.gradeLevel,
-                        classroom: sched.classroomName || sched.classroom_name || 'Sin aula',
-                        subject: sched.subject || section.subjectName || 'Sin materia'
+                        sectionName: section.sectionName || section.section_name,
+                        subjectName: section.subjectName || section.subject_name,
+                        gradeLevel: section.gradeLevel || section.grade_level,
+                        classroom: sched.classroomName || sched.classroom_name || sched.classroom || 'Sin aula',
+                        subject: sched.subject || sched.subject_name || section.subjectName || 'Sin materia'
                     })
                 }
             })
@@ -187,11 +224,11 @@ const HorarioDocente = () => {
 
         // Ordenar cada día por hora de inicio
         Object.keys(scheduleMap).forEach(day => {
-            scheduleMap[day].sort((a, b) => a.startTime.localeCompare(b.startTime))
+            scheduleMap[day].sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''))
         })
 
         return scheduleMap
-    }, [sections, selectedTeacher])
+    }, [sections, selectedTeacher, isDocente, userData, userId, user])
 
     const totalClases = useMemo(() => {
         return Object.values(teacherSchedules).reduce((acc, dayClases) => acc + dayClases.length, 0)

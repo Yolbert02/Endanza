@@ -356,6 +356,79 @@ const getLapsosByYear = async (req, res) => {
   }
 };
 
+const createLapso = async (req, res) => {
+  try {
+    const { yearId } = req.params;
+    const { nombre_lapso, name, inicio_lapso, startDate, fin_lapso, endDate } = req.body;
+    const lapsoName = nombre_lapso || name;
+    const sDate = inicio_lapso || startDate;
+    const eDate = fin_lapso || endDate;
+
+    if (!lapsoName || !sDate || !eDate || !yearId) {
+      return res.status(400).json({
+        ok: false,
+        msg: "Todos los campos son requeridos (nombre, inicio, fin, año)",
+      });
+    }
+
+    const newLapso = await ConfigModel.createLapso(lapsoName, sDate, eDate, yearId);
+    return res.status(201).json({
+      ok: true,
+      msg: "Lapso creado exitosamente",
+      data: newLapso,
+    });
+  } catch (error) {
+    console.error("Error en createLapso:", error);
+    return res.status(500).json({
+      ok: false,
+      msg: "Error al crear lapso",
+      error: error.message,
+    });
+  }
+};
+
+const updateLapso = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nombre_lapso, name, inicio_lapso, startDate, fin_lapso, endDate } = req.body;
+    const lapsoName = nombre_lapso ?? name;
+    const sDate = inicio_lapso ?? startDate;
+    const eDate = fin_lapso ?? endDate;
+
+    const updated = await ConfigModel.updateLapso(id, lapsoName, sDate, eDate);
+    return res.json({
+      ok: true,
+      msg: "Lapso actualizado exitosamente",
+      data: updated,
+    });
+  } catch (error) {
+    console.error("Error en updateLapso:", error);
+    return res.status(500).json({
+      ok: false,
+      msg: "Error al actualizar lapso",
+      error: error.message,
+    });
+  }
+};
+
+const deleteLapso = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await ConfigModel.deleteLapso(id);
+    return res.json({
+      ok: true,
+      msg: "Lapso eliminado exitosamente",
+    });
+  } catch (error) {
+    console.error("Error en deleteLapso:", error);
+    return res.status(500).json({
+      ok: false,
+      msg: "Error al eliminar lapso",
+      error: error.message,
+    });
+  }
+};
+
 // ============================================
 // EXPORTAR CONTROLADOR
 // ============================================
@@ -377,4 +450,7 @@ export const ConfigController = {
 
   // Lapsos
   getLapsosByYear,
+  createLapso,
+  updateLapso,
+  deleteLapso,
 };

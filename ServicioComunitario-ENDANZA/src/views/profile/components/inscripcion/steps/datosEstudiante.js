@@ -28,8 +28,15 @@ const DatosEstudiante = ({ formData, onChange, errores = {}, mode = "completo" }
 
   // Función para determinar si el grado es avanzado (6to a 8vo)
   const esGradoAvanzado = () => {
-    const grado = formData.grado;
-    return grado === "6to_grado" || grado === "7mo_grado" || grado === "8vo_grado";
+    if (!formData.grado) return false;
+    const grado = String(formData.grado).trim().toLowerCase();
+    return (
+      grado === "6to_grado" || grado === "7mo_grado" || grado === "8vo_grado" ||
+      grado === "6to grado" || grado === "7mo grado" || grado === "8vo grado" ||
+      grado.includes("6to") || grado.includes("7mo") || grado.includes("8vo") ||
+      grado === "6" || grado === "7" || grado === "8" ||
+      grado.includes("sexto") || grado.includes("septimo") || grado.includes("séptimo") || grado.includes("octavo")
+    );
   };
 
   // Opciones para grados de danza (1er grado a 8vo grado)
@@ -44,12 +51,40 @@ const DatosEstudiante = ({ formData, onChange, errores = {}, mode = "completo" }
     { value: "8vo_grado", label: "8vo Grado" }
   ];
 
-  // Opciones para especialidades (solo para grados avanzados)
+  // Normalizar valor de grado para que el CFormSelect coincida exactamente
+  const normalizedGrado = () => {
+    if (!formData.grado) return "";
+    const g = String(formData.grado).trim();
+    const exactMatch = gradosDanza.find(d => d.value.toLowerCase() === g.toLowerCase() || d.label.toLowerCase() === g.toLowerCase());
+    if (exactMatch) return exactMatch.value;
+    const lower = g.toLowerCase();
+    if (lower.includes('1er') || lower.includes('primero')) return '1er_grado';
+    if (lower.includes('2do') || lower.includes('segundo')) return '2do_grado';
+    if (lower.includes('3er') || lower.includes('tercero')) return '3er_grado';
+    if (lower.includes('4to') || lower.includes('cuarto')) return '4to_grado';
+    if (lower.includes('5to') || lower.includes('quinto')) return '5to_grado';
+    if (lower.includes('6to') || lower.includes('sexto')) return '6to_grado';
+    if (lower.includes('7mo') || lower.includes('septimo') || lower.includes('séptimo')) return '7mo_grado';
+    if (lower.includes('8vo') || lower.includes('octavo')) return '8vo_grado';
+    return formData.grado;
+  };
+
+  // Opciones para especialidades oficiales (solo para grados avanzados 6to, 7mo y 8vo)
   const opcionesEspecialidades = [
-    { value: "ballet_clasico", label: "Ballet Clásico" },
-    { value: "danza_contemporanea", label: "Danza Contemporánea" },
-    { value: "danza_tradicional", label: "Danza Tradicional" }
+    { value: "Danza Clásica", label: "Danza Clásica" },
+    { value: "Danza Tradicional", label: "Danza Tradicional" },
+    { value: "Danza Contemporánea", label: "Danza Contemporánea" }
   ];
+
+  // Normalizar valor de especialidad para coincidir con el select
+  const normalizedEspecialidad = () => {
+    if (!formData.especialidad) return "";
+    const esp = String(formData.especialidad).toLowerCase().trim();
+    if (esp.includes('clasic') || esp.includes('ballet')) return 'Danza Clásica';
+    if (esp.includes('tradicion') || esp.includes('folk')) return 'Danza Tradicional';
+    if (esp.includes('contempor')) return 'Danza Contemporánea';
+    return formData.especialidad;
+  };
 
   // Opciones para grados escolares externos (Escuela)
   const gradosEscuela = [
@@ -188,8 +223,15 @@ const DatosEstudiante = ({ formData, onChange, errores = {}, mode = "completo" }
                     </span>
                   }
                   name="grado"
-                  value={formData.grado}
-                  onChange={onChange}
+                  value={normalizedGrado()}
+                  onChange={(e) => {
+                    onChange(e);
+                    const selectedVal = e.target.value;
+                    const isAdv = selectedVal.includes('6to') || selectedVal.includes('7mo') || selectedVal.includes('8vo');
+                    if (!isAdv && formData.especialidad) {
+                      onChange({ target: { name: 'especialidad', value: '' } });
+                    }
+                  }}
                   required
                   className={`input-premium py-2 ${errores.grado ? 'is-invalid' : ''}`}
                   feedback={errores.grado}
@@ -216,7 +258,7 @@ const DatosEstudiante = ({ formData, onChange, errores = {}, mode = "completo" }
                       </span>
                     }
                     name="especialidad"
-                    value={formData.especialidad}
+                    value={normalizedEspecialidad()}
                     onChange={onChange}
                     className={`input-premium py-2 ${errores.especialidad ? 'is-invalid' : ''}`}
                     feedback={errores.especialidad}

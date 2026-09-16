@@ -385,38 +385,64 @@ export const RepresentanteModel = {
       throw error;
     }
   },
-findByUserId: async (userId) => {
-  try {
-    console.log("🔍 Buscando representante para userId:", userId);
-    
-    const query = {
-      text: `
-        SELECT 
-          r."Id_representante" as id,
-          r."Id_usuario" as user_id,
-          u."nombre",
-          u."apellido",
-          u."cedula",
-          u."correo" as email
-        FROM "Representante" r
-        INNER JOIN "Usuario" u ON r."Id_usuario" = u."Id_usuario"
-        WHERE u."Id_usuario" = $1
-      `,
-      values: [userId]
-    };
-    
-    console.log("📝 Query a ejecutar:", query.text);
-    console.log("📊 Valores:", query.values);
-    
-    const { rows } = await db.query(query.text, query.values);
-    
-    console.log("✅ Filas encontradas:", rows.length);
-    console.log("📦 Datos:", rows);
-    
-    return rows[0] || null;
-  } catch (error) {
-    console.error("❌ Error en findByUserId:", error);
-    throw error;
+  findByUserId: async (userId) => {
+    try {
+      console.log("🔍 Buscando representante para userId:", userId);
+      
+      const query = {
+        text: `
+          SELECT 
+            r."Id_representante" as id,
+            r."Id_representante" as id_representante,
+            r."Id_usuario" as user_id,
+            u."nombre",
+            u."apellido",
+            u."cedula",
+            u."correo" as email
+          FROM "Representante" r
+          INNER JOIN "Usuario" u ON r."Id_usuario" = u."Id_usuario"
+          WHERE u."Id_usuario" = $1
+        `,
+        values: [userId]
+      };
+      
+      const { rows } = await db.query(query.text, query.values);
+      if (rows.length > 0) {
+        return rows[0];
+      }
+
+      // Si no se encontró por Id_usuario directo, buscar por cédula del usuario (soporte de rol dual)
+      const userRes = await db.query(
+        'SELECT "cedula" FROM "Usuario" WHERE "Id_usuario" = $1',
+        [userId]
+      );
+
+      if (userRes.rows.length > 0 && userRes.rows[0].cedula) {
+        const cedula = userRes.rows[0].cedula;
+        const repByCedula = await db.query(
+          `SELECT 
+             r."Id_representante" as id,
+             r."Id_representante" as id_representante,
+             COALESCE(r."Id_usuario", $1) as user_id,
+             u."nombre",
+             u."apellido",
+             u."cedula",
+             u."correo" as email
+           FROM "Representante" r
+           JOIN "Usuario" u ON r."Id_usuario" = u."Id_usuario"
+           WHERE u."cedula" = $2`,
+          [userId, cedula]
+        );
+        if (repByCedula.rows.length > 0) {
+          console.log("✅ Representante encontrado por cédula para rol dual:", repByCedula.rows[0].id);
+          return repByCedula.rows[0];
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error("❌ Error en findByUserId:", error);
+      throw error;
+    }
   }
-}
 };

@@ -10,9 +10,19 @@ const fetch = api;
 // GESTIÓN DE SECCIONES
 // ============================================
 
+export { getActiveYear } from './configService';
+
 export const getAllSections = async (academicYearId = null) => {
     try {
-        const response = await scheduleAPI.listSections(academicYearId);
+        let yearId = academicYearId;
+        if (typeof yearId === 'string' && isNaN(Number(yearId))) {
+            const allYearsRes = await fetch.get('/api/config/academic-years');
+            if (allYearsRes.ok && allYearsRes.data) {
+                const found = allYearsRes.data.find(y => y.name === yearId);
+                if (found) yearId = found.id;
+            }
+        }
+        const response = await scheduleAPI.listSections(yearId);
         if (response?.ok) {
             return response.sections || response.data || [];
         }
@@ -26,7 +36,16 @@ export const getAllSections = async (academicYearId = null) => {
 // Alias para compatibilidad con código antiguo que usaba schedules.js
 export const listSections = async (filters = {}) => {
     try {
-        let sections = await getAllSections(filters.academicYearId);
+        const yearParam = filters.academicYearId || filters.academicYear;
+        let sections = await getAllSections(yearParam);
+
+        if (filters.academicYear && typeof filters.academicYear === 'string') {
+            const cleanYear = filters.academicYear.trim();
+            sections = sections.filter(s => {
+                const sYear = (s.academic_year_name || s.academicYear || '').trim();
+                return !sYear || sYear === cleanYear;
+            });
+        }
 
         if (filters.gradeLevel) {
             sections = sections.filter(s => s.grade_level === filters.gradeLevel || s.gradeLevel === filters.gradeLevel);
@@ -39,17 +58,20 @@ export const listSections = async (filters = {}) => {
             subjectName: s.subject_name || s.subjectName || 'Sin Materia',
             gradeLevel: s.grade_level || s.gradeLevel || s.subject_name,
             academicYear: s.academic_year_name || s.academicYear,
+            academicYearId: s.academic_year_id || s.academicYearId,
             schedules: (s.schedules || []).map(sched => ({
                 ...sched,
                 subject: sched.subject || sched.subject_name || sched.subjectName || s.subject_name || s.subjectName || 'Sin Materia',
-                teacherUserId: sched.teacher_user_id || sched.teacherUserId,
+                subjectName: sched.subject_name || sched.subject || sched.subjectName || s.subject_name || s.subjectName || 'Sin Materia',
+                teacherUserId: sched.teacher_user_id || sched.teacherUserId || sched.user_id,
                 teacherName: sched.teacher_name || sched.teacherName,
                 teacherId: sched.teacher_id || sched.teacherId,
                 dayName: sched.day_name || sched.dayName,
                 blockName: sched.block_name || sched.blockName,
                 startTime: sched.start_time || sched.startTime,
                 endTime: sched.end_time || sched.endTime,
-                classroomName: sched.classroom_name || sched.classroomName,
+                classroomName: sched.classroom_name || sched.classroomName || sched.classroom,
+                classroom: sched.classroom_name || sched.classroomName || sched.classroom,
             }))
         }));
 

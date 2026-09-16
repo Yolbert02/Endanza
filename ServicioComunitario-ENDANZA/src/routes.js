@@ -47,6 +47,9 @@ const horarioEstudiante = React.lazy(() => import('./views/profile/horarioEstudi
 //Aulas
 const Aulas = React.lazy(() => import('./views/Aulas/Aulas'))
 
+// Secciones y Lapsos
+const SeccionesLapsos = React.lazy(() => import('./views/secciones/SeccionesLapsos'))
+
 //prueba 
 const prueba = React.lazy(() => import('./views/Boletin/components/resumenSeccion'))
 
@@ -89,6 +92,7 @@ const routes = [
   { path: '/boletin', name: 'Boletin', element: Boletin }, // Boletín
   { path: '/horario', name: 'Horario', element: Horario }, // Horario
   { path: '/aulas', name: 'Aulas', element: Aulas }, // Aulas
+  { path: '/secciones', name: 'Secciones y Lapsos', element: SeccionesLapsos }, // Secciones y Lapsos
   { path: '/students', name: 'Students', element: Students }, // Students
   { path: '/students/:id', name: 'PerfilStudents', element: PerfilStudents }, // Perfil Students
 

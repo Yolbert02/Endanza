@@ -23,20 +23,35 @@ const listSections = async (req, res) => {
         academic_year_id: s.academic_year_id,
         grade_id: s.grade_id,
         grade_name: s.grade_name,
+        nivel_academico: s.nivel_academico || s.grade_name,
+        capacity: s.capacity || 30,
+        capacidad: s.capacity || 30,
+        period_id: s.period_id,
+        period_name: s.period_name,
+        specialty_id: s.specialty_id,
+        specialty_name: s.specialty_name,
         student_count: parseInt(s.student_count || 0),
         // Mapeamos los horarios al formato esperado por el frontend
         schedules: schedules.map(sch => ({
           id: sch.id,
-          subject: sch.subject_name || 'Materia', // Asumiendo que el horario o la materia tienen nombre
+          subject: sch.subject_name || 'Materia',
+          subject_name: sch.subject_name || 'Materia',
+          subject_id: sch.subject_id,
           teacherName: sch.teacher_name
             ? `${sch.teacher_name.trim()} ${sch.teacher_lastname.trim()}`.replace(/\s+/g, ' ')
             : 'Sin profesor',
+          teacher_name: sch.teacher_name
+            ? `${sch.teacher_name.trim()} ${sch.teacher_lastname.trim()}`.replace(/\s+/g, ' ')
+            : 'Sin profesor',
           teacherId: sch.teacher_id,
-          teacherUserId: sch.user_id, // Added user ID for robust filtering
+          teacher_id: sch.teacher_id,
+          teacherUserId: sch.user_id,
+          teacher_user_id: sch.user_id,
           day_name: sch.day_name,
           start_time: sch.start_time,
           end_time: sch.end_time,
-          classroom: sch.classroom_name
+          classroom: sch.classroom_name,
+          classroom_name: sch.classroom_name
         }))
       };
     }));

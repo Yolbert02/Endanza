@@ -216,3 +216,79 @@ export const CLASSROOMS = [
   { value: 'Salón Nutrición', label: 'Salón Nutrición' }
 ];
 
+/**
+ * Obtiene los estudiantes inscritos en una sección
+ * @param {number} sectionId 
+ * @returns {Promise<Array>}
+ */
+export const getSectionStudents = async (sectionId) => {
+  try {
+    const response = await fetch.get(`/api/sections/${sectionId}/students`);
+    if (response.ok && response.data) {
+      return response.data;
+    }
+    return [];
+  } catch (error) {
+    console.error("Error en getSectionStudents:", error);
+    return [];
+  }
+};
+
+/**
+ * Obtiene los lapsos de un año académico
+ * @param {number} yearId 
+ * @returns {Promise<Array>}
+ */
+export const listLapsos = async (yearId) => {
+  try {
+    const response = await fetch.get(`/api/config/academic-years/${yearId}/lapsos`);
+    if (response.ok && response.data) {
+      return response.data;
+    }
+    return [];
+  } catch (error) {
+    console.error("Error en listLapsos:", error);
+    return [];
+  }
+};
+
+/**
+ * Crea un lapso
+ */
+export const createLapso = async (yearId, lapsoData) => {
+  try {
+    const response = await fetch.post(`/api/config/academic-years/${yearId}/lapsos`, lapsoData);
+    return response;
+  } catch (error) {
+    console.error("Error en createLapso:", error);
+    throw error;
+  }
+};
+
+/**
+ * Actualiza un lapso
+ */
+export const updateLapso = async (lapsoId, lapsoData) => {
+  try {
+    const response = await fetch.put(`/api/config/lapsos/${lapsoId}`, lapsoData);
+    return response;
+  } catch (error) {
+    console.error("Error en updateLapso:", error);
+    throw error;
+  }
+};
+
+/**
+ * Elimina un lapso
+ */
+export const deleteLapso = async (lapsoId) => {
+  try {
+    const response = await fetch.delet(`/api/config/lapsos/${lapsoId}`);
+    return response;
+  } catch (error) {
+    console.error("Error en deleteLapso:", error);
+    throw error;
+  }
+};
+
+

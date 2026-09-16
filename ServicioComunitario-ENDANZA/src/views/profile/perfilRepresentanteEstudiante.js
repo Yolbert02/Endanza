@@ -28,7 +28,8 @@ import {
   cilBadge,
   cilMedicalCross,
   cilPrint,
-  cilWarning
+  cilWarning,
+  cilPencil
 } from "@coreui/icons"
 
 import ProfileSummary from "../profile/components/profile/ProfileSummary"
@@ -36,9 +37,10 @@ import ProfileStatsCards from "../profile/components/profile/ProfileStatsCards"
 import PersonalInfoTab from "../profile/components/profile/PersonalInfoTab"
 import RepresentativeTab from "../profile/components/profile/RepresentativeTab"
 import HealthTab from "../profile/components/profile/HealthTab"
+import EditStudentModal from "../profile/components/profile/editModal"
 
 // 👇 Importar el servicio para representantes (como fallback)
-import { getStudentProfile } from '../../services/studentsService'
+import { getStudentProfile, updateStudent as updateStudentService } from '../../services/studentsService'
 import useUserRole from '../../Hooks/useUserRole'
 
 // 👇 LOG 1: Verificar que el archivo se carga
@@ -47,24 +49,26 @@ console.log("📦 ARCHIVO PerfilRepresentanteEstudiante CARGADO EN MEMORIA");
 const PerfilRepresentanteEstudiante = () => {
   // 👇 LOG 2: Verificar que el componente se monta
   console.log("🏗️ COMPONENTE Montándose - PerfilRepresentanteEstudiante");
-  
+
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
   // 👇 IMPORTANTE: Obtener también isLoading
   const { isRepresentante, isLoading } = useUserRole()
-  
+
   // 👇 LOG 3: Verificar parámetros
   console.log("📍 useParams:", { id });
   console.log("📍 location.pathname:", location.pathname);
   console.log("📍 location.state:", location.state);
   console.log("📍 isRepresentante:", isRepresentante);
   console.log("📍 isLoading:", isLoading);
-  
+
   const [loading, setLoading] = useState(true)
   const [student, setStudent] = useState(null)
   const [activeKey, setActiveKey] = useState(1)
   const [toasts, setToasts] = useState([])
+  const [editModalVisible, setEditModalVisible] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   // 👇 SOLUCIÓN: Esperar a que isLoading sea false antes de ejecutar la lógica
   useEffect(() => {
@@ -73,25 +77,25 @@ const PerfilRepresentanteEstudiante = () => {
       console.log("⏳ Esperando a que cargue el rol del usuario...");
       return;
     }
-    
+
     console.log("🔄 useEffect ejecutándose - id:", id, "isRepresentante:", isRepresentante);
-    
+
     // Redirigir si no es representante (ahora con datos reales)
     if (!isRepresentante) {
       console.log("🚫 No es representante, redirigiendo a /inicio");
       navigate('/inicio')
       return
     }
-    
+
     // Intentar obtener el estudiante de la lista cacheada
     const studentsList = location.state?.studentsList
     console.log("📋 studentsList desde state:", studentsList);
-    
+
     if (studentsList && studentsList.length > 0) {
       console.log("📦 Usando estudiantes de la lista cacheada:", studentsList)
       // Buscar el estudiante por ID (convertir a número por si acaso)
       const foundStudent = studentsList.find(s => s.id === parseInt(id) || s.id === id)
-      
+
       if (foundStudent) {
         console.log("✅ Estudiante encontrado en cache:", foundStudent)
         setStudent(foundStudent)
@@ -103,7 +107,7 @@ const PerfilRepresentanteEstudiante = () => {
     } else {
       console.log("📡 No hay cache disponible, haciendo petición al backend")
     }
-    
+
     // Fallback: hacer petición al backend
     fetchStudentData()
   }, [id, isRepresentante, isLoading, location.state]) // 👈 AÑADIR isLoading a las dependencias
@@ -131,6 +135,32 @@ const PerfilRepresentanteEstudiante = () => {
   const handlePrint = () => {
     window.print()
     showToast("success", "Imprimir", "Preparando para imprimir...")
+  }
+
+  const handleEdit = () => {
+    setEditModalVisible(true)
+  }
+
+  const handleSaveStudent = async (updatedData) => {
+    setSaving(true)
+    try {
+      const response = await updateStudentService(id, updatedData)
+      if (response && response.ok) {
+        if (response.data) {
+          setStudent(response.data)
+        }
+        showToast("success", "Guardado", "Datos actualizados correctamente")
+        setEditModalVisible(false)
+        await fetchStudentData()
+      } else {
+        showToast("danger", "Error", response?.msg || "No se pudieron guardar los datos")
+      }
+    } catch (error) {
+      console.error('Error al guardar:', error)
+      showToast("danger", "Error", "No se pudieron guardar los datos")
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleGoBack = () => {
@@ -212,6 +242,18 @@ const PerfilRepresentanteEstudiante = () => {
         </CCol>
         <CCol xs={12} md={6} className="text-md-end mt-3 mt-md-0">
           <div className="d-flex justify-content-md-end gap-2">
+            <CButton
+              className="btn-premium rounded-pill px-4 py-2 d-flex align-items-center shadow-sm"
+              style={{
+                background: 'linear-gradient(135deg, #DD6F1E 0%, #924003 100%)',
+                color: '#ffffff',
+                border: 'none',
+                fontWeight: '600'
+              }}
+              onClick={handleEdit}
+            >
+              <CIcon icon={cilPencil} className="me-2 text-white" />Editar Perfil
+            </CButton>
             <CButton variant="outline" className="border-2 rounded-pill profile-outline-btn d-flex align-items-center" onClick={handlePrint}>
               <CIcon icon={cilPrint} className="me-2" />Imprimir Ficha
             </CButton>
@@ -229,7 +271,7 @@ const PerfilRepresentanteEstudiante = () => {
             progreso={progreso}
             showToast={showToast}
             setActiveKey={setActiveKey}
-            setEditModalVisible={() => {}} // No hay edición
+            setEditModalVisible={setEditModalVisible}
           />
         </CCol>
       </CRow>
@@ -338,6 +380,14 @@ const PerfilRepresentanteEstudiante = () => {
           </CToast>
         ))}
       </CToaster>
+
+      <EditStudentModal
+        visible={editModalVisible}
+        setVisible={setEditModalVisible}
+        studentData={student}
+        onSave={handleSaveStudent}
+        saving={saving}
+      />
 
       <style>{`
         @media print {

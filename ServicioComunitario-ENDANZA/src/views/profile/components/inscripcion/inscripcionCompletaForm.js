@@ -18,9 +18,31 @@ import DatosSalud from "./steps/datosSalud";
 import ConfirmacionInscripcion from "./steps/confirmacionInscripcion";
 import { generarCodigoInscripcion, validarFormularioCompleto } from "./utils/validators";
 import { generarPlanillaHTML } from "./utils/pdfGenerator";
-import { inscribirEstudiante } from "../../../../services/inscripcionService";
+import { inscribirEstudiante, obtenerDatosPrecargaEstudiante } from "../../../../services/inscripcionService";
 import { capitalizeWords } from "../../../../utils/formatters";
 import "./styles/inscripcion.css";
+
+// Funciones auxiliares para separar nombres y teléfonos
+const splitTwoParts = (str) => {
+  if (!str) return { first: "", second: "" };
+  const parts = str.trim().split(/\s+/);
+  return {
+    first: parts[0] || "",
+    second: parts.slice(1).join(" ") || ""
+  };
+};
+
+const splitPhoneParts = (phone) => {
+  if (!phone) return { prefix: "0414", number: "" };
+  const digits = String(phone).replace(/[^\d]/g, "");
+  if (digits.length >= 4) {
+    return {
+      prefix: digits.slice(0, 4),
+      number: digits.slice(4)
+    };
+  }
+  return { prefix: "0414", number: digits };
+};
 
 const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }) => {
   const [step, setStep] = useState(1);
@@ -28,6 +50,9 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
   const [codigoInscripcion, setCodigoInscripcion] = useState("");
   const [errores, setErrores] = useState({});
   const [enviando, setEnviando] = useState(false);
+  const [cargandoPrecarga, setCargandoPrecarga] = useState(false);
+  const [yaInscrito, setYaInscrito] = useState(false);
+  const [mensajeYaInscrito, setMensajeYaInscrito] = useState("");
 
   // Estado inicial LIMPIO
   const [formData, setFormData] = useState({
@@ -121,34 +146,156 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
     setErrores({});
   }, [step]);
 
-  // Cargar datos del estudiante
+  // Precargar datos del estudiante y su representante desde la base de datos
   useEffect(() => {
-    if (student) {
-      // Formatear la fecha para input type="date" (YYYY-MM-DD)
-      let formattedDate = "";
-      if (student.birth_date || student.birthDate) {
-        const rawDate = student.birth_date || student.birthDate;
-        formattedDate = rawDate.split('T')[0];
-      }
+    const precargarDatos = async () => {
+      if (!student?.id) return;
+      setCargandoPrecarga(true);
+      try {
+        const res = await obtenerDatosPrecargaEstudiante(student.id, activeYear?.id);
+        const data = res?.data || res;
+        if (!data) return;
 
-      // Mapear el grado de "1er Grado" a "1er_grado" para que coincida con el select
-      let mappedGrade = "";
-      const rawGrade = student.grade_level || student.gradeLevel || "";
-      if (rawGrade) {
-        mappedGrade = rawGrade.toLowerCase().replace(" ", "_");
-      }
+        const est = data.estudiante || {};
+        const rep = data.representante || {};
+        const madre = data.madre || null;
+        const padre = data.padre || null;
+        const hm = data.historial_medico || {};
+        const inscActual = data.inscripcion_actual || {};
 
-      setFormData(prev => ({
-        ...prev,
-        id_estudiante: student.id,
-        nombres: student.first_name || student.name || "",
-        apellidos: student.last_name || student.lastName || "",
-        fecha_nac: formattedDate,
-        grado: mappedGrade,
-        // NO cargamos datos del representante aquí
-      }));
-    }
-  }, [student]);
+        if (inscActual.ya_inscrito) {
+          setYaInscrito(true);
+          setMensajeYaInscrito(
+            `El estudiante ${est.nombres || student.first_name || ''} ${est.apellidos || student.last_name || ''} ya se encuentra inscrito en este período escolar (${activeYear?.name || ''})${inscActual.seccion ? ` en la Sección "${inscActual.seccion}"` : ''}.`
+          );
+        } else {
+          setYaInscrito(false);
+          setMensajeYaInscrito("");
+        }
+
+        // Formatear fecha de nacimiento
+        let formattedDate = "";
+        const rawDate = est.fecha_nacimiento || student.birth_date || student.birthDate;
+        if (rawDate) {
+          formattedDate = String(rawDate).split('T')[0];
+        }
+
+        // Grado del estudiante mapeado
+        let mappedGrade = "";
+        const rawGrade = est.grado_escuela || est.dance_level_name || est.grade_level_name || student.grade_level || student.gradeLevel || "";
+        if (rawGrade) {
+          mappedGrade = rawGrade.toLowerCase().replace(" ", "_");
+        }
+
+        // Separar partes de nombres y teléfonos
+        const repNombres = splitTwoParts(rep.nombres);
+        const repApellidos = splitTwoParts(rep.apellidos);
+        const repTel = splitPhoneParts(rep.telefono);
+
+        // Madre: si no hay en tabla Padre y el rep es Madre, usar datos del rep
+        const infoMadre = madre || (rep.parentesco === 'Madre' ? rep : null);
+        const madreNombres = splitTwoParts(infoMadre?.nombre || infoMadre?.nombres);
+        const madreApellidos = splitTwoParts(infoMadre?.apellido || infoMadre?.apellidos);
+        const madreTel = splitPhoneParts(infoMadre?.telefono);
+
+        // Padre: si no hay en tabla Padre y el rep es Padre, usar datos del rep
+        const infoPadre = padre || (rep.parentesco === 'Padre' ? rep : null);
+        const padreNombres = splitTwoParts(infoPadre?.nombre || infoPadre?.nombres);
+        const padreApellidos = splitTwoParts(infoPadre?.apellido || infoPadre?.apellidos);
+        const padreTel = splitPhoneParts(infoPadre?.telefono);
+
+        // Parentesco del representante
+        let quienRep = "Madre";
+        let parentescoOtro = "";
+        if (rep.parentesco === "Padre") {
+          quienRep = "Padre";
+        } else if (rep.parentesco && rep.parentesco !== "Madre") {
+          quienRep = "Otro";
+          parentescoOtro = rep.parentesco;
+        }
+
+        setFormData(prev => ({
+          ...prev,
+          id_estudiante: est.id || student.id,
+          nombres: est.nombres || student.first_name || prev.nombres,
+          apellidos: est.apellidos || student.last_name || prev.apellidos,
+          fecha_nac: formattedDate || prev.fecha_nac,
+          direccion_Habitacion: est.direccion || prev.direccion_Habitacion,
+          grado: mappedGrade || prev.grado,
+          escuela: est.escuela || prev.escuela,
+          Grado_Escuela: est.grado_escuela || prev.Grado_Escuela,
+          Seguro_Escolar: est.seguro_escolar ? "si" : (prev.Seguro_Escolar || "no"),
+          nombre_Seguro: est.nombre_seguro || prev.nombre_Seguro,
+          Telefono_Celular: est.telefono || prev.Telefono_Celular,
+
+          // Representante
+          quien_es_representante: quienRep,
+          parentesco_Otro: parentescoOtro,
+          primer_nombre_Rep: repNombres.first || prev.primer_nombre_Rep,
+          segundo_nombre_Rep: repNombres.second || prev.segundo_nombre_Rep,
+          primer_apellido_Rep: repApellidos.first || prev.primer_apellido_Rep,
+          segundo_apellido_Rep: repApellidos.second || prev.segundo_apellido_Rep,
+          nombres_Representante: rep.nombres || prev.nombres_Representante,
+          apellidos_Representante: rep.apellidos || prev.apellidos_Representante,
+          telefono_Rep_prefix: repTel.prefix || prev.telefono_Rep_prefix,
+          telefono_Rep_number: repTel.number || prev.telefono_Rep_number,
+          telefono_Rep: rep.telefono || prev.telefono_Rep,
+          profesion_Rep: rep.profesion || prev.profesion_Rep,
+          direccion_Trabajo_Rep: rep.direccion_trabajo || prev.direccion_Trabajo_Rep,
+
+          // Madre
+          primer_nombre_Madre: madreNombres.first || prev.primer_nombre_Madre,
+          segundo_nombre_Madre: madreNombres.second || prev.segundo_nombre_Madre,
+          primer_apellido_Madre: madreApellidos.first || prev.primer_apellido_Madre,
+          segundo_apellido_Madre: madreApellidos.second || prev.segundo_apellido_Madre,
+          nombre_Madre: (infoMadre?.nombre || infoMadre?.nombres) || prev.nombre_Madre,
+          apellido_Madre: (infoMadre?.apellido || infoMadre?.apellidos) || prev.apellido_Madre,
+          cedula_Madre: infoMadre?.cedula || prev.cedula_Madre,
+          ocupacion_Madre: infoMadre?.profesion || infoMadre?.profesion_padre || prev.ocupacion_Madre,
+          direccion_Trabajo_Madre: infoMadre?.direccion_trabajo || infoMadre?.direccion_trabajo_padre || prev.direccion_Trabajo_Madre,
+          telefono_Madre_prefix: madreTel.prefix || prev.telefono_Madre_prefix,
+          telefono_Madre_number: madreTel.number || prev.telefono_Madre_number,
+          telefono_Madre: infoMadre?.telefono || prev.telefono_Madre,
+
+          // Padre
+          primer_nombre_Padre: padreNombres.first || prev.primer_nombre_Padre,
+          segundo_nombre_Padre: padreNombres.second || prev.segundo_nombre_Padre,
+          primer_apellido_Padre: padreApellidos.first || prev.primer_apellido_Padre,
+          segundo_apellido_Padre: padreApellidos.second || prev.segundo_apellido_Padre,
+          nombre_Padre: (infoPadre?.nombre || infoPadre?.nombres) || prev.nombre_Padre,
+          apellido_Padre: (infoPadre?.apellido || infoPadre?.apellidos) || prev.apellido_Padre,
+          cedula_Padre: infoPadre?.cedula || prev.cedula_Padre,
+          ocupacion_Padre: infoPadre?.profesion || infoPadre?.profesion_padre || prev.ocupacion_Padre,
+          direccion_Trabajo_Padre: infoPadre?.direccion_trabajo || infoPadre?.direccion_trabajo_padre || prev.direccion_Trabajo_Padre,
+          telefono_Padre_prefix: padreTel.prefix || prev.telefono_Padre_prefix,
+          telefono_Padre_number: padreTel.number || prev.telefono_Padre_number,
+          telefono_Padre: infoPadre?.telefono || prev.telefono_Padre,
+
+          // Salud
+          peso: hm.peso || prev.peso,
+          talla: hm.talla || prev.talla,
+          tipo_sangre: hm.tipo_sangre || prev.tipo_sangre,
+          intolerancia: hm.intolerancia || prev.intolerancia,
+          textIntolerancia: hm.textIntolerancia || prev.textIntolerancia,
+          operaciones: hm.operaciones || prev.operaciones,
+          textOperaciones: hm.textOperaciones || prev.textOperaciones,
+          control_Hormonal: hm.control_hormonal || prev.control_Hormonal,
+          textcontrolHormonal: hm.textcontrolHormonal || prev.textcontrolHormonal,
+          alergias: hm.alergias || prev.alergias,
+          textAlergia: hm.textAlergia || prev.textAlergia,
+          nacimiento: hm.termino_nacimiento || prev.nacimiento,
+          antecedentesFamiliares: hm.antecedentes_familiares || prev.antecedentesFamiliares,
+        }));
+
+      } catch (err) {
+        console.warn("⚠️ No se pudieron precargar los datos completos:", err);
+      } finally {
+        setCargandoPrecarga(false);
+      }
+    };
+
+    precargarDatos();
+  }, [student, activeYear]);
 
   useEffect(() => {
     // Actualizar año académico si cambia
@@ -400,7 +547,12 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
 
     } catch (error) {
       console.error("Error al enviar inscripción:", error);
-      alert("Ocurrió un error al procesar la inscripción. Por favor, intente nuevamente.");
+      const errorMsg = error.message || "Ocurrió un error al procesar la inscripción. Por favor, intente nuevamente.";
+      alert(errorMsg);
+      if (errorMsg.toLowerCase().includes("ya se encuentra inscrito")) {
+        setYaInscrito(true);
+        setMensajeYaInscrito(errorMsg);
+      }
     } finally {
       setEnviando(false);
     }
@@ -503,6 +655,34 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
             </CNav>
           )}
 
+          {yaInscrito && step !== 4 && (
+            <CAlert color="warning" className="mb-4 border-0 shadow-sm rounded-4 animate__animated animate__fadeIn">
+              <div className="d-flex align-items-center">
+                <CIcon icon={cilWarning} className="flex-shrink-0 me-3 text-warning" size="xl" />
+                <div className="flex-grow-1">
+                  <h6 className="mb-1 fw-bold">Estudiante Ya Inscrito en Este Período</h6>
+                  <p className="mb-0 small">{mensajeYaInscrito}</p>
+                </div>
+                <CButton
+                  color="warning"
+                  variant="outline"
+                  size="sm"
+                  className="ms-3 rounded-pill fw-bold"
+                  onClick={onVolver}
+                >
+                  Volver a la Lista
+                </CButton>
+              </div>
+            </CAlert>
+          )}
+
+          {cargandoPrecarga && (
+            <div className="text-center py-3 mb-4 rounded-4 bg-light">
+              <CSpinner color="warning" size="sm" className="me-2" />
+              <span className="small text-muted fw-bold">Precargando información del estudiante y representante...</span>
+            </div>
+          )}
+
           {Object.keys(errores).length > 0 && step !== 4 && (
             <CAlert color="danger" className="mb-4 border-0 shadow-sm rounded-4 animate__animated animate__shakeX">
               <div className="d-flex align-items-center mb-2">
@@ -568,7 +748,7 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
                   className="rounded-pill px-4 border-2 fw-bold inscripcion-cancel-btn hover-danger transition-all"
                   disabled={enviando}
                 >
-                  CANCELAR PROCESO
+                  {yaInscrito ? "VOLVER A LA LISTA" : "CANCELAR PROCESO"}
                 </CButton>
               ) : null}
             </div>
@@ -578,7 +758,7 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
                 <CButton
                   className="btn-premium rounded-pill px-5 shadow-sm"
                   onClick={handleNextStep}
-                  disabled={enviando}
+                  disabled={enviando || yaInscrito}
                 >
                   SIGUIENTE PASO <CIcon icon={cilArrowRight} className="ms-2" />
                 </CButton>
@@ -587,7 +767,7 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
                   color="success"
                   className="rounded-pill px-5 text-white fw-bold shadow-sm bg-success border-0"
                   onClick={handleSubmit}
-                  disabled={enviando}
+                  disabled={enviando || yaInscrito}
                   style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
                 >
                   {enviando ? (

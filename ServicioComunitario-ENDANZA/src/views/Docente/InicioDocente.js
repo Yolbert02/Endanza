@@ -5,6 +5,7 @@ import { cilSchool } from '@coreui/icons'
 import { listSections } from 'src/services/scheduleService'
 import { getAvailableYears, getActiveYear } from 'src/services/configService'
 import { listStudents } from 'src/services/studentsService'
+import { getStoredUser } from 'src/utils/authStorage'
 import useUserRole from '../../Hooks/useUserRole'
 
 // Components
@@ -13,7 +14,7 @@ import ClassGroupsList from './components/inicio/ClassGroupsList'
 import StudentListModal from './components/inicio/StudentListModal'
 
 const InicioDocente = () => {
-    const { isSuperadministrador } = useUserRole()
+    const { isSuperadministrador, userData, userId } = useUserRole()
     const [loading, setLoading] = useState(true)
     const [sections, setSections] = useState([])
     const [academicYears, setAcademicYears] = useState([])
@@ -25,21 +26,22 @@ const InicioDocente = () => {
     const [students, setStudents] = useState([])
     const [showStudentModal, setShowStudentModal] = useState(false)
     const [loadingStudents, setLoadingStudents] = useState(false)
-    const [currentUser, setCurrentUser] = useState(null)
+    const [currentUser, setCurrentUser] = useState(() => {
+        const stored = getStoredUser()
+        return stored ? { ...stored, id: stored.id || stored.Id_usuario } : null
+    })
 
     useEffect(() => {
-        // 1. Obtener usuario del localStorage
-        const userStr = localStorage.getItem('user')
-        if (userStr) {
-            const user = JSON.parse(userStr)
-            console.log("👤 INICIO: Usuario recuperado de localStorage:", user);
-            const normalizedUser = { ...user, id: user.id || user.Id_usuario };
+        const activeUser = userData || currentUser || getStoredUser()
+        if (activeUser) {
+            const normalizedUser = { ...activeUser, id: activeUser.id || activeUser.Id_usuario }
             setCurrentUser(normalizedUser)
-            // Si es docente, seteamos su nombre completo
-            const fullName = `${user.nombre} ${user.apellido}`.trim()
-            setSelectedTeacher(fullName)
+            const fullName = `${activeUser.nombre || ''} ${activeUser.apellido || ''}`.trim()
+            if (fullName && !selectedTeacher) {
+                setSelectedTeacher(fullName)
+            }
         }
-    }, [])
+    }, [userData])
 
     useEffect(() => {
         loadInitialData()
@@ -49,7 +51,7 @@ const InicioDocente = () => {
         if (selectedYearId) {
             fetchDashboardData()
         }
-    }, [selectedYearId, selectedTeacher, currentUser])
+    }, [selectedYearId, selectedTeacher, currentUser, userData])
 
     const loadInitialData = async () => {
         try {
@@ -125,9 +127,9 @@ const InicioDocente = () => {
             setFullTeachersList(teachers)
 
             // 2. Datos del usuario autenticado
-            const userStr = localStorage.getItem('user')
-            const localUser = userStr ? JSON.parse(userStr) : null
-            const currentUserId = Number(currentUser?.id || currentUser?.Id_usuario || localUser?.id || localUser?.Id_usuario)
+            const activeUser = currentUser || userData || getStoredUser()
+            const currentUserId = Number(userId || activeUser?.id || activeUser?.Id_usuario)
+            const currentProfId = Number(activeUser?.Id_profesor || activeUser?.profesor_id || activeUser?.teacher_id)
 
             // Función auxiliar para normalizar cadenas (elimina tildes y espacios extra)
             const normalizeText = (text) =>
@@ -138,10 +140,11 @@ const InicioDocente = () => {
                     .replace(/\s+/g, ' ')
                     .trim()
 
-            const currentTeacherName = normalizeText(selectedTeacher)
+            const currentTeacherName = normalizeText(selectedTeacher || (activeUser ? `${activeUser.nombre || ''} ${activeUser.apellido || ''}` : ''))
 
             console.log("👤 DASHBOARD: Datos para filtrado del docente:", {
                 currentUserId,
+                currentProfId,
                 currentTeacherName
             })
 
@@ -161,8 +164,7 @@ const InicioDocente = () => {
                     }
 
                     // Validación B: Por ID de Profesor (si el usuario local guarda Id_profesor)
-                    const localProfId = Number(currentUser?.Id_profesor || localUser?.Id_profesor)
-                    if (localProfId && schedProfId && localProfId === schedProfId) {
+                    if (currentProfId && schedProfId && currentProfId === schedProfId) {
                         console.log(`✅ MATCH POR PROFESOR ID en [${section.sectionName || section.nombre_seccion}]`)
                         return true
                     }
@@ -242,18 +244,30 @@ const InicioDocente = () => {
     }
 
     const teacherStats = useMemo(() => {
-        const normalizedTeacher = (selectedTeacher || '').trim().toLowerCase()
+        const activeUser = currentUser || userData || getStoredUser()
+        const currentUserId = Number(userId || activeUser?.id || activeUser?.Id_usuario)
+        const normalizeStr = (text) =>
+            (text || '')
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/\s+/g, ' ')
+                .trim()
+        const normalizedTeacher = normalizeStr(selectedTeacher || (activeUser ? `${activeUser.nombre || ''} ${activeUser.apellido || ''}` : ''))
+
         const totalClasses = sections.reduce((acc, sec) =>
-            acc + sec.schedules.filter(s => {
-                const schedTeacher = (s.teacherName || '').trim().toLowerCase()
-                return schedTeacher === normalizedTeacher || schedTeacher.includes(normalizedTeacher)
+            acc + (sec.schedules || []).filter(s => {
+                const schedUserId = Number(s.teacherUserId || s.teacher_user_id || s.user_id)
+                if (currentUserId && schedUserId && currentUserId === schedUserId) return true
+                const schedTeacher = normalizeStr(s.teacherName || s.teacher_name)
+                return schedTeacher && normalizedTeacher && (schedTeacher === normalizedTeacher || schedTeacher.includes(normalizedTeacher) || normalizedTeacher.includes(schedTeacher))
             }).length, 0
         )
         return {
             groups: sections.length,
             classes: totalClasses
         }
-    }, [sections, selectedTeacher])
+    }, [sections, selectedTeacher, currentUser, userData, userId])
 
     return (
         <CContainer fluid className="pb-5">

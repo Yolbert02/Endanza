@@ -16,6 +16,14 @@ router.post(
   InscripcionRepresentanteController.completarInscripcion
 );
 
+// Precargar datos del estudiante y su representante para el formulario de inscripción
+router.get(
+  "/precargar/:studentId",
+  verifyToken,
+  autoVerifyRole,
+  InscripcionRepresentanteController.obtenerDatosPrecarga
+);
+
 // Verificar si un estudiante ya está inscrito
 router.get(
   "/verificar/:studentId",

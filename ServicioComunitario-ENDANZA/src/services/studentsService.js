@@ -131,12 +131,16 @@ export const searchStudents = async (query) => {
 export const getMyStudents = async () => {
   try {
     const response = await fetch.get('/api/students/mis-estudiantes');
+    const isOk = response.ok || response._ok;
 
-    if (response.ok && response.data) {
-      return response.data; // Array de estudiantes
+    if (isOk) {
+      if (Array.isArray(response.data)) return response.data;
+      if (Array.isArray(response)) return response;
+      if (response.data && Array.isArray(response.data.data)) return response.data.data;
+      return [];
     }
 
-    console.log("📥 getMyStudents - Respuesta:", response);
+    console.log("📥 getMyStudents - Respuesta no exitosa:", response);
     return [];
   } catch (error) {
     console.error("❌ Error en getMyStudents:", error);

@@ -46,20 +46,20 @@ import {
     addScheduleToSection
 } from '../../services/scheduleService'
 
-// Constantes con IDs para las materias
+// Constantes alineadas con la base de datos de materias
 const SUBJECTS = [
-    { id: 1, value: 'Danza Clásica', label: 'Danza Clásica' },
-    { id: 2, value: 'Danza Contemporánea', label: 'Danza Contemporánea' },
-    { id: 3, value: 'Danza Tradicional', label: 'Danza Tradicional' },
-    { id: 4, value: 'Danza Creativa', label: 'Danza Creativa' },
-    { id: 5, value: 'Preparación Física', label: 'Preparación Física' },
-    { id: 6, value: 'Música', label: 'Música' },
-    { id: 7, value: 'Historia de la Danza', label: 'Historia de la Danza' },
-    { id: 8, value: 'Nutrición', label: 'Nutrición' },
-    { id: 9, value: 'Kinesiología', label: 'Kinesiología' },
-    { id: 10, value: 'Francés', label: 'Francés' },
-    { id: 11, value: 'Composición Coreográfica', label: 'Composición Coreográfica' },
-    { id: 12, value: 'Danza de Carácter', label: 'Danza de Carácter' }
+    { id: 5, value: 'Danza Clásica', label: 'Danza Clásica' },
+    { id: 21, value: 'Danza Contemporánea', label: 'Danza Contemporánea' },
+    { id: 2, value: 'Danza Tradicional', label: 'Danza Tradicional' },
+    { id: 7, value: 'Danza Creativa', label: 'Danza Creativa' },
+    { id: 3, value: 'Preparación Física', label: 'Preparación Física' },
+    { id: 4, value: 'Música', label: 'Música' },
+    { id: 16, value: 'Historia de la Danza', label: 'Historia de la Danza' },
+    { id: 18, value: 'Nutrición', label: 'Nutrición' },
+    { id: 41, value: 'Kinesiología', label: 'Kinesiología' },
+    { id: 25, value: 'Francés', label: 'Francés' },
+    { id: 40, value: 'Composición Coreográfica', label: 'Composición Coreográfica' },
+    { id: 49, value: 'Danza de Carácter', label: 'Danza de Carácter' }
 ]
 
 const GRADE_LEVELS = [
@@ -74,16 +74,45 @@ const GRADE_LEVELS = [
     { value: '8vo Grado', label: '8vo Grado' }
 ]
 
+const DEFAULT_SPECIALTIES = [
+    { id: 7, value: 'Danza Clásica', label: 'Danza Clásica', name: 'Danza Clásica' },
+    { id: 8, value: 'Danza Tradicional', label: 'Danza Tradicional', name: 'Danza Tradicional' },
+    { id: 9, value: 'Danza Contemporánea', label: 'Danza Contemporánea', name: 'Danza Contemporánea' }
+]
+
+export const isSpecialtyRequired = (grade) => {
+    if (!grade) return false;
+    const g = String(grade).toLowerCase().trim();
+    return (
+        g === '6to grado' || g === '7mo grado' || g === '8vo grado' ||
+        g === '6to_grado' || g === '7mo_grado' || g === '8vo_grado' ||
+        g.includes('6to') || g.includes('7mo') || g.includes('8vo') ||
+        g === '6' || g === '7' || g === '8' ||
+        g.includes('sexto') || g.includes('septimo') || g.includes('séptimo') || g.includes('octavo')
+    );
+};
+
 const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear }) => {
     // ============================================
     // ESTADOS PARA DATOS DEL FORMULARIO
     // ============================================
     const [sectionName, setSectionName] = useState('')
     const [gradeLevel, setGradeLevel] = useState('1er Grado')
+    const [specialty, setSpecialty] = useState('')
+    const [specialtiesList, setSpecialtiesList] = useState(DEFAULT_SPECIALTIES)
     const [section, setSection] = useState('')
     const [errorModal, setErrorModal] = useState({ visible: false, message: '' })
     const [schedules, setSchedules] = useState([])
     const [saving, setSaving] = useState(false)
+
+    // Manejador del cambio de nivel académico con actualización inmediata
+    const handleGradeLevelChange = (e) => {
+        const selectedGrade = e.target.value;
+        setGradeLevel(selectedGrade);
+        if (!isSpecialtyRequired(selectedGrade)) {
+            setSpecialty('');
+        }
+    };
 
     // ============================================
     // ESTADOS PARA DATOS DE CATÁLOGOS (DESDE BD)
@@ -116,16 +145,38 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
             if (initial) {
                 setSectionName(initial.sectionName || '')
                 setGradeLevel(initial.gradeLevel || '1er Grado')
+                setSpecialty(initial.specialty || initial.specialty_name || initial.nombre_especialidad || initial.especialidad || '')
                 setSection(initial.section || '')
-                setSchedules(initial.schedules || [])
+                
+                // Normalizar horarios existentes marcándolos como ya persistidos en la base de datos
+                const initialSchedules = (initial.schedules || []).map(s => {
+                    const matchedSubject = SUBJECTS.find(sub => sub.id === s.subject_id || sub.value === s.subject || sub.value === s.subject_name);
+                    return {
+                        id: s.id,
+                        subject: s.subject || s.subject_name || s.subjectName || matchedSubject?.value || 'Danza Clásica',
+                        subjectId: s.subject_id || s.subjectId || matchedSubject?.id || null,
+                        teacherId: s.teacher_id || s.teacherId || s.teacher_user_id || s.teacherUserId,
+                        teacherName: s.teacher_name || s.teacherName || 'Docente',
+                        classroomId: s.classroom_id || s.classroomId,
+                        classroom: s.classroom_name || s.classroomName || s.classroom || 'Aula',
+                        dayId: s.day_id || s.dayId,
+                        dayOfWeek: s.day_name || s.dayName || s.dayOfWeek || 'LUNES',
+                        blockId: s.block_id || s.blockId,
+                        startTime: (s.start_time || s.startTime || '00:00').substring(0, 5),
+                        endTime: (s.end_time || s.endTime || '00:00').substring(0, 5),
+                        isPersisted: true
+                    };
+                });
+                setSchedules(initialSchedules);
             } else {
                 setSectionName('')
                 setGradeLevel('1er Grado')
+                setSpecialty('')
                 setSection('')
                 setSchedules([])
                 setNewSchedule({
                     subject: 'Danza Clásica',
-                    subjectId: 1,
+                    subjectId: 5,
                     teacherId: '',
                     classroomId: '',
                     dayId: '',
@@ -198,6 +249,21 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
             const blocksRes = await getBlocks()
             console.log('⏰ Bloques cargados:', blocksRes)
             setBlocks(blocksRes || [])
+
+            // Cargar catálogo de especialidades
+            try {
+                const specialtiesRes = await TeacherService.getSpecialties()
+                if (specialtiesRes && specialtiesRes.length > 0) {
+                    setSpecialtiesList(specialtiesRes.map(s => ({
+                        id: s.id || s.Id_especialidad,
+                        value: s.name || s.nombre_especialidad,
+                        label: s.name || s.nombre_especialidad,
+                        name: s.name || s.nombre_especialidad
+                    })))
+                }
+            } catch (espErr) {
+                console.warn('⚠️ Usando catálogo por defecto de especialidades:', espErr.message)
+            }
         } catch (error) {
             console.error('❌ Error loading catalog data:', error)
             setErrorModal({ visible: true, message: 'Error al cargar datos del formulario' })
@@ -235,54 +301,83 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
         }
 
         try {
-            // 1. Verificar conflicto LOCAL (dentro de esta misma sección)
-            const hasLocalConflict = schedules.some(s =>
-                s.dayId === parseInt(newSchedule.dayId) &&
-                s.blockId === parseInt(newSchedule.blockId) &&
-                s.classroomId === parseInt(newSchedule.classroomId)
-            )
+            // 1. Conflicto LOCAL de aula (mismo día y bloque)
+            const hasClassroomLocalConflict = schedules.some(s =>
+                parseInt(s.dayId) === parseInt(newSchedule.dayId) &&
+                parseInt(s.blockId) === parseInt(newSchedule.blockId) &&
+                parseInt(s.classroomId) === parseInt(newSchedule.classroomId)
+            );
 
-            if (hasLocalConflict) {
-                const classroom = classrooms.find(c => c.id === parseInt(newSchedule.classroomId))
+            if (hasClassroomLocalConflict) {
+                const classroom = classrooms.find(c => c.id === parseInt(newSchedule.classroomId));
                 setErrorModal({
                     visible: true,
-                    message: `Conflicto Local: El aula ${classroom?.name || 'seleccionada'} ya está asignada en este horario para esta misma sección.`
-                })
-                return
+                    message: `El aula ${classroom?.name || 'seleccionada'} ya se encuentra ocupada en este bloque y día.`
+                });
+                return;
             }
 
-            // 2. Verificar conflicto GLOBAL (con otras secciones)
+            // Conflicto LOCAL de profesor (mismo día y bloque)
+            const hasTeacherLocalConflict = schedules.some(s =>
+                parseInt(s.dayId) === parseInt(newSchedule.dayId) &&
+                parseInt(s.blockId) === parseInt(newSchedule.blockId) &&
+                parseInt(s.teacherId) === parseInt(newSchedule.teacherId)
+            );
+
+            if (hasTeacherLocalConflict) {
+                const teacher = teachers.find(t => t.id === parseInt(newSchedule.teacherId));
+                setErrorModal({
+                    visible: true,
+                    message: `El profesor ${teacher ? `${teacher.first_name} ${teacher.last_name}` : 'seleccionado'} ya tiene una clase asignada en este bloque y día.`
+                });
+                return;
+            }
+
+            // 2. Validación de disponibilidad GLOBAL en el backend
             const availability = await checkAvailability({
-                academicYearId: academicYear.id,
+                academicYearId: academicYear?.id,
                 dayId: newSchedule.dayId,
                 blockId: newSchedule.blockId,
                 classroomId: newSchedule.classroomId,
-                teacherId: newSchedule.teacherId,
-                excludeScheduleId: initial?.id
-            })
+                teacherId: newSchedule.teacherId
+            });
 
             if (!availability.available) {
                 setErrorModal({
                     visible: true,
                     message: availability.message || 'Conflicto de horario'
-                })
-                return
+                });
+                return;
             }
 
-            // 3. Obtener datos completos para mostrar en la tabla
-            const teacher = teachers.find(t => t.id === parseInt(newSchedule.teacherId))
-            const classroom = classrooms.find(c => c.id === parseInt(newSchedule.classroomId))
-            const day = days.find(d => d.id === parseInt(newSchedule.dayId))
-            const block = blocks.find(b => b.id === parseInt(newSchedule.blockId))
-
-            // 4. Buscar la materia seleccionada para obtener su ID
+            // 3. Preparar datos para visualización
+            const teacher = teachers.find(t => t.id === parseInt(newSchedule.teacherId));
+            const classroom = classrooms.find(c => c.id === parseInt(newSchedule.classroomId));
+            const day = days.find(d => d.id === parseInt(newSchedule.dayId));
+            const block = blocks.find(b => b.id === parseInt(newSchedule.blockId));
             const selectedSubject = SUBJECTS.find(s => s.value === newSchedule.subject);
 
-            // 5. Crear ID temporal para el horario en memoria
-            const scheduleId = Math.max(...schedules.map(s => s.id), 0) + 1
+            const targetSectionId = initial?.id || initial?.section_id;
+            let realScheduleId = null;
 
-            // 6. Agregar a la lista local con SUBJECT_ID
-            setSchedules([...schedules, {
+            // 4. Si la sección ya existe, insertar de inmediato en la base de datos
+            if (targetSectionId) {
+                const schedulePayload = {
+                    classroom_id: parseInt(newSchedule.classroomId),
+                    teacher_id: parseInt(newSchedule.teacherId),
+                    block_id: parseInt(newSchedule.blockId),
+                    day_id: parseInt(newSchedule.dayId),
+                    subject_id: selectedSubject?.id || null,
+                    subject_name: newSchedule.subject || selectedSubject?.value || null
+                };
+                const res = await addScheduleToSection(targetSectionId, schedulePayload);
+                realScheduleId = res?.schedule?.id || res?.id;
+            }
+
+            const scheduleId = realScheduleId || (Math.max(...schedules.map(s => Number(s.id) || 0), 0) + 1);
+
+            // 5. Agregar de inmediato el bloque a la lista visual
+            setSchedules(prev => [...prev, {
                 id: scheduleId,
                 subject: newSchedule.subject,
                 subjectId: selectedSubject?.id || null,
@@ -294,22 +389,23 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
                 dayOfWeek: day?.name?.toUpperCase() || 'LUNES',
                 blockId: newSchedule.blockId,
                 startTime: block?.start_time?.substring(0, 5) || '00:00',
-                endTime: block?.end_time?.substring(0, 5) || '00:00'
-            }])
+                endTime: block?.end_time?.substring(0, 5) || '00:00',
+                isPersisted: !!targetSectionId
+            }]);
 
-            // 7. Resetear el formulario para el siguiente horario
+            // 6. Resetear campos para permitir agregar el próximo bloque fluido
             setNewSchedule({
                 subject: newSchedule.subject,
-                subjectId: selectedSubject?.id || 1,
+                subjectId: selectedSubject?.id || 5,
                 teacherId: '',
                 classroomId: '',
                 dayId: '',
                 blockId: ''
-            })
+            });
 
         } catch (error) {
-            console.error('Error adding schedule:', error)
-            setErrorModal({ visible: true, message: error.message || 'Error al agregar horario' })
+            console.error('Error adding schedule:', error);
+            setErrorModal({ visible: true, message: error.message || 'Error al agregar horario' });
         }
     }
 
@@ -325,8 +421,17 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
         });
     };
 
-    const handleRemoveSchedule = (id) => {
-        setSchedules(schedules.filter(schedule => schedule.id !== id))
+    const handleRemoveSchedule = async (id) => {
+        const itemToRemove = schedules.find(s => s.id === id);
+        const targetSectionId = initial?.id || initial?.section_id;
+        if (targetSectionId && itemToRemove?.isPersisted) {
+            try {
+                await removeScheduleFromSection(targetSectionId, id);
+            } catch (err) {
+                console.warn('Error al eliminar horario en backend:', err);
+            }
+        }
+        setSchedules(schedules.filter(schedule => schedule.id !== id));
     }
 
     // ============================================
@@ -360,6 +465,10 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
             setErrorModal({ visible: true, message: 'El grado es obligatorio' })
             return false
         }
+        if (isSpecialtyRequired(gradeLevel) && !specialty) {
+            setErrorModal({ visible: true, message: 'Debe seleccionar una especialidad para 6to, 7mo u 8vo grado' })
+            return false
+        }
         return true
     }
 
@@ -386,12 +495,18 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
             const isEditing = Boolean(initial?.id || initial?.section_id)
             const targetSectionId = initial?.id || initial?.section_id
 
+            const selectedSpecialtyObj = specialtiesList.find(s => s.value === specialty || s.name === specialty || s.label === specialty);
+
             // Datos de la sección a procesar
             const sectionData = {
                 sectionName: sectionName.trim(),
                 gradeLevel: gradeLevel,  // Nivel académico
                 section: section,         // Letra de la sección
-                capacity: 30
+                capacity: 30,
+                specialty: isSpecialtyRequired(gradeLevel) ? specialty : null,
+                specialtyId: isSpecialtyRequired(gradeLevel) ? (selectedSpecialtyObj?.id || null) : null,
+                Id_especialidad: isSpecialtyRequired(gradeLevel) ? (selectedSpecialtyObj?.id || null) : null,
+                especialidad_id: isSpecialtyRequired(gradeLevel) ? (selectedSpecialtyObj?.id || null) : null
             }
 
             let currentSection = null
@@ -422,13 +537,17 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
                 let horariosConError = 0
 
                 for (const schedule of schedules) {
+                    if (schedule.isPersisted) {
+                        continue;
+                    }
                     try {
                         const scheduleData = {
                             classroom_id: schedule.classroomId,
                             teacher_id: schedule.teacherId,
                             block_id: schedule.blockId,
                             day_id: schedule.dayId,
-                            subject_id: schedule.subjectId
+                            subject_id: schedule.subjectId,
+                            subject_name: schedule.subject || null
                         }
 
                         console.log('📤 Guardando horario:', scheduleData)
@@ -508,21 +627,21 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
                                     Datos Generales
                                 </h6>
                                 <CRow className="g-4">
-                                    <CCol md={5}>
+                                    <CCol md={isSpecialtyRequired(gradeLevel) ? 4 : 5}>
                                         <CFormInput
                                             label={<span className="text-muted-custom small fw-bold text-uppercase ls-1">Nombre de la Sección</span>}
-                                            placeholder="Ej: 1er Grado A"
+                                            placeholder="Ej: 6to Grado A"
                                             value={sectionName}
                                             onChange={(e) => setSectionName(e.target.value)}
                                             required
                                             className="bg-light-custom border-light-custom header-title-custom fw-bold shadow-sm py-2"
                                         />
                                     </CCol>
-                                    <CCol md={4}>
+                                    <CCol md={isSpecialtyRequired(gradeLevel) ? 3 : 4}>
                                         <CFormSelect
                                             label={<span className="text-muted-custom small fw-bold text-uppercase ls-1">Nivel Académico</span>}
                                             value={gradeLevel}
-                                            onChange={(e) => setGradeLevel(e.target.value)}
+                                            onChange={handleGradeLevelChange}
                                             required
                                             className="bg-light-custom border-light-custom header-title-custom fw-bold shadow-sm py-2"
                                         >
@@ -531,7 +650,32 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
                                             ))}
                                         </CFormSelect>
                                     </CCol>
-                                    <CCol md={3}>
+                                    {isSpecialtyRequired(gradeLevel) && (
+                                        <CCol md={3} className="animate__animated animate__fadeIn">
+                                            <CFormSelect
+                                                label={
+                                                    <span className="text-muted-custom small fw-bold text-uppercase ls-1 text-primary">
+                                                        Especialidad <span className="text-danger">*</span>
+                                                    </span>
+                                                }
+                                                value={specialty}
+                                                onChange={(e) => setSpecialty(e.target.value)}
+                                                required
+                                                className="bg-light-custom border-light-custom header-title-custom fw-bold shadow-sm py-2"
+                                            >
+                                                <option value="">Seleccione especialidad...</option>
+                                                {specialtiesList.map(esp => (
+                                                    <option key={esp.id || esp.value} value={esp.value}>
+                                                        {esp.label || esp.name}
+                                                    </option>
+                                                ))}
+                                            </CFormSelect>
+                                            <small className="text-muted mt-1 d-block" style={{ fontSize: '0.72rem' }}>
+                                                Requerido para 6to, 7mo y 8vo grado
+                                            </small>
+                                        </CCol>
+                                    )}
+                                    <CCol md={isSpecialtyRequired(gradeLevel) ? 2 : 3}>
                                         <CFormInput
                                             label={<span className="text-muted-custom small fw-bold text-uppercase ls-1">Letra (Opcional)</span>}
                                             placeholder="A"

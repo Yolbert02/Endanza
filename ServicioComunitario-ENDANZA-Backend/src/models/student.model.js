@@ -1,5 +1,6 @@
 import { db } from "../db/connection.database.js";
 import { RevisionModel } from "./revision.model.js";
+import { EspecialidadModel } from "./especialidad.model.js";
 import { capitalizeWords } from "../utils/formatters.js";
 
 // ============================================
@@ -27,6 +28,12 @@ const findAll = async (filters = {}) => {
           nl."nivel" as grade_level_name,
           e."Id_nivel_danza" as dance_level_id,
           nd."nivel_danza" as dance_level_name,
+          e."Id_especialidad" as specialty_id,
+          e."Id_especialidad" as especialidad_id,
+          e."Id_especialidad" as id_especialidad,
+          esp."nombre_especialidad" as specialty_name,
+          esp."nombre_especialidad" as especialidad,
+          esp."nombre_especialidad" as nombre_especialidad,
           e."Id_escuela" as school_id,
           er."nombre_escuela" as school_name,
           e."Id_seguro" as insurance_id,
@@ -55,6 +62,7 @@ const findAll = async (filters = {}) => {
         FROM "Estudiante" e
         LEFT JOIN "Nivel_Escolar" nl ON e."Id_nivel" = nl."Id_nivel"
         LEFT JOIN "Nivel_Danza" nd ON e."Id_nivel_danza" = nd."Id_nivel_danza"
+        LEFT JOIN "Especialidad" esp ON e."Id_especialidad" = esp."Id_especialidad"
         LEFT JOIN "Escuela_Regular" er ON e."Id_escuela" = er."Id_escuela"
         LEFT JOIN "Seguro" s ON e."Id_seguro" = s."Id_seguro"
         LEFT JOIN "Representante" r ON e."Id_representante" = r."Id_representante"
@@ -124,6 +132,12 @@ const findById = async (id) => {
           nl."nivel" as grade_level_name,
           e."Id_nivel_danza" as dance_level_id,
           nd."nivel_danza" as dance_level_name,
+          e."Id_especialidad" as specialty_id,
+          e."Id_especialidad" as especialidad_id,
+          e."Id_especialidad" as id_especialidad,
+          esp."nombre_especialidad" as specialty_name,
+          esp."nombre_especialidad" as especialidad,
+          esp."nombre_especialidad" as nombre_especialidad,
           e."Id_escuela" as school_id,
           er."nombre_escuela" as school_name,
           e."Id_seguro" as insurance_id,
@@ -156,6 +170,7 @@ const findById = async (id) => {
         LEFT JOIN "Historial_Medico" hm ON e."Id_historial" = hm."Id_historial"
         LEFT JOIN "Nivel_Escolar" nl ON e."Id_nivel" = nl."Id_nivel"
         LEFT JOIN "Nivel_Danza" nd ON e."Id_nivel_danza" = nd."Id_nivel_danza"
+        LEFT JOIN "Especialidad" esp ON e."Id_especialidad" = esp."Id_especialidad"
         LEFT JOIN "Escuela_Regular" er ON e."Id_escuela" = er."Id_escuela"
         LEFT JOIN "Seguro" s ON e."Id_seguro" = s."Id_seguro"
         LEFT JOIN "Representante" r ON e."Id_representante" = r."Id_representante"
@@ -235,6 +250,12 @@ const create = async (studentData) => {
       Id_historial
     } = studentData;
 
+    let Id_especialidad = studentData.Id_especialidad ?? studentData.especialidad_id ?? studentData.id_especialidad ?? studentData.specialty_id ?? null;
+    if (!Id_especialidad && studentData.especialidad) {
+      const esp = await EspecialidadModel.findByName(studentData.especialidad);
+      if (esp) Id_especialidad = esp.id;
+    }
+
     const formattedNombre = capitalizeWords(nombre);
     const formattedApellido = capitalizeWords(apellido);
 
@@ -243,9 +264,9 @@ const create = async (studentData) => {
         INSERT INTO "Estudiante" (
           "nombre", "apellido", "cedula", "fecha_nacimiento", "genero",
           "seguro_escolar", "Id_nivel", "Id_nivel_danza", "Id_escuela",
-          "Id_seguro", "Id_representante", "Id_historial"
+          "Id_seguro", "Id_representante", "Id_historial", "Id_especialidad"
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         RETURNING 
           "Id_estudiante" as id, 
           "nombre" as first_name,
@@ -255,7 +276,7 @@ const create = async (studentData) => {
       values: [
         formattedNombre, formattedApellido, cedula, fecha_nacimiento, genero,
         seguro_escolar || false, Id_nivel, Id_nivel_danza, Id_escuela,
-        Id_seguro, Id_representante, Id_historial
+        Id_seguro, Id_representante, Id_historial, Id_especialidad
       ]
     };
 
@@ -298,6 +319,12 @@ const update = async (id, studentData) => {
     const Id_historial = studentData.Id_historial ?? studentData.medical_history_id;
     const estatus = studentData.estatus ?? studentData.status ?? studentData.Estatus;
 
+    let Id_especialidad = studentData.Id_especialidad ?? studentData.especialidad_id ?? studentData.id_especialidad ?? studentData.specialty_id;
+    if (Id_especialidad === undefined && studentData.especialidad) {
+      const esp = await EspecialidadModel.findByName(studentData.especialidad);
+      if (esp) Id_especialidad = esp.id;
+    }
+
     const formattedNombre = rawNombre !== undefined ? capitalizeWords(rawNombre) : undefined;
     const formattedApellido = rawApellido !== undefined ? capitalizeWords(rawApellido) : undefined;
 
@@ -317,8 +344,9 @@ const update = async (id, studentData) => {
           "Id_seguro" = COALESCE($10, "Id_seguro"),
           "Id_representante" = COALESCE($11, "Id_representante"),
           "Id_historial" = COALESCE($12, "Id_historial"),
-          "estatus" = COALESCE($13, "estatus")
-        WHERE "Id_estudiante" = $14
+          "estatus" = COALESCE($13, "estatus"),
+          "Id_especialidad" = COALESCE($14, "Id_especialidad")
+        WHERE "Id_estudiante" = $15
         RETURNING 
           "Id_estudiante" as id,
           "nombre" as first_name,
@@ -328,7 +356,7 @@ const update = async (id, studentData) => {
       values: [
         formattedNombre, formattedApellido, cedula, fecha_nacimiento, genero,
         seguro_escolar, Id_nivel, Id_nivel_danza, Id_escuela,
-        Id_seguro, Id_representante, Id_historial, estatus, id
+        Id_seguro, Id_representante, Id_historial, estatus, Id_especialidad, id
       ]
     };
 
@@ -729,6 +757,7 @@ const existsByCedula = async (cedula, excludeId = null) => {
  */
 const findByRepresentante = async (representanteId) => {
   try {
+    const repId = parseInt(representanteId);
     const query = {
       text: `
         SELECT 
@@ -740,14 +769,27 @@ const findByRepresentante = async (representanteId) => {
           e."genero" as gender,
           nl."nivel" as grade_level,
           nd."nivel_danza" as dance_level,
-          e."seguro_escolar" as school_insurance
+          e."Id_especialidad" as specialty_id,
+          e."Id_especialidad" as especialidad_id,
+          esp."nombre_especialidad" as specialty_name,
+          esp."nombre_especialidad" as especialidad,
+          e."seguro_escolar" as school_insurance,
+          e."Id_representante" as representative_id
         FROM "Estudiante" e
         LEFT JOIN "Nivel_Escolar" nl ON e."Id_nivel" = nl."Id_nivel"
         LEFT JOIN "Nivel_Danza" nd ON e."Id_nivel_danza" = nd."Id_nivel_danza"
-        WHERE e."Id_representante" = $1
+        LEFT JOIN "Especialidad" esp ON e."Id_especialidad" = esp."Id_especialidad"
+        WHERE e."Id_representante" IN (
+          SELECT r."Id_representante" 
+          FROM "Representante" r 
+          WHERE r."Id_representante" = $1
+             OR r."Id_usuario" = (
+               SELECT r2."Id_usuario" FROM "Representante" r2 WHERE r2."Id_representante" = $1
+             )
+        )
         ORDER BY e."apellido", e."nombre"
       `,
-      values: [representanteId]
+      values: [repId]
     };
     const { rows } = await db.query(query.text, query.values);
     return rows;

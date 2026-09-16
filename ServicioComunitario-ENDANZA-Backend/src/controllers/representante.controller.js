@@ -150,7 +150,7 @@ export const RepresentanteController = {
           }
 
           // Generar cédula única para el estudiante
-          const cedulaEstudiante = `E${Date.now()}${Math.floor(Math.random() * 1000)}`;
+          const cedulaEstudiante = (estudiante.cedula && estudiante.cedula.trim() !== "") ? estudiante.cedula.trim() : null;
 
           // Crear estudiante con el ID del representante
           const studentQuery = {

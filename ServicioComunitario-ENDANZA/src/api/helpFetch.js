@@ -3,7 +3,7 @@ import { getStoredToken, clearStoredAuth } from '../utils/authStorage.js'
 // helpFetch.js - Versión corregida con sesión por pestaña
 export const helpFetch = () => {
   // En producción usa la API real, en desarrollo usa localhost
-  const URL = import.meta.env.VITE_API_URL || 
+  const URL = import.meta.env.VITE_API_URL ||
     (window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://api.endanzatachira.org.ve')
 
   const customFetch = async (endpoint, options = {}) => {
@@ -31,7 +31,7 @@ export const helpFetch = () => {
 
     try {
       const response = await fetch(`${URL}${endpoint}`, options)
-      
+
       console.log(`📡 Response status: ${response.status} ${response.statusText}`)
 
       // Si el servidor responde 401 en cualquier endpoint protegido, cerrar sesión silenciosamente y enviar al login
@@ -42,14 +42,14 @@ export const helpFetch = () => {
           window.location.hash = '#/login'
         }
       }
-      
+
       const text = await response.text()
-      
+
       if (!text || text.trim() === '') {
         console.log('✅ Response vacía')
         return { ok: response.ok, _ok: response.ok, _status: response.status }
       }
-      
+
       let data
       try {
         data = JSON.parse(text)
@@ -58,13 +58,13 @@ export const helpFetch = () => {
         console.log(`⚠️ Response no es JSON:`, text)
         data = { text, ok: response.ok, _ok: response.ok, _status: response.status }
       }
-      
+
       if (!data._ok) data._ok = response.ok
       if (!data._status) data._status = response.status
       if (!data._statusText) data._statusText = response.statusText
-      
+
       return data
-      
+
     } catch (error) {
       console.error(`❌ Network error:`, error.message)
       return {
@@ -100,13 +100,13 @@ export const helpFetch = () => {
     }
   }
 
-  return { 
-    get, 
-    post, 
-    put, 
+  return {
+    get,
+    post,
+    put,
     delete: del,  // ← Exportar como 'delete'
-    customFetch, 
-    checkConnection, 
-    URL 
+    customFetch,
+    checkConnection,
+    URL
   }
 }

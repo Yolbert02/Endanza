@@ -69,22 +69,29 @@ const routePermissions = {
   // ============================================
   // 🟢 RUTAS DE ESTUDIANTES
   // ============================================
-  // Rutas específicas para representantes PRIMERO
-  '/api/students/mis-estudiantes': ['admin', 'representante'],
-  '/api/students/:id/representante': ['admin', 'representante', 'secretaria'],
-  '/api/students/:id/boletines': ['admin', 'representante', 'secretaria'],
-  '/api/students/:id/horario-grado': ['admin', 'representante', 'secretaria'],
+  // Rutas específicas para representantes PRIMERO (soportan dualidad de roles ej. docente-representante)
+  '/api/students/mis-estudiantes': ['admin', 'representante', 'docente'],
+  '/api/students/:id/representante': ['admin', 'representante', 'secretaria', 'docente'],
+  '/api/students/:id/boletines': ['admin', 'representante', 'secretaria', 'docente'],
+  '/api/students/:id/horario-grado': ['admin', 'representante', 'secretaria', 'docente'],
   '/api/students/:id/seccion-actual': ['admin', 'representante', 'docente', 'secretaria'],
 
   // Rutas generales
   '/api/students/list': ['admin', 'docente', 'secretaria'],
   '/api/students/search': ['admin', 'docente', 'secretaria'],
-  '/api/students/:id': ['admin', 'docente', 'secretaria'],
-  '/api/students/*': ['admin', 'docente', 'secretaria'],
+  '/api/students/:id': ['admin', 'docente', 'secretaria', 'representante'],
+  '/api/students/*': ['admin', 'docente', 'secretaria', 'representante'],
 
   // ============================================
   // 🟢 OTRAS RUTAS
   // ============================================
+  // Inscripciones para representantes (incluyendo docentes que son representantes)
+  '/api/inscripciones/completar': ['admin', 'representante', 'docente'],
+  '/api/inscripciones/precargar/:studentId': ['admin', 'representante', 'docente'],
+  '/api/inscripciones/verificar/:studentId': ['admin', 'representante', 'docente'],
+  '/api/inscripciones': ['admin', 'representante', 'docente', 'secretaria'],
+  '/api/inscripciones/*': ['admin', 'representante', 'docente', 'secretaria'],
+
   '/api/inscripcion': ['admin', 'secretaria'],
   '/api/inscripcion/*': ['admin', 'secretaria'],
   '/api/aulas': ['admin', 'secretaria'],
@@ -120,6 +127,14 @@ const routePermissions = {
   '/api/representantes/list': ['admin', 'secretaria'],
   '/api/representantes/search': ['admin', 'secretaria'],
   '/api/representantes/:id/estudiantes': ['admin', 'representante', 'secretaria'],
+
+  // ============================================
+  // 🟢 RUTAS DE ESPECIALIDADES
+  // ============================================
+  '/api/especialidades': ['admin', 'docente', 'representante', 'estudiante', 'secretaria'],
+  '/api/especialidades/:id': ['admin', 'docente', 'representante', 'estudiante', 'secretaria'],
+  '/api/especialidades/requerida/:grado': ['admin', 'docente', 'representante', 'estudiante', 'secretaria'],
+  '/api/especialidades/*': ['admin', 'docente', 'representante', 'estudiante', 'secretaria'],
 };
 
 /**
@@ -183,8 +198,15 @@ export const autoVerifyRole = async (req, res, next) => {
     const userRoleId = req.user.Id_rol;
     const userRole = roleMap[userRoleId] || 'estudiante';
     const userRoles = Array.isArray(req.user.roles) && req.user.roles.length > 0
-      ? req.user.roles
+      ? [...req.user.roles]
       : [userRole];
+
+    if (req.user.representanteId || req.user.es_representante) {
+      if (!userRoles.includes('representante')) userRoles.push('representante');
+    }
+    if (req.user.profesorId || req.user.es_profesor) {
+      if (!userRoles.includes('docente')) userRoles.push('docente');
+    }
 
     console.log(`👤 Rol principal: "${userRole}" (Id_rol: ${userRoleId}), Roles: [${userRoles.join(', ')}]`);
 

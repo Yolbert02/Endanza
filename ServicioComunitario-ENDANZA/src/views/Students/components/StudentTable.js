@@ -174,7 +174,7 @@ const StudentTable = ({
                                                                 {formatShortName(student.first_name, student.last_name)}
                                                             </div>
                                                             <div className="text-muted-custom small d-mobile-none">
-                                                                {student.dni}
+                                                                {student.dni ? student.dni : `ID: #${student.id}`}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -197,7 +197,7 @@ const StudentTable = ({
                                                 </CTableDataCell>
                                                 <CTableDataCell className="border-bottom-light d-mobile-none">
                                                     <div className="header-title-custom fw-bold text-nowrap">
-                                                        {student.dni || 'N/A'}
+                                                        {student.dni || <span className="text-muted small fw-normal">Sin cédula</span>}
                                                     </div>
                                                 </CTableDataCell>
                                                 <CTableDataCell className="border-bottom-light">

@@ -22,6 +22,7 @@ export const routeGuard = () => {
         '/api/representantes/preinscripcion',
         '/api/representantes/catalog/grades',
         '/api/teachers/catalog/grades',
+        '/api/especialidades',
       ];
 
       const currentPath = req.path;

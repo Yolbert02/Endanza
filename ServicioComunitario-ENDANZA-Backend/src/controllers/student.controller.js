@@ -36,6 +36,9 @@ const listStudents = async (req, res) => {
       insurance: s.insurance_name,
       representative: s.representative_first_name ?
         `${s.representative_first_name} ${s.representative_last_name}`.trim() : null,
+      representative_id: s.representative_id,
+      representative_dni: s.representative_dni,
+      representative_user_id: s.representative_user_id,
       representative_phone: s.representative_phone,
       representative_email: s.representative_email,
       status: 'active', // Por defecto todos activos si están en la base de datos
@@ -412,36 +415,53 @@ const searchStudents = async (req, res) => {
 /**
  * ✅ VERSIÓN CORREGIDA - Obtener estudiantes del representante autenticado
  */
+/**
+ * ✅ VERSIÓN CORREGIDA - Obtener estudiantes del representante autenticado (Soporte Rol Dual)
+ */
 const getMyStudents = async (req, res) => {
   try {
-    // ✅ CORREGIDO: Obtener userId de req.user.userId (no de req.userId)
-    const userId = req.user?.userId;
+    const userId = req.user?.userId || req.user?.id;
+    const representanteId = req.user?.representanteId;
 
-    console.log("🔍 Contenido de req.user:", req.user);
-    console.log("🔍 Contenido de req.userId (obsoleto):", req.userId);
-    console.log(`👤 userId extraído: ${userId}`);
+    console.log("🔍 getMyStudents - Contenido de req.user:", {
+      userId,
+      roles: req.user?.roles,
+      Id_rol: req.user?.Id_rol,
+      representanteId
+    });
 
-    if (!userId) {
-      console.error("❌ No se pudo extraer userId del token");
+    if (!userId && !representanteId) {
+      console.error("❌ No se pudo extraer userId ni representanteId del token");
       return res.status(401).json({
         ok: false,
         msg: "No se pudo identificar al usuario"
       });
     }
 
-    // ✅ Usar el modelo de representantes para obtener el ID
-    const representante = await RepresentanteModel.findByUserId(userId);
+    // 1. Obtener representante (por representanteId si existe, por userId o por cédula para rol dual)
+    let representante = null;
+    if (representanteId) {
+      representante = await RepresentanteModel.findById(representanteId);
+    }
+    if (!representante && userId) {
+      representante = await RepresentanteModel.findByUserId(userId);
+    }
+    if (!representante && req.user?.cedula) {
+      representante = await RepresentanteModel.findByCedula(req.user.cedula);
+    }
 
     if (!representante) {
       return res.json({
         ok: true,
         data: [],
-        msg: "No es un representante"
+        msg: "No es un representante o no tiene estudiantes asociados"
       });
     }
 
+    const repId = parseInt(representante.id_representante || representante.id);
+
     // ✅ Usar el método en StudentModel para obtener estudiantes
-    const students = await StudentModel.findByRepresentante(representante.id);
+    const students = await StudentModel.findByRepresentante(repId);
 
     // Transformar al formato esperado por el frontend
     const transformed = students.map(s => ({
@@ -454,7 +474,8 @@ const getMyStudents = async (req, res) => {
       gender: s.gender,
       grade_level: s.grade_level,
       dance_level: s.dance_level,
-      school_insurance: s.school_insurance
+      school_insurance: s.school_insurance,
+      representative_id: s.representative_id || repId
     }));
 
     return res.json({
@@ -476,17 +497,27 @@ const getMyStudents = async (req, res) => {
 
 
 /**
- * Obtener un estudiante por ID (solo si el representante tiene permiso)
+ * Obtener un estudiante por ID (solo si el representante tiene permiso, soporta rol dual)
  */
 const getStudentForRepresentante = async (req, res) => {
   try {
     const studentId = req.params.id;
-    const userId = req.user?.userId;
+    const userId = req.user?.userId || req.user?.id;
+    const representanteId = req.user?.representanteId;
 
-    console.log(`👤 Representante ${userId} solicitando perfil del estudiante ${studentId}`);
+    console.log(`👤 Representante (user: ${userId}, repId: ${representanteId}) solicitando perfil del estudiante ${studentId}`);
 
     // 1. Verificar que el usuario es representante
-    const representante = await RepresentanteModel.findByUserId(userId);
+    let representante = null;
+    if (representanteId) {
+      representante = await RepresentanteModel.findById(representanteId);
+    }
+    if (!representante && userId) {
+      representante = await RepresentanteModel.findByUserId(userId);
+    }
+    if (!representante && req.user?.cedula) {
+      representante = await RepresentanteModel.findByCedula(req.user.cedula);
+    }
 
     if (!representante) {
       return res.status(403).json({
@@ -505,9 +536,14 @@ const getStudentForRepresentante = async (req, res) => {
       });
     }
 
-    // 3. Verificar que el estudiante pertenece a este representante
-    if (student.representative_id !== representante.id) {
-      console.warn(`🚨 Intento de acceso no autorizado: Representante ${representante.id} intenta ver estudiante ${studentId} que pertenece a ${student.representative_id}`);
+    // 3. Verificar que el estudiante pertenece a este representante (compatibilidad numérica y rol dual)
+    const repId = parseInt(representante.id_representante || representante.id);
+    const studentRepId = parseInt(student.representative_id);
+    const studentRepUserId = parseInt(student.representative_user_id);
+    const isOwner = studentRepId === repId || (userId && studentRepUserId === parseInt(userId));
+
+    if (!isOwner) {
+      console.warn(`🚨 Intento de acceso no autorizado: Representante ${repId} intenta ver estudiante ${studentId} que pertenece a ${studentRepId}`);
       return res.status(403).json({
         ok: false,
         msg: "No tienes permiso para ver este estudiante"
@@ -578,14 +614,23 @@ const getStudentForRepresentante = async (req, res) => {
 const getStudentBoletines = async (req, res) => {
   try {
     const studentId = req.params.id;
-    // 👇 CAMBIA ESTA LÍNEA (la única corrección)
-    const userId = req.user?.userId; // Antes era: req.userId
+    const userId = req.user?.userId || req.user?.id;
+    const representanteId = req.user?.representanteId;
     const { academicYearId } = req.query;
 
     console.log(`👤 Usuario ${userId} solicitando boletines del estudiante ${studentId}`);
 
     // 1. Verificar que el usuario es representante
-    const representante = await RepresentanteModel.findByUserId(userId);
+    let representante = null;
+    if (representanteId) {
+      representante = await RepresentanteModel.findById(representanteId);
+    }
+    if (!representante && userId) {
+      representante = await RepresentanteModel.findByUserId(userId);
+    }
+    if (!representante && req.user?.cedula) {
+      representante = await RepresentanteModel.findByCedula(req.user.cedula);
+    }
 
     if (!representante) {
       return res.status(403).json({
@@ -604,7 +649,12 @@ const getStudentBoletines = async (req, res) => {
       });
     }
 
-    if (student.representative_id !== representante.id) {
+    const repId = parseInt(representante.id_representante || representante.id);
+    const studentRepId = parseInt(student.representative_id);
+    const studentRepUserId = parseInt(student.representative_user_id);
+    const isOwner = studentRepId === repId || (userId && studentRepUserId === parseInt(userId));
+
+    if (!isOwner) {
       return res.status(403).json({
         ok: false,
         msg: "No tienes permiso para ver este estudiante"

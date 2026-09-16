@@ -194,6 +194,23 @@ const _nav = [
     ],
   },
 
+  // SECCIONES Y LAPSOS (Solo admin)
+  {
+    component: CNavGroup,
+    name: 'Secciones y Lapsos',
+    to: '/secciones',
+    icon: <CIcon icon={cilSpreadsheet} customClassName="nav-icon" />,
+    roles: ['admin'],
+    items: [
+      {
+        component: CNavItem,
+        name: 'Gestión de Secciones',
+        to: '/secciones',
+        roles: ['admin']
+      }
+    ],
+  },
+
   // PANEL DOCENTE (Solo docentes)
   {
     component: CNavGroup,

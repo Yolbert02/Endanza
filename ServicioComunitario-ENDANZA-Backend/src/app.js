@@ -16,6 +16,7 @@ import revisionRoutes from './routes/revision.routes.js';
 import promocionRoutes from './routes/promocion.routes.js';
 
 import attendanceRoutes from './routes/attendance.routes.js';
+import especialidadRoutes from './routes/especialidad.routes.js';
 
 // IMPORTAR MIDDLEWARES DE PROTECCIÓN
 import { routeGuard } from "./middlewares/routeGuard.middleware.js";
@@ -149,6 +150,7 @@ app.use('/api/inscripciones', inscripcionRepresentanteRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/revisiones', revisionRoutes);
 app.use('/api/promocion', promocionRoutes);
+app.use('/api/especialidades', especialidadRoutes);
 
 // ============================================
 // MIDDLEWARE PARA RUTAS NO ENCONTRADAS

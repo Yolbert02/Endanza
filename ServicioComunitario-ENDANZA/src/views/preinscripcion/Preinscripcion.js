@@ -19,43 +19,56 @@ import { listStudents } from '../../services/studentsService';
 import SystemMessageModal from '../../components/SystemMessageModal';
 import { capitalizeWords } from '../../utils/formatters';
 
-const DEFAULT_STUDENTS = [
-    {
-        firstName1: '',
-        firstName2: '',
-        lastName1: '',
-        lastName2: '',
-        name: '',
-        lastName: '',
-        gradeLevel: '',
-        section: 'A',
-        birthDate: '',
-        gender: ''
-    }
-];
+const createInitialStudent = () => ({
+    firstName1: '',
+    firstName2: '',
+    lastName1: '',
+    lastName2: '',
+    name: '',
+    lastName: '',
+    gradeLevel: '',
+    section: 'A',
+    birthDate: '',
+    gender: ''
+});
+
+const DEFAULT_STUDENTS = [createInitialStudent()];
 
 const Preinscripcion = () => {
     const [step, setStep] = useState(1);
+    const [formKey, setFormKey] = useState(0);
     const [loading, setLoading] = useState(false);
     const [representativeData, setRepresentativeData] = useState(null);
-    const [studentsData, setStudentsData] = useState(DEFAULT_STUDENTS);
+    const [studentsData, setStudentsData] = useState([createInitialStudent()]);
     const [existingStudents, setExistingStudents] = useState([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [modalConfig, setModalConfig] = useState({});
+
+    const resetPreinscripcion = () => {
+        setStep(1);
+        setRepresentativeData(null);
+        setExistingStudents([]);
+        setStudentsData([createInitialStudent()]);
+        setFormKey(prev => prev + 1);
+        window.scrollTo(0, 0);
+    };
 
     const handleRepresentativeNext = async (data) => {
         setLoading(true);
         setRepresentativeData(data);
         console.log("📥 Datos recibidos del representante:", data); // Verifica que incluya password
         try {
-            // Si el representante ya tiene ID, buscamos sus estudiantes
-            if (data.id_representante || data.dni) {
+            // Si el representante ya tiene ID, cédula o es docente vinculado, buscamos sus estudiantes
+            if (data.id_representante || data.dni || data.id_usuario_docente) {
                 const allStudents = await listStudents();
-                // Adaptar según la estructura de tu API de estudiantes
-                const filtered = allStudents.data?.filter(s =>
-                    s.representative_id === data.id_representante ||
-                    s.representative_dni === data.dni
-                ) || [];
+                const list = Array.isArray(allStudents) ? allStudents : (allStudents.data || []);
+                const filtered = list.filter(s => {
+                    const matchRepId = data.id_representante && parseInt(s.representative_id) === parseInt(data.id_representante);
+                    const matchDni = data.dni && (s.representative_dni === data.dni);
+                    const matchDocente = (data.id_usuario_docente || data.id_usuario) && 
+                        parseInt(s.representative_user_id) === parseInt(data.id_usuario_docente || data.id_usuario);
+                    return matchRepId || matchDni || matchDocente;
+                });
                 setExistingStudents(filtered);
             } else {
                 setExistingStudents([]);
@@ -128,6 +141,9 @@ const Preinscripcion = () => {
                 const esNuevo = response.representante?.credenciales ? true : false;
                 const esDocenteVinculado = response.representante?.isExistingDocente || false;
 
+                // Limpiar el estado y reiniciar al punto inicial
+                resetPreinscripcion();
+
                 setModalConfig({
                     type: 'success',
                     title: esDocenteVinculado
@@ -176,7 +192,7 @@ const Preinscripcion = () => {
                             {response.estudiantes?.length > 0 ? (
                                 <div style={{ marginTop: '8px', paddingLeft: '10px' }}>
                                     {response.estudiantes.map((e, i) => (
-                                        <div key={i} style={{ marginBottom: '6px', display: 'flex', alignItems: 'center' }}>
+                                         <div key={i} style={{ marginBottom: '6px', display: 'flex', alignItems: 'center' }}>
                                             <span style={{ marginRight: '8px', color: '#f9b115', fontWeight: 'bold' }}>•</span>
                                             <span>
                                                 {e.first_name} {e.last_name}
@@ -193,10 +209,7 @@ const Preinscripcion = () => {
                     confirmText: 'ENTENDIDO',
                     onConfirm: () => {
                         setModalVisible(false);
-                        setStep(1);
-                        setRepresentativeData(null);
-                        setStudentsData(DEFAULT_STUDENTS);
-                        setExistingStudents([]);
+                        resetPreinscripcion();
                     }
                 });
                 setModalVisible(true);
@@ -291,6 +304,7 @@ const Preinscripcion = () => {
                     <div className="preinscripcion-content mx-auto" style={{ maxWidth: '900px' }}>
                         <div style={{ display: step === 1 ? 'block' : 'none' }}>
                             <RegistroRepresentante
+                                key={`rep-${formKey}`}
                                 onNext={handleRepresentativeNext}
                                 initialData={representativeData}
                                 onChange={setRepresentativeData}
@@ -300,6 +314,7 @@ const Preinscripcion = () => {
 
                         <div style={{ display: step === 2 ? 'block' : 'none' }}>
                             <RegistroEstudiante
+                                key={`est-${formKey}`}
                                 representative={representativeData}
                                 existingStudents={existingStudents}
                                 initialStudents={studentsData}
@@ -315,7 +330,12 @@ const Preinscripcion = () => {
 
             <SystemMessageModal
                 visible={modalVisible}
-                onClose={() => setModalVisible(false)}
+                onClose={() => {
+                    setModalVisible(false);
+                    if (modalConfig.type === 'success') {
+                        resetPreinscripcion();
+                    }
+                }}
                 {...modalConfig}
             />
 

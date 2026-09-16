@@ -7,9 +7,8 @@ import { cilEducation, cilPeople, cilSchool, cilWarning } from "@coreui/icons";
 import { getMyStudents } from 'src/services/studentsService';
 // 👇 IMPORTAR DESDE TU SERVICIO EXISTENTE
 // Cambiar la importación
-import { getActiveYearPublic, getEnrollmentPeriodPublic } from 'src/services/configService'; // 👈 CAMBIADO
-
-
+import { getActiveYearPublic, getEnrollmentPeriodPublic } from 'src/services/configService';
+import { verificarInscripcionEstudiante } from 'src/services/inscripcionService';
 
 import WelcomeBanner from '../Inicio/components/WelcomeBanner';
 import StudentSelectionCard from '../Inicio/components/StudentSelectionCard';
@@ -138,13 +137,28 @@ const checkEnrollmentPeriod = async () => {
     }
   };
 
-  const handleStartInscripcion = (studentId) => {
+  const handleStartInscripcion = async (studentId) => {
     // Verificar nuevamente por si acaso
     if (!enrollmentAllowed) {
       alert("El período de inscripciones no está habilitado.");
       return;
     }
     
+    // Verificar si el estudiante ya está inscrito en el año escolar actual
+    if (activeYear?.id) {
+      try {
+        const check = await verificarInscripcionEstudiante(studentId, activeYear.id);
+        if (check.inscrito) {
+          const studentObj = children.find(c => c.id === studentId);
+          const studentName = studentObj?.first_name || studentObj?.name || 'El estudiante';
+          alert(`⚠️ ${studentName} ya se encuentra inscrito(a) en el período académico activo (${activeYear.name || ''})${check.seccion ? ` en la Sección "${check.seccion}"` : ''}.`);
+          return;
+        }
+      } catch (err) {
+        console.warn("No se pudo pre-verificar el estado de inscripción:", err);
+      }
+    }
+
     const student = children.find(c => c.id === studentId);
     setSelectedStudent(student);
   };
@@ -153,7 +167,10 @@ const checkEnrollmentPeriod = async () => {
   if (selectedStudent) {
     return (
       <InscripcionCompletaForm
-        onVolver={() => setSelectedStudent(null)}
+        onVolver={() => {
+          setSelectedStudent(null);
+          loadRepresentativeChildren();
+        }}
         student={selectedStudent}
         studentsList={children}
         activeYear={activeYear}

@@ -58,6 +58,30 @@ router.get(
   ConfigController.getLapsosByYear
 );
 
+router.post(
+  "/academic-years/:yearId/lapsos",
+  verifyToken,
+  verifyAdmin,
+  autoVerifyRole,
+  ConfigController.createLapso
+);
+
+router.put(
+  "/lapsos/:id",
+  verifyToken,
+  verifyAdmin,
+  autoVerifyRole,
+  ConfigController.updateLapso
+);
+
+router.delete(
+  "/lapsos/:id",
+  verifyToken,
+  verifyAdmin,
+  autoVerifyRole,
+  ConfigController.deleteLapso
+);
+
 // ============================================
 // RUTAS PARA PERÍODO DE INSCRIPCIÓN
 // ============================================

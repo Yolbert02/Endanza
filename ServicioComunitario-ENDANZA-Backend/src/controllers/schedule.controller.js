@@ -217,8 +217,13 @@ const createSchedule = async (req, res) => {
     } catch (error) {
         console.error("❌ Error en createSchedule:", error);
 
-        // Si es error de conflicto, devolver 409
-        if (error.message.includes('Conflicto')) {
+        if (
+            error.message.includes('Conflicto') ||
+            error.message.includes('ya tiene una clase') ||
+            error.message.includes('se encuentra ocupada') ||
+            error.message.includes('ya está ocupada') ||
+            error.code === '23505'
+        ) {
             return res.status(409).json({
                 ok: false,
                 msg: error.message
@@ -257,7 +262,13 @@ const updateSchedule = async (req, res) => {
     } catch (error) {
         console.error("❌ Error en updateSchedule:", error);
 
-        if (error.message.includes('Conflicto')) {
+        if (
+            error.message.includes('Conflicto') ||
+            error.message.includes('ya tiene una clase') ||
+            error.message.includes('se encuentra ocupada') ||
+            error.message.includes('ya está ocupada') ||
+            error.code === '23505'
+        ) {
             return res.status(409).json({
                 ok: false,
                 msg: error.message

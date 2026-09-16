@@ -99,6 +99,21 @@ const createAcademicYear = async (name, startDate, endDate) => {
         [newYear.id, startDate, endDate]
       );
 
+      // 4. Crear los 3 lapsos académicos por defecto
+      const startYear = new Date(startDate).getFullYear();
+      const endYear = new Date(endDate).getFullYear();
+      await db.query(`
+        INSERT INTO public."Lapso" ("nombre_lapso", "inicio_lapso", "fin_lapso", "Id_ano")
+        VALUES 
+          ('I LAPSO', $1, $2, $3),
+          ('II LAPSO', $4, $5, $3),
+          ('III LAPSO', $6, $7, $3)
+      `, [
+        `${startYear}-09-15`, `${startYear}-12-15`, newYear.id,
+        `${endYear}-01-10`, `${endYear}-04-05`,
+        `${endYear}-04-15`, `${endYear}-07-15`
+      ]);
+
       await db.query('COMMIT');
       return newYear;
     } catch (error) {
@@ -215,6 +230,70 @@ const findLapsosByYearId = async (yearId) => {
   }
 };
 
+const createLapso = async (name, startDate, endDate, yearId) => {
+  try {
+    const query = {
+      text: `
+        INSERT INTO public."Lapso" ("nombre_lapso", "inicio_lapso", "fin_lapso", "Id_ano")
+        VALUES ($1, $2, $3, $4)
+        RETURNING 
+          "Id_lapso" as id,
+          "nombre_lapso" as name,
+          "inicio_lapso" as start_date,
+          "fin_lapso" as end_date,
+          "Id_ano" as year_id
+      `,
+      values: [name, startDate, endDate, yearId]
+    };
+    const { rows } = await db.query(query.text, query.values);
+    return rows[0];
+  } catch (error) {
+    console.error("Error en createLapso:", error);
+    throw error;
+  }
+};
+
+const updateLapso = async (id, name, startDate, endDate) => {
+  try {
+    const query = {
+      text: `
+        UPDATE public."Lapso"
+        SET 
+          "nombre_lapso" = COALESCE($1, "nombre_lapso"),
+          "inicio_lapso" = COALESCE($2, "inicio_lapso"),
+          "fin_lapso" = COALESCE($3, "fin_lapso")
+        WHERE "Id_lapso" = $4
+        RETURNING 
+          "Id_lapso" as id,
+          "nombre_lapso" as name,
+          "inicio_lapso" as start_date,
+          "fin_lapso" as end_date,
+          "Id_ano" as year_id
+      `,
+      values: [name, startDate, endDate, id]
+    };
+    const { rows } = await db.query(query.text, query.values);
+    return rows[0];
+  } catch (error) {
+    console.error("Error en updateLapso:", error);
+    throw error;
+  }
+};
+
+const deleteLapso = async (id) => {
+  try {
+    const query = {
+      text: `DELETE FROM public."Lapso" WHERE "Id_lapso" = $1 RETURNING "Id_lapso" as id`,
+      values: [id]
+    };
+    const { rows } = await db.query(query.text, query.values);
+    return rows[0];
+  } catch (error) {
+    console.error("Error en deleteLapso:", error);
+    throw error;
+  }
+};
+
 // ============================================
 // PERÍODO DE SUBIDA DE NOTAS
 // ============================================
@@ -307,6 +386,9 @@ export const ConfigModel = {
 
   // Lapsos
   findLapsosByYearId,
+  createLapso,
+  updateLapso,
+  deleteLapso,
 
   // Período de subida de notas
   findGradesPeriodByYearId,

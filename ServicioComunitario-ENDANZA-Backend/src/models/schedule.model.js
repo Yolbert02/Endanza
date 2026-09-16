@@ -493,20 +493,47 @@ const createSchedule = async (scheduleData) => {
 
         const academicYearId = sectionCheck.rows[0].Id_ano;
 
-        // PASO 2: Obtener el Id_profesor a partir del Id_usuario
+        // PASO 2: Obtener el Id_profesor a partir del Id_usuario o Id_profesor
+        let profesorId = null;
         const profesorQuery = await db.query(
             `SELECT "Id_profesor" 
              FROM "Profesor" 
-             WHERE "Id_usuario" = $1`,
+             WHERE "Id_usuario" = $1 OR "Id_profesor" = $1
+             LIMIT 1`,
             [teacher_id]
         );
 
-        if (profesorQuery.rows.length === 0) {
-            throw new Error(`El usuario ${teacher_id} no tiene un registro en la tabla Profesor. Debe ser creado como docente primero.`);
+        if (profesorQuery.rows.length > 0) {
+            profesorId = profesorQuery.rows[0].Id_profesor;
+        } else {
+            throw new Error(`El usuario o profesor ${teacher_id} no tiene un registro activo en la tabla Profesor.`);
         }
 
-        const profesorId = profesorQuery.rows[0].Id_profesor;
-        console.log(`✅ Profesor encontrado: Usuario ${teacher_id} → Profesor ID ${profesorId}`);
+        // PASO 2B: Resolver Id_materia exacto según el catálogo de la BD
+        const subjectName = scheduleData.subject_name || (isNaN(Number(subject_id)) ? subject_id : null);
+        let resolvedSubjectId = null;
+
+        if (subjectName) {
+            const matByName = await db.query(
+                `SELECT "Id_materia" FROM "Materia" WHERE TRIM(LOWER("nombre_materia")) = TRIM(LOWER($1)) LIMIT 1`,
+                [String(subjectName).trim()]
+            );
+            if (matByName.rows.length > 0) {
+                resolvedSubjectId = matByName.rows[0].Id_materia;
+            }
+        }
+
+        if (!resolvedSubjectId && subject_id && !isNaN(Number(subject_id))) {
+            const matById = await db.query(
+                `SELECT "Id_materia" FROM "Materia" WHERE "Id_materia" = $1 LIMIT 1`,
+                [Number(subject_id)]
+            );
+            if (matById.rows.length > 0) {
+                resolvedSubjectId = matById.rows[0].Id_materia;
+            }
+        }
+
+        console.log(`✅ Datos procesados: Profesor ID ${profesorId}, Materia: "${subjectName || ''}" → ID en BD: ${resolvedSubjectId}`);
 
         // PASO 3: Verificar disponibilidad con el profesorId correcto
         const isAvailable = await checkAvailability({
@@ -543,7 +570,7 @@ const createSchedule = async (scheduleData) => {
                     "Id_dia" as day_id,
                     "Id_materia" as subject_id
             `,
-            values: [section_id, classroom_id, profesorId, block_id, day_id, subject_id || null]
+            values: [section_id, classroom_id, profesorId, block_id, day_id, resolvedSubjectId || null]
         };
 
         const { rows } = await db.query(query.text, query.values);
@@ -552,6 +579,12 @@ const createSchedule = async (scheduleData) => {
 
     } catch (error) {
         console.error("❌ Error en schedule.createSchedule:", error);
+        if (error.code === '23505' || error.constraint === 'uq_disponibilidad_profesor') {
+            throw new Error('El profesor ya tiene una clase asignada en este bloque y día');
+        }
+        if (error.code === '23505' || error.constraint === 'uq_ocupacion_aula') {
+            throw new Error('El aula seleccionada se encuentra ocupada en este bloque y día');
+        }
         throw error;
     }
 };
@@ -572,17 +605,43 @@ const updateSchedule = async (id, scheduleData) => {
             throw new Error('Horario no encontrado');
         }
 
+        // Resolver teacherId
+        let resolvedProfesorId = teacher_id;
+        if (teacher_id) {
+            const profRes = await db.query(
+                `SELECT "Id_profesor" FROM "Profesor" WHERE "Id_profesor" = $1 OR "Id_usuario" = $1 LIMIT 1`,
+                [teacher_id]
+            );
+            if (profRes.rows.length > 0) {
+                resolvedProfesorId = profRes.rows[0].Id_profesor;
+            }
+        }
+
         const isAvailable = await checkAvailability({
             academicYearId: currentSchedule.rows[0].academic_year_id,
             dayId: day_id,
             blockId: block_id,
             classroomId: classroom_id,
-            teacherId: teacher_id,
+            teacherId: resolvedProfesorId,
             excludeScheduleId: id
         });
 
         if (!isAvailable.available) {
             throw new Error(isAvailable.message || 'Conflicto de horario');
+        }
+
+        // Resolver materia
+        const subjectName = scheduleData.subject_name || (isNaN(Number(subject_id)) ? subject_id : null);
+        let resolvedSubjectId = subject_id !== undefined ? subject_id : null;
+
+        if (subjectName) {
+            const matByName = await db.query(
+                `SELECT "Id_materia" FROM "Materia" WHERE TRIM(LOWER("nombre_materia")) = TRIM(LOWER($1)) LIMIT 1`,
+                [String(subjectName).trim()]
+            );
+            if (matByName.rows.length > 0) {
+                resolvedSubjectId = matByName.rows[0].Id_materia;
+            }
         }
 
         const query = {
@@ -604,13 +663,19 @@ const updateSchedule = async (id, scheduleData) => {
                     "Id_dia" as day_id,
                     "Id_materia" as subject_id
             `,
-            values: [classroom_id, teacher_id, block_id, day_id, subject_id !== undefined ? subject_id : null, id]
+            values: [classroom_id, resolvedProfesorId, block_id, day_id, resolvedSubjectId, id]
         };
 
         const { rows } = await db.query(query.text, query.values);
         return rows[0];
     } catch (error) {
         console.error("❌ Error en schedule.updateSchedule:", error);
+        if (error.code === '23505' || error.constraint === 'uq_disponibilidad_profesor') {
+            throw new Error('El profesor ya tiene una clase asignada en este bloque y día');
+        }
+        if (error.code === '23505' || error.constraint === 'uq_ocupacion_aula') {
+            throw new Error('El aula seleccionada se encuentra ocupada en este bloque y día');
+        }
         throw error;
     }
 };
@@ -653,7 +718,18 @@ const checkAvailability = async ({
             excludeSectionId
         });
 
-        // 1. Verificar disponibilidad del aula
+        let resolvedTeacherId = teacherId;
+        if (teacherId) {
+            const profCheck = await db.query(
+                `SELECT "Id_profesor" FROM "Profesor" WHERE "Id_profesor" = $1 OR "Id_usuario" = $1 LIMIT 1`,
+                [teacherId]
+            );
+            if (profCheck.rows.length > 0) {
+                resolvedTeacherId = profCheck.rows[0].Id_profesor;
+            }
+        }
+
+        // 1. Verificar disponibilidad del aula (cruzada en BD)
         let classroomQuery = `
             SELECT 
                 h."Id_horario", 
@@ -666,22 +742,20 @@ const checkAvailability = async ({
             WHERE h."Id_aula" = $1 
               AND h."Id_dia" = $2 
               AND h."Id_bloque" = $3
-              AND s."Id_ano" = $4
         `;
 
-        const classroomValues = [classroomId, dayId, blockId, academicYearId];
-        let classroomParamIdx = 5;
+        const classroomValues = [classroomId, dayId, blockId];
+        let classroomParamIdx = 4;
+
+        if (academicYearId) {
+            classroomQuery += ` AND s."Id_ano" = $${classroomParamIdx}`;
+            classroomValues.push(academicYearId);
+            classroomParamIdx++;
+        }
 
         if (excludeScheduleId) {
             classroomQuery += ` AND h."Id_horario" != $${classroomParamIdx}`;
             classroomValues.push(excludeScheduleId);
-            classroomParamIdx++;
-        }
-
-        // 👈 2. IGNORAR HORARIOS DE LA MISMA SECCIÓN AL EDITAR
-        if (excludeSectionId) {
-            classroomQuery += ` AND h."Id_seccion" != $${classroomParamIdx}`;
-            classroomValues.push(excludeSectionId);
             classroomParamIdx++;
         }
 
@@ -690,7 +764,7 @@ const checkAvailability = async ({
         if (classroomConflict.rows.length > 0) {
             return {
                 available: false,
-                message: `El aula ya está ocupada por ${classroomConflict.rows[0].teacher_name} en la sección ${classroomConflict.rows[0].nombre_seccion}`,
+                message: `El aula seleccionada se encuentra ocupada por ${classroomConflict.rows[0].teacher_name || 'otro docente'} en la sección ${classroomConflict.rows[0].nombre_seccion || ''}`,
                 conflict: {
                     type: 'classroom',
                     section: classroomConflict.rows[0].nombre_seccion,
@@ -699,7 +773,7 @@ const checkAvailability = async ({
             };
         }
 
-        // 2. Verificar disponibilidad del profesor
+        // 2. Verificar disponibilidad del profesor (no tenga otra clase en simultáneo)
         let teacherQuery = `
             SELECT 
                 h."Id_horario", 
@@ -711,22 +785,20 @@ const checkAvailability = async ({
             WHERE h."Id_profesor" = $1 
               AND h."Id_dia" = $2 
               AND h."Id_bloque" = $3
-              AND s."Id_ano" = $4
         `;
 
-        const teacherValues = [teacherId, dayId, blockId, academicYearId];
-        let teacherParamIdx = 5;
+        const teacherValues = [resolvedTeacherId, dayId, blockId];
+        let teacherParamIdx = 4;
+
+        if (academicYearId) {
+            teacherQuery += ` AND s."Id_ano" = $${teacherParamIdx}`;
+            teacherValues.push(academicYearId);
+            teacherParamIdx++;
+        }
 
         if (excludeScheduleId) {
             teacherQuery += ` AND h."Id_horario" != $${teacherParamIdx}`;
             teacherValues.push(excludeScheduleId);
-            teacherParamIdx++;
-        }
-
-        // 👈 3. IGNORAR SI EL PROFESOR TIENE CLASE EN LA MISMA SECCIÓN
-        if (excludeSectionId) {
-            teacherQuery += ` AND h."Id_seccion" != $${teacherParamIdx}`;
-            teacherValues.push(excludeSectionId);
             teacherParamIdx++;
         }
 
@@ -735,7 +807,7 @@ const checkAvailability = async ({
         if (teacherConflict.rows.length > 0) {
             return {
                 available: false,
-                message: `El profesor ya tiene una clase en el aula ${teacherConflict.rows[0].classroom_name} en la sección ${teacherConflict.rows[0].nombre_seccion}`,
+                message: `El profesor ya tiene una clase asignada en este bloque y día (en el aula ${teacherConflict.rows[0].classroom_name || ''}, sección ${teacherConflict.rows[0].nombre_seccion || ''})`,
                 conflict: {
                     type: 'teacher',
                     section: teacherConflict.rows[0].nombre_seccion,

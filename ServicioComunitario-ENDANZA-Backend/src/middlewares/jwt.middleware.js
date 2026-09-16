@@ -85,16 +85,34 @@ export const verifyToken = async (req, res, next) => {
         });
       }
 
-      // Agregar información del usuario al request - CORREGIDO
+      // Agregar información del usuario al request - SOPORTE DE ROL DUAL
+      const combinedRoles = Array.from(new Set([
+        ...(user.roles || []),
+        ...(decoded.roles || []),
+        ...(decoded.es_representante ? ['representante'] : []),
+        ...(decoded.es_profesor ? ['docente'] : [])
+      ]));
+
+      const combinedRolesIds = Array.from(new Set([
+        ...(user.roles_ids || []),
+        ...(decoded.roles_ids || [])
+      ]));
+
       req.user = {
         id: decoded.userId || decoded.id || user.id,
         userId: decoded.userId || decoded.id || user.id,
         username: decoded.username,
-        Id_rol: decoded.Id_rol, // CORREGIDO: Usar Id_rol
+        Id_rol: user.Id_rol || decoded.Id_rol,
         nombre: decoded.nombre || user.nombre,
         apellido: decoded.apellido || user.apellido,
         email: decoded.email || user.email,
         cedula: decoded.cedula || user.cedula,
+        roles: combinedRoles,
+        roles_ids: combinedRolesIds,
+        representanteId: decoded.representanteId || null,
+        profesorId: decoded.profesorId || null,
+        es_representante: decoded.es_representante || combinedRoles.includes('representante'),
+        es_profesor: decoded.es_profesor || combinedRoles.includes('docente'),
       };
 
       console.log("✅ MIDDLEWARE - Verificación completada exitosamente");
