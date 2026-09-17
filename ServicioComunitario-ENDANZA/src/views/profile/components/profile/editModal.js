@@ -664,24 +664,38 @@ const editModal = ({
           CANCELAR
         </CButton>
         <CButton
-          className="btn-premium rounded-pill px-5 py-2 shadow-sm d-flex align-items-center"
+          color="warning"
+          className="btn-premium rounded-pill px-5 py-2 shadow-sm d-flex align-items-center text-white border-0"
+          style={{
+            background: 'linear-gradient(135deg, #DD6F1E 0%, #C35604 100%)',
+            color: '#ffffff',
+            fontWeight: '700'
+          }}
           onClick={handleSave}
           disabled={loading}
         >
           {loading ? (
             <>
-              <CSpinner size="sm" className="me-2" />
+              <CSpinner size="sm" className="me-2 text-white" />
               GUARDANDO...
             </>
           ) : (
             <>
-              <CIcon icon={cilSave} className="me-2" />
+              <CIcon icon={cilSave} className="me-2 text-white" />
               GUARDAR CAMBIOS
             </>
           )}
         </CButton>
       </CModalFooter>
       <style>{`
+        .btn-premium {
+          background: linear-gradient(135deg, #DD6F1E 0%, #C35604 100%) !important;
+          color: #ffffff !important;
+        }
+        .btn-premium:hover {
+          filter: brightness(1.1);
+          transform: translateY(-1px);
+        }
         .ls-1 { letter-spacing: 1px; }
         .hover-orange:hover {
             background: var(--primary-50) !important;

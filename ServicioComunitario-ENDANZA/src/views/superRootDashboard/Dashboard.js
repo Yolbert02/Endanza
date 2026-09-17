@@ -27,7 +27,7 @@ import PeriodoInscripcionModal from './components/modals/periodoInscripcionModal
 import SubidaNotasModal from './components/modals/subidaNotasModal'
 import ValidacionNotasModal from './components/modals/validacionNotasModal'
 import ControlBoletinesModal from './components/modals/controlBoletinesModal'
-import CrearAnioModal from './components/modals/CrearAnioModal'
+
 import SystemMessageModal from '../../components/SystemMessageModal'
 
 // Hooks y servicios
@@ -41,7 +41,7 @@ export const SuperRootDashboard = () => {
   const { isSecretaria, isSuperadministrador } = useUserRole()
   const [currentYear, setCurrentYear] = useState(null)
   const [availableYears, setAvailableYears] = useState([])
-  const [visibleCrearAnio, setVisibleCrearAnio] = useState(false)
+
 
   // ✅ Hook con todos los datos necesarios - INCLUYE TEACHERS
   const {
@@ -132,7 +132,31 @@ export const SuperRootDashboard = () => {
   }
 
   const handleCreateNextYear = () => {
-    setVisibleCrearAnio(true)
+    if (!currentYear?.name) {
+      showSystemMessage('Error', 'No hay un año académico actual seleccionado.', 'error')
+      return
+    }
+    const [start, end] = currentYear.name.split('-').map(Number)
+    const nextYear = `${start + 1}-${end + 1}`
+    
+    if (availableYears.some(y => y.name === nextYear)) {
+      showSystemMessage('Aviso', `El año académico ${nextYear} ya existe.`, 'warning')
+      return
+    }
+    
+    showSystemMessage(
+      'Nueva Gestión Académica',
+      `¿Desea crear y activar el año académico ${nextYear}? El año actual (${currentYear.name}) será desactivado automáticamente.`,
+      'warning',
+      'confirm',
+      async () => {
+        try {
+          await confirmCreateYear(nextYear)
+        } catch (e) {
+          // Error already handled in confirmCreateYear
+        }
+      }
+    )
   }
 
   const handleAprobarNota = async (notaId) => {
@@ -397,15 +421,7 @@ export const SuperRootDashboard = () => {
         />
       )}
 
-      {!isSecretaria && (
-        <CrearAnioModal
-          visible={visibleCrearAnio}
-          onClose={() => setVisibleCrearAnio(false)}
-          onConfirm={confirmCreateYear}
-          currentYear={currentYear}
-          existingYears={availableYears}
-        />
-      )}
+
 
       <SystemMessageModal
         visible={messageModal.visible}
