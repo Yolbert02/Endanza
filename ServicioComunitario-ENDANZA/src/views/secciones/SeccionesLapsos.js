@@ -56,18 +56,14 @@ import {
   GRADE_LEVELS
 } from '../../services/sectionsService'
 import { getAvailableYears } from '../../services/configService'
-
-const DEFAULT_SPECIALTIES = [
-  { id: 7, name: 'Danza Clásica' },
-  { id: 8, name: 'Danza Tradicional' },
-  { id: 9, name: 'Danza Contemporánea' }
-]
+import { listSpecialties } from '../../services/especialidadService'
 
 const SeccionesLapsos = () => {
   const [activeTab, setActiveTab] = useState(1)
   const [academicYears, setAcademicYears] = useState([])
   const [selectedYearId, setSelectedYearId] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [specialties, setSpecialties] = useState([])
   const [alert, setAlert] = useState(null)
 
   // Sections state
@@ -101,25 +97,29 @@ const SeccionesLapsos = () => {
     fin_lapso: ''
   })
 
-  // Load academic years on mount
+  // Load academic years and specialties on mount
   useEffect(() => {
-    const initYears = async () => {
+    const initData = async () => {
       try {
         setLoading(true)
-        const years = await getAvailableYears()
+        const [years, specs] = await Promise.all([
+          getAvailableYears(),
+          listSpecialties()
+        ])
         setAcademicYears(years || [])
+        setSpecialties(specs || [])
         const active = years?.find((y) => y.active) || years?.[0]
         if (active) {
           setSelectedYearId(active.id)
         }
       } catch (err) {
-        console.error('Error cargando años:', err)
-        showAlert('danger', 'Error al cargar años académicos')
+        console.error('Error cargando datos iniciales:', err)
+        showAlert('danger', 'Error al cargar datos iniciales')
       } finally {
         setLoading(false)
       }
     }
-    initYears()
+    initData()
   }, [])
 
   // Reload sections and lapsos when selectedYearId changes
@@ -525,7 +525,7 @@ const SeccionesLapsos = () => {
                             </CTableDataCell>
                             <CTableDataCell>
                               <div className="fw-bold" style={{ color: '#2B2827' }}>
-                                {sec.grade_name || sec.nivel_academico || 'General'}
+                                {sec.nivel_academico || sec.grade_name || 'Sin asignar'}
                               </div>
                               <span className="small text-muted">Aplica a los 3 lapsos</span>
                             </CTableDataCell>
@@ -746,7 +746,7 @@ const SeccionesLapsos = () => {
                 style={{ borderColor: '#ECE4E0' }}
               >
                 <option value="">Tronco Común (Sin Especialidad)</option>
-                {DEFAULT_SPECIALTIES.map((esp) => (
+                {specialties.map((esp) => (
                   <option key={esp.id} value={esp.id}>
                     {esp.name}
                   </option>

@@ -205,10 +205,19 @@ export const InscripcionRepresentanteController = {
           ]
         );
 
-        // 7. Guardar datos de los padres
+        // 7. Asegurar columna 'tipo' en Estudiante_Padre
+        await client.query(`
+          ALTER TABLE "Estudiante_Padre" 
+          ADD COLUMN IF NOT EXISTS "tipo" VARCHAR(10)
+        `);
+
+        // 8. Guardar datos de los padres (madre y padre por separado)
         await guardarPadresEnTablaPadre(id_estudiante, datos, client);
 
-        // 8. Verificar si ya está inscrito en el año actual
+        // 9. Actualizar datos del representante según quién es
+        await actualizarDatosRepresentante(representante, datos, client);
+
+        // 10. Verificar si ya está inscrito en el año actual
         const checkInscripcionQuery = {
           text: `
             SELECT es."Id_estudiante_seccion"
@@ -229,7 +238,7 @@ export const InscripcionRepresentanteController = {
           });
         }
 
-        // 9. Determinar y vincular especialidad académica (requerida para 6to, 7mo u 8vo grado)
+        // 11. Determinar y vincular especialidad académica (requerida para 6to, 7mo u 8vo grado)
         let idEspecialidad = datos.id_especialidad || datos.especialidad_id || datos.Id_especialidad || null;
         if (!idEspecialidad && datos.especialidad) {
           const espFound = await EspecialidadModel.findByName(datos.especialidad);
@@ -248,7 +257,7 @@ export const InscripcionRepresentanteController = {
           );
         }
 
-        // 10. Buscar o crear sección para el grado y especialidad del estudiante
+        // 12. Buscar o crear sección para el grado y especialidad del estudiante
         await client.query(`
           ALTER TABLE "Seccion" 
           ADD COLUMN IF NOT EXISTS "nivel_academico" VARCHAR(50),
@@ -274,7 +283,7 @@ export const InscripcionRepresentanteController = {
           }
         }
 
-        // 11. Inscribir al estudiante en la sección con su especialidad correspondiente
+        // 13. Inscribir al estudiante en la sección con su especialidad correspondiente
         await client.query(`
           ALTER TABLE "Estudiante_Seccion" 
           ADD COLUMN IF NOT EXISTS "Id_especialidad" INTEGER
@@ -456,17 +465,18 @@ export const InscripcionRepresentanteController = {
         }
       }
 
-      // 5. Obtener padres asociados desde Estudiante_Padre -> Padre
+      // 5. Obtener padres asociados desde Estudiante_Padre -> Padre (filtrando por tipo)
       const padresRes = await db.query(`
-        SELECT p.*
+        SELECT p.*, ep."tipo"
         FROM "Estudiante_Padre" ep
         JOIN "Padre" p ON ep."Id_padre" = p."Id_padre"
         WHERE ep."Id_estudiante" = $1
         ORDER BY ep."Id_padre" ASC
       `, [studentId]);
 
-      const madre = padresRes.rows[0] || null;
-      const padre = padresRes.rows[1] || null;
+      // Identificar madre y padre por la columna 'tipo'
+      const madre = padresRes.rows.find(r => r.tipo === 'Madre') || null;
+      const padre = padresRes.rows.find(r => r.tipo === 'Padre') || null;
 
       // 6. Verificar si ya se encuentra inscrito en el año especificado
       let yaInscrito = false;
@@ -520,8 +530,19 @@ export const InscripcionRepresentanteController = {
             correo: student.representative_email || representante.email,
             parentesco: student.representative_relationship || (student.representative_es_familiar ? "Madre" : "Otro"),
             profesion: student.representative_occupation || "",
-            direccion_trabajo: student.representative_work_address || ""
+            direccion_trabajo: student.representative_work_address || "",
+            genero: student.representative_gender || ""
           },
+          quien_es_representante: (() => {
+            const relFromModel = student.representative_relationship;
+            if (relFromModel && relFromModel !== 'Madre') return relFromModel;
+            const genero = (student.representative_gender || '').toLowerCase();
+            if (genero.startsWith('m') || genero === 'masculino' || genero === 'male') {
+              return 'Padre';
+            }
+            if (student.representative_es_familiar === false) return 'Otro';
+            return relFromModel || 'Madre';
+          })(),
           madre: madre ? {
             nombre: madre.nombre,
             apellido: madre.apellido,
@@ -577,13 +598,21 @@ export const InscripcionRepresentanteController = {
 // ============================================
 
 /**
- * Guarda los datos de la madre y el padre en la tabla Padre
+ * Guarda los datos de la madre y el padre en la tabla Padre,
+ * vinculándolos con el estudiante en Estudiante_Padre con el campo 'tipo'.
  */
 async function guardarPadresEnTablaPadre(id_estudiante, datos, client = db) {
   try {
     console.log("👪 Guardando padres para estudiante:", id_estudiante);
 
-    // 1. Insertar MADRE
+    // 1. Eliminar relaciones existentes en Estudiante_Padre (antes de insertar nuevos)
+    await client.query(
+      'DELETE FROM "Estudiante_Padre" WHERE "Id_estudiante" = $1',
+      [id_estudiante]
+    );
+    console.log("🗑️ Relaciones anteriores eliminadas");
+
+    // 2. Insertar MADRE
     let id_madre = null;
     if (datos.nombre_Madre && datos.apellido_Madre) {
       const nombreMadre = capitalizeWords(datos.nombre_Madre);
@@ -609,9 +638,16 @@ async function guardarPadresEnTablaPadre(id_estudiante, datos, client = db) {
       const madreResult = await client.query(madreQuery.text, madreQuery.values);
       id_madre = madreResult.rows[0].id;
       console.log("✅ Madre insertada con ID:", id_madre);
+
+      // Vincular madre con estudiante (con tipo 'Madre')
+      await client.query(
+        'INSERT INTO "Estudiante_Padre" ("Id_estudiante", "Id_padre", "tipo") VALUES ($1, $2, $3)',
+        [id_estudiante, id_madre, 'Madre']
+      );
+      console.log("🔗 Relación madre-estudiante creada con tipo 'Madre'");
     }
 
-    // 2. Insertar PADRE
+    // 3. Insertar PADRE
     let id_padre = null;
     if (datos.nombre_Padre && datos.apellido_Padre) {
       const nombrePadre = capitalizeWords(datos.nombre_Padre);
@@ -637,30 +673,13 @@ async function guardarPadresEnTablaPadre(id_estudiante, datos, client = db) {
       const padreResult = await client.query(padreQuery.text, padreQuery.values);
       id_padre = padreResult.rows[0].id;
       console.log("✅ Padre insertado con ID:", id_padre);
-    }
 
-    // 3. Eliminar relaciones existentes en Estudiante_Padre
-    await client.query(
-      'DELETE FROM "Estudiante_Padre" WHERE "Id_estudiante" = $1',
-      [id_estudiante]
-    );
-    console.log("🗑️ Relaciones anteriores eliminadas");
-
-    // 4. Crear nuevas relaciones
-    if (id_madre) {
+      // Vincular padre con estudiante (con tipo 'Padre')
       await client.query(
-        'INSERT INTO "Estudiante_Padre" ("Id_estudiante", "Id_padre") VALUES ($1, $2)',
-        [id_estudiante, id_madre]
+        'INSERT INTO "Estudiante_Padre" ("Id_estudiante", "Id_padre", "tipo") VALUES ($1, $2, $3)',
+        [id_estudiante, id_padre, 'Padre']
       );
-      console.log("🔗 Relación madre-estudiante creada");
-    }
-
-    if (id_padre) {
-      await client.query(
-        'INSERT INTO "Estudiante_Padre" ("Id_estudiante", "Id_padre") VALUES ($1, $2)',
-        [id_estudiante, id_padre]
-      );
-      console.log("🔗 Relación padre-estudiante creada");
+      console.log("🔗 Relación padre-estudiante creada con tipo 'Padre'");
     }
 
     console.log(`✅ Padres guardados exitosamente: Madre=${id_madre || 'no'}, Padre=${id_padre || 'no'}`);
@@ -668,6 +687,53 @@ async function guardarPadresEnTablaPadre(id_estudiante, datos, client = db) {
   } catch (error) {
     console.error("❌ Error en guardarPadresEnTablaPadre:", error);
     throw error;
+  }
+}
+
+/**
+ * Actualiza los datos del representante (profesión, dirección de trabajo, parentesco)
+ * según quién fue seleccionado como representante (Madre, Padre u Otro).
+ */
+async function actualizarDatosRepresentante(representante, datos, client = db) {
+  try {
+    const repId = representante.id_representante || representante.id;
+    const quienEsRep = datos.quien_es_representante || 'Madre';
+
+    console.log(`📋 Actualizando representante ID=${repId}, tipo=${quienEsRep}`);
+
+    let profesion = null;
+    let direccionTrabajo = null;
+    let esFamiliar = true;
+
+    if (quienEsRep === 'Madre') {
+      profesion = datos.ocupacion_Madre || null;
+      direccionTrabajo = datos.direccion_Trabajo_Madre || null;
+      esFamiliar = true;
+    } else if (quienEsRep === 'Padre') {
+      profesion = datos.ocupacion_Padre || null;
+      direccionTrabajo = datos.direccion_Trabajo_Padre || null;
+      esFamiliar = true;
+    } else {
+      // Otro representante
+      profesion = datos.profesion_Rep || null;
+      direccionTrabajo = datos.direccion_Trabajo_Rep || null;
+      esFamiliar = false;
+    }
+
+    // Actualizar campos del representante
+    await client.query(`
+      UPDATE "Representante" SET
+        "profesion" = COALESCE($1, "profesion"),
+        "direccion_trabajo" = COALESCE($2, "direccion_trabajo"),
+        "es_familiar" = $3
+      WHERE "Id_representante" = $4
+    `, [profesion, direccionTrabajo, esFamiliar, repId]);
+
+    console.log(`✅ Representante actualizado: profesion=${profesion}, esFamiliar=${esFamiliar}`);
+
+  } catch (error) {
+    console.error("⚠️ Error actualizando representante (no crítico):", error.message);
+    // No lanzar error - no es crítico para la inscripción
   }
 }
 

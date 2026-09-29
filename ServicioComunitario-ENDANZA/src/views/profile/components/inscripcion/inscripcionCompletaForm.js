@@ -192,26 +192,38 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
         const repApellidos = splitTwoParts(rep.apellidos);
         const repTel = splitPhoneParts(rep.telefono);
 
-        // Madre: si no hay en tabla Padre y el rep es Madre, usar datos del rep
-        const infoMadre = madre || (rep.parentesco === 'Madre' ? rep : null);
+        // Determinar parentesco del representante (nueva lógica con campo directo del backend)
+        const repParentesco = data.quien_es_representante || rep.parentesco || "Madre";
+
+        // Madre: usar datos de tabla Padre si existen, sino datos del rep si es Madre
+        const infoMadre = madre || (repParentesco === 'Madre' ? rep : null);
         const madreNombres = splitTwoParts(infoMadre?.nombre || infoMadre?.nombres);
         const madreApellidos = splitTwoParts(infoMadre?.apellido || infoMadre?.apellidos);
         const madreTel = splitPhoneParts(infoMadre?.telefono);
 
-        // Padre: si no hay en tabla Padre y el rep es Padre, usar datos del rep
-        const infoPadre = padre || (rep.parentesco === 'Padre' ? rep : null);
+        // Padre: usar datos de tabla Padre si existen, sino datos del rep si es Padre
+        const infoPadre = padre || (repParentesco === 'Padre' ? rep : null);
         const padreNombres = splitTwoParts(infoPadre?.nombre || infoPadre?.nombres);
         const padreApellidos = splitTwoParts(infoPadre?.apellido || infoPadre?.apellidos);
         const padreTel = splitPhoneParts(infoPadre?.telefono);
 
-        // Parentesco del representante
-        let quienRep = "Madre";
+        // Parentesco del representante (usar campo directo del backend si disponible)
+        let quienRep = data.quien_es_representante || "Madre";
         let parentescoOtro = "";
-        if (rep.parentesco === "Padre") {
-          quienRep = "Padre";
-        } else if (rep.parentesco && rep.parentesco !== "Madre") {
+        if (quienRep === "Padre") {
+          // quienRep ya es "Padre"
+        } else if (quienRep !== "Madre" && quienRep !== "Padre") {
+          parentescoOtro = quienRep;
           quienRep = "Otro";
-          parentescoOtro = rep.parentesco;
+        }
+        // Fallback: si no vino del backend, usar parentesco del representante
+        if (!data.quien_es_representante && rep.parentesco) {
+          if (rep.parentesco === "Padre") {
+            quienRep = "Padre";
+          } else if (rep.parentesco !== "Madre") {
+            quienRep = "Otro";
+            parentescoOtro = rep.parentesco;
+          }
         }
 
         setFormData(prev => ({

@@ -765,7 +765,7 @@ const findByRepresentante = async (representanteId) => {
           e."nombre" as first_name,
           e."apellido" as last_name,
           e."cedula" as dni,
-          e."fecha_nacimiento" as birth_date,
+          TO_CHAR(e."fecha_nacimiento", 'YYYY-MM-DD') as birth_date,
           e."genero" as gender,
           nl."nivel" as grade_level,
           nd."nivel_danza" as dance_level,

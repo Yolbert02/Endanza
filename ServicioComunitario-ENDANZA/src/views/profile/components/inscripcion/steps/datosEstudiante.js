@@ -41,6 +41,7 @@ const DatosEstudiante = ({ formData, onChange, errores = {}, mode = "completo" }
 
   // Opciones para grados de danza (1er grado a 8vo grado)
   const gradosDanza = [
+    { value: "preparatorio", label: "Preparatorio" },
     { value: "1er_grado", label: "1er Grado" },
     { value: "2do_grado", label: "2do Grado" },
     { value: "3er_grado", label: "3er Grado" },
@@ -58,6 +59,7 @@ const DatosEstudiante = ({ formData, onChange, errores = {}, mode = "completo" }
     const exactMatch = gradosDanza.find(d => d.value.toLowerCase() === g.toLowerCase() || d.label.toLowerCase() === g.toLowerCase());
     if (exactMatch) return exactMatch.value;
     const lower = g.toLowerCase();
+    if (lower.includes('preparatorio') || lower.includes('prep')) return 'preparatorio';
     if (lower.includes('1er') || lower.includes('primero')) return '1er_grado';
     if (lower.includes('2do') || lower.includes('segundo')) return '2do_grado';
     if (lower.includes('3er') || lower.includes('tercero')) return '3er_grado';
