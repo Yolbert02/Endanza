@@ -164,8 +164,7 @@ export const initTable = async () => {
   }
 };
 
-// Ejecutar inicialización automáticamente al importar el modelo
-initTable();
+// initTable(); // Deshabilitado: NewEndanza ya tiene la estructura DDL nativa
 
 // ============================================
 // MÉTODOS CRUD Y UTILIDADES

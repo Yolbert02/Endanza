@@ -26,8 +26,7 @@ const initTable = async () => {
   }
 };
 
-// Ejecutar inicialización
-initTable();
+// initTable(); // Deshabilitado: NewEndanza ya tiene tabla nativa boletin_estudiante
 
 const findByYearId = async (academicYearId) => {
   try {

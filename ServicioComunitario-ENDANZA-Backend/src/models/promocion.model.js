@@ -36,8 +36,7 @@ const initTable = async () => {
   }
 };
 
-// Ejecutar inicialización al importar módulo
-initTable();
+// initTable(); // Deshabilitado: NewEndanza ya tiene tabla nativa acta_promocion
 
 /**
  * Encuentra candidatos sobresalientes del 1er Lapso

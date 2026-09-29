@@ -19,9 +19,9 @@ const useUserRole = () => {
   const roleMap = {
     1: 'admin',
     2: 'docente',
-    3: 'estudiante',
+    3: 'secretaria',
     4: 'representante',
-    5: 'secretaria'
+    5: 'estudiante'
   }
 
   const fetchUserFromBackend = useCallback(async () => {
@@ -47,7 +47,7 @@ const useUserRole = () => {
       if (!response.user) throw new Error('Respuesta inválida del servidor')
 
       const roleId = response.user.Id_rol
-      let defaultRoleName = roleMap[roleId] || 'estudiante'
+      let defaultRoleName = response.user.rol || roleMap[roleId] || 'estudiante'
 
       // Identificar superadmin: todos los admins (Id_rol=1) son superadmin en este sistema
       if (roleId === 1 || response.user.username === 'superroot' || response.user.correo === 'superroot@gmail.com' || response.user.email === 'superroot@gmail.com') {
