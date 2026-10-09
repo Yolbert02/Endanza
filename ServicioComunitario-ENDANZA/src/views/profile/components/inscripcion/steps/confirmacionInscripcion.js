@@ -7,10 +7,15 @@ import CIcon from "@coreui/icons-react";
 import {
   cilCheckCircle, cilWarning, cilCloudDownload,
   cilPrint, cilEnvelopeClosed, cilCopy,
-  cilCalendar, cilBadge, cilFile, cilUser, cilBriefcase
+  cilCalendar, cilBadge, cilFile, cilUser, cilBriefcase, cilDescription
 } from "@coreui/icons";
+import ModalPlanillasInscripcion from "../../../../../components/planillas/ModalPlanillasInscripcion";
+import { normalizarDatosPlanillas } from "../../../../../components/planillas/PlanillasOficialesEndanza";
+import { imprimirPlanillasDirecto } from "../utils/pdfGenerator";
 
 const ConfirmacionInscripcion = ({ formData, codigoInscripcion, onDescargar }) => {
+  const [modalPlanillasVisible, setModalPlanillasVisible] = React.useState(false);
+
   const copiarCodigo = () => {
     navigator.clipboard.writeText(codigoInscripcion)
       .then(() => alert('Código copiado al portapapeles'))
@@ -18,7 +23,8 @@ const ConfirmacionInscripcion = ({ formData, codigoInscripcion, onDescargar }) =
   };
 
   const imprimirPlanilla = () => {
-    window.print();
+    const info = normalizarDatosPlanillas(formData, { codigoInscripcion });
+    imprimirPlanillasDirecto(info, 'todas');
   };
 
   return (
@@ -116,32 +122,44 @@ const ConfirmacionInscripcion = ({ formData, codigoInscripcion, onDescargar }) =
       </CCard>
 
       <div className="text-center py-2">
-        <h6 className="confirm-subtitle mb-4 fw-bold small text-uppercase ls-1">Acciones Disponibles</h6>
+        <h6 className="confirm-subtitle mb-4 fw-bold small text-uppercase ls-1">Acciones Oficiales de Inscripción</h6>
         <div className="d-flex flex-column flex-md-row justify-content-center gap-3 mb-4">
           <CButton
-            className="btn-premium px-5 py-3 shadow-lg d-flex align-items-center justify-content-center"
-            onClick={onDescargar}
+            className="btn-premium px-4 py-3 shadow-lg d-flex align-items-center justify-content-center"
+            onClick={() => setModalPlanillasVisible(true)}
           >
-            <CIcon icon={cilCloudDownload} className="me-2" size="lg" />
-            <div>
-              <div className="fw-bold">DESCARGAR PLANILLA</div>
-              <small className="d-block opacity-75" style={{ fontSize: '0.65rem', fontWeight: 'normal' }}>Formato PDF Oficial</small>
+            <CIcon icon={cilDescription} className="me-2" size="lg" />
+            <div className="text-start">
+              <div className="fw-bold">VER / IMPRIMIR LAS 4 PLANILLAS</div>
+              <small className="d-block opacity-75" style={{ fontSize: '0.65rem', fontWeight: 'normal' }}>Vista Previa Oficial con Hojas Separadas</small>
             </div>
           </CButton>
 
           <CButton
             onClick={imprimirPlanilla}
-            className="px-5 py-3 confirm-print-btn fw-bold border-0 shadow-sm hover-lift d-flex align-items-center justify-content-center"
+            className="px-4 py-3 confirm-print-btn fw-bold border-0 shadow-sm hover-lift d-flex align-items-center justify-content-center"
           >
             <CIcon icon={cilPrint} className="me-2" size="lg" />
-            IMPRIMIR COPIA
+            <div className="text-start">
+              <div className="fw-bold">IMPRIMIR PAQUETE DIRECTO</div>
+              <small className="d-block opacity-75" style={{ fontSize: '0.65rem', fontWeight: 'normal' }}>4 Hojas en Tamaño Carta / PDF</small>
+            </div>
           </CButton>
         </div>
 
         <p className="confirm-subtitle small w-75 mx-auto">
-          <strong className="text-primary">Nota:</strong> Se ha enviado una copia de confirmación al correo electrónico registrado. Si no lo recibe en 5 minutos, verifique su bandeja de spam o descargue la planilla manualmente.
+          <strong className="text-primary">Nota:</strong> Se han generado las 4 planillas institucionales oficiales (Ficha de Inscripción, Acta de Compromiso del Representante, Acta de Compromiso del Estudiante e Historia Clínica Nutricional). Puede imprimirlas juntas o por separado.
         </p>
       </div>
+
+      {modalPlanillasVisible && (
+        <ModalPlanillasInscripcion
+          visible={modalPlanillasVisible}
+          onClose={() => setModalPlanillasVisible(false)}
+          data={formData}
+          codigoInscripcion={codigoInscripcion}
+        />
+      )}
     </div>
   );
 };

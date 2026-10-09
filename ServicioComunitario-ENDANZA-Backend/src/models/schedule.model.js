@@ -13,68 +13,60 @@ const findAllSections = async (academicYearId = null) => {
             query = {
                 text: `
                     SELECT 
-                        s."Id_seccion" as id,
-                        s."nombre_seccion" as section_name,
-                        COALESCE(g."nombre_grado", 'General') as grade_level,
-                        g."Id_grado" as grade_id,
-                        g."nombre_grado" as grade_name,
-                        s."capacidad" as capacity,
-                        s."Id_materia" as subject_id,
-                        s."Id_lapso" as period_id,
-                        s."Id_ano" as academic_year_id,
-                        COALESCE(m."nombre_materia", 'Sin materia') as subject_name,
-                        COALESCE(l."nombre_lapso", 'Período 1') as period_name,
-                        a."nombre_ano" as academic_year_name,
-                        -- Horarios de la sección CON MATERIAS
+                        s.id_seccion as id,
+                        s.nombre_seccion as section_name,
+                        COALESCE(nd.nivel_danza, 'General') as grade_level,
+                        s.id_nivel_danza as grade_id,
+                        COALESCE(nd.nivel_danza, 'General') as grade_name,
+                        30 as capacity,
+                        COALESCE(h.id_materia, NULL) as subject_id,
+                        NULL as period_id,
+                        s.id_ano as academic_year_id,
+                        COALESCE(mat.nombre_materia, 'Sin materia') as subject_name,
+                        'Período 1' as period_name,
+                        a.nombre_ano as academic_year_name,
                         COALESCE(
                             (
                                 SELECT json_agg(
                                     json_build_object(
-                                        'id', h."Id_horario",
-                                        'day_id', h."Id_dia",
-                                        'day_name', d."nombre_dia",
-                                        'block_id', h."Id_bloque",
-                                        'block_name', b."nombre_bloque",
-                                        'start_time', b."inicio_bloque",
-                                        'end_time', b."fin_bloque",
-                                        'classroom_id', h."Id_aula",
-                                        'classroom_name', au."nombre_aula",
-                                        'teacher_id', h."Id_profesor",
-                                        'teacher_name', CONCAT(u."nombre", ' ', u."apellido"),
-                                        'teacher_user_id', u."Id_usuario",
-                                        'subject_id', COALESCE(h."Id_materia", s."Id_materia"),
-                                        'subject_name', COALESCE(mat."nombre_materia", m."nombre_materia", 'Sin materia')
+                                        'id', hor.id_horario,
+                                        'day_id', hor_d.id_dia,
+                                        'day_name', hor_d.nombre_dia,
+                                        'block_id', hor_b.id_bloque,
+                                        'block_name', hor_b.nombre_bloque,
+                                        'start_time', hor_b.inicio_bloque,
+                                        'end_time', hor_b.fin_bloque,
+                                        'classroom_id', hor.id_aula,
+                                        'classroom_name', hor_au.nombre_aula,
+                                        'teacher_id', hor.id_docente,
+                                        'teacher_name', CONCAT(p_doc.nombre, ' ', p_doc.apellido),
+                                        'teacher_user_id', u_doc.id_usuario,
+                                        'subject_id', hor.id_materia,
+                                        'subject_name', COALESCE(hor_mat.nombre_materia, 'Sin materia')
                                     )
-                                    ORDER BY d."Id_dia", b."inicio_bloque"
+                                    ORDER BY hor_d.id_dia, hor_b.inicio_bloque
                                 )
-                                FROM "Horario" h
-                                LEFT JOIN "Dia" d ON h."Id_dia" = d."Id_dia"
-                                LEFT JOIN "Bloque_Horario" b ON h."Id_bloque" = b."Id_bloque"
-                                LEFT JOIN "Aula" au ON h."Id_aula" = au."Id_aula"
-                                LEFT JOIN "Profesor" p ON h."Id_profesor" = p."Id_profesor"
-                                LEFT JOIN "Usuario" u ON p."Id_usuario" = u."Id_usuario"
-                                LEFT JOIN "Materia" mat ON h."Id_materia" = mat."Id_materia"
-                                WHERE h."Id_seccion" = s."Id_seccion"
+                                FROM horario hor
+                                LEFT JOIN tiempo_bloque hor_b ON hor.id_bloque = hor_b.id_bloque
+                                LEFT JOIN dia hor_d ON hor_b.id_dia = hor_d.id_dia
+                                LEFT JOIN aula hor_au ON hor.id_aula = hor_au.id_aula
+                                LEFT JOIN docente hor_doc ON hor.id_docente = hor_doc.id_docente
+                                LEFT JOIN usuario u_doc ON hor_doc.id_usuario = u_doc.id_usuario
+                                LEFT JOIN persona p_doc ON u_doc.id_persona = p_doc.id_persona
+                                LEFT JOIN materia hor_mat ON hor.id_materia = hor_mat.id_materia
+                                WHERE hor.id_seccion = s.id_seccion
                             ),
                             '[]'::json
                         ) as schedules,
-                        -- Calcular horas totales
-                        COALESCE(
-                            (
-                                SELECT SUM(EXTRACT(EPOCH FROM (b."fin_bloque" - b."inicio_bloque")) / 3600)
-                                FROM "Horario" h
-                                JOIN "Bloque_Horario" b ON h."Id_bloque" = b."Id_bloque"
-                                WHERE h."Id_seccion" = s."Id_seccion"
-                            ),
-                            0
-                        ) as total_hours
-                    FROM "Seccion" s
-                    LEFT JOIN "Materia" m ON s."Id_materia" = m."Id_materia"
-                    LEFT JOIN "Grado" g ON m."ano_materia" = g."Id_grado"
-                    LEFT JOIN "Lapso" l ON s."Id_lapso" = l."Id_lapso"
-                    LEFT JOIN "Ano_Academico" a ON s."Id_ano" = a."Id_ano"
-                    WHERE s."Id_ano" = $1
-                    ORDER BY g."nombre_grado", s."Id_seccion" DESC
+                        0 as total_hours
+                    FROM seccion s
+                    LEFT JOIN ano_academico a ON s.id_ano = a.id_ano
+                    LEFT JOIN nivel_danza nd ON s.id_nivel_danza = nd.id_nivel_danza
+                    LEFT JOIN horario h ON s.id_seccion = h.id_seccion
+                    LEFT JOIN materia mat ON h.id_materia = mat.id_materia
+                    WHERE s.id_ano = $1
+                    GROUP BY s.id_seccion, s.nombre_seccion, nd.nivel_danza, s.id_nivel_danza, h.id_materia, s.id_ano, mat.nombre_materia, a.nombre_ano
+                    ORDER BY nd.nivel_danza, s.id_seccion DESC
                 `,
                 values: [academicYearId]
             };
@@ -82,67 +74,59 @@ const findAllSections = async (academicYearId = null) => {
             query = {
                 text: `
                     SELECT 
-                        s."Id_seccion" as id,
-                        s."nombre_seccion" as section_name,
-                        COALESCE(g."nombre_grado", 'General') as grade_level,
-                        g."Id_grado" as grade_id,
-                        g."nombre_grado" as grade_name,
-                        s."capacidad" as capacity,
-                        s."Id_materia" as subject_id,
-                        s."Id_lapso" as period_id,
-                        s."Id_ano" as academic_year_id,
-                        COALESCE(m."nombre_materia", 'Sin materia') as subject_name,
-                        COALESCE(l."nombre_lapso", 'Período 1') as period_name,
-                        a."nombre_ano" as academic_year_name,
-                        -- Horarios de la sección CON MATERIAS
+                        s.id_seccion as id,
+                        s.nombre_seccion as section_name,
+                        COALESCE(nd.nivel_danza, 'General') as grade_level,
+                        s.id_nivel_danza as grade_id,
+                        COALESCE(nd.nivel_danza, 'General') as grade_name,
+                        30 as capacity,
+                        COALESCE(h.id_materia, NULL) as subject_id,
+                        NULL as period_id,
+                        s.id_ano as academic_year_id,
+                        COALESCE(mat.nombre_materia, 'Sin materia') as subject_name,
+                        'Período 1' as period_name,
+                        a.nombre_ano as academic_year_name,
                         COALESCE(
                             (
                                 SELECT json_agg(
                                     json_build_object(
-                                        'id', h."Id_horario",
-                                        'day_id', h."Id_dia",
-                                        'day_name', d."nombre_dia",
-                                        'block_id', h."Id_bloque",
-                                        'block_name', b."nombre_bloque",
-                                        'start_time', b."inicio_bloque",
-                                        'end_time', b."fin_bloque",
-                                        'classroom_id', h."Id_aula",
-                                        'classroom_name', au."nombre_aula",
-                                        'teacher_id', h."Id_profesor",
-                                        'teacher_name', CONCAT(u."nombre", ' ', u."apellido"),
-                                        'teacher_user_id', u."Id_usuario",
-                                        'subject_id', COALESCE(h."Id_materia", s."Id_materia"),
-                                        'subject_name', COALESCE(mat."nombre_materia", m."nombre_materia", 'Sin materia')
+                                        'id', hor.id_horario,
+                                        'day_id', hor_d.id_dia,
+                                        'day_name', hor_d.nombre_dia,
+                                        'block_id', hor_b.id_bloque,
+                                        'block_name', hor_b.nombre_bloque,
+                                        'start_time', hor_b.inicio_bloque,
+                                        'end_time', hor_b.fin_bloque,
+                                        'classroom_id', hor.id_aula,
+                                        'classroom_name', hor_au.nombre_aula,
+                                        'teacher_id', hor.id_docente,
+                                        'teacher_name', CONCAT(p_doc.nombre, ' ', p_doc.apellido),
+                                        'teacher_user_id', u_doc.id_usuario,
+                                        'subject_id', hor.id_materia,
+                                        'subject_name', COALESCE(hor_mat.nombre_materia, 'Sin materia')
                                     )
-                                    ORDER BY d."Id_dia", b."inicio_bloque"
+                                    ORDER BY hor_d.id_dia, hor_b.inicio_bloque
                                 )
-                                FROM "Horario" h
-                                LEFT JOIN "Dia" d ON h."Id_dia" = d."Id_dia"
-                                LEFT JOIN "Bloque_Horario" b ON h."Id_bloque" = b."Id_bloque"
-                                LEFT JOIN "Aula" au ON h."Id_aula" = au."Id_aula"
-                                LEFT JOIN "Profesor" p ON h."Id_profesor" = p."Id_profesor"
-                                LEFT JOIN "Usuario" u ON p."Id_usuario" = u."Id_usuario"
-                                LEFT JOIN "Materia" mat ON h."Id_materia" = mat."Id_materia"
-                                WHERE h."Id_seccion" = s."Id_seccion"
+                                FROM horario hor
+                                LEFT JOIN tiempo_bloque hor_b ON hor.id_bloque = hor_b.id_bloque
+                                LEFT JOIN dia hor_d ON hor_b.id_dia = hor_d.id_dia
+                                LEFT JOIN aula hor_au ON hor.id_aula = hor_au.id_aula
+                                LEFT JOIN docente hor_doc ON hor.id_docente = hor_doc.id_docente
+                                LEFT JOIN usuario u_doc ON hor_doc.id_usuario = u_doc.id_usuario
+                                LEFT JOIN persona p_doc ON u_doc.id_persona = p_doc.id_persona
+                                LEFT JOIN materia hor_mat ON hor.id_materia = hor_mat.id_materia
+                                WHERE hor.id_seccion = s.id_seccion
                             ),
                             '[]'::json
                         ) as schedules,
-                        -- Calcular horas totales
-                        COALESCE(
-                            (
-                                SELECT SUM(EXTRACT(EPOCH FROM (b."fin_bloque" - b."inicio_bloque")) / 3600)
-                                FROM "Horario" h
-                                JOIN "Bloque_Horario" b ON h."Id_bloque" = b."Id_bloque"
-                                WHERE h."Id_seccion" = s."Id_seccion"
-                            ),
-                            0
-                        ) as total_hours
-                    FROM "Seccion" s
-                    LEFT JOIN "Materia" m ON s."Id_materia" = m."Id_materia"
-                    LEFT JOIN "Grado" g ON m."ano_materia" = g."Id_grado"
-                    LEFT JOIN "Lapso" l ON s."Id_lapso" = l."Id_lapso"
-                    LEFT JOIN "Ano_Academico" a ON s."Id_ano" = a."Id_ano"
-                    ORDER BY g."nombre_grado", s."Id_seccion" DESC
+                        0 as total_hours
+                    FROM seccion s
+                    LEFT JOIN ano_academico a ON s.id_ano = a.id_ano
+                    LEFT JOIN nivel_danza nd ON s.id_nivel_danza = nd.id_nivel_danza
+                    LEFT JOIN horario h ON s.id_seccion = h.id_seccion
+                    LEFT JOIN materia mat ON h.id_materia = mat.id_materia
+                    GROUP BY s.id_seccion, s.nombre_seccion, nd.nivel_danza, s.id_nivel_danza, h.id_materia, s.id_ano, mat.nombre_materia, a.nombre_ano
+                    ORDER BY nd.nivel_danza, s.id_seccion DESC
                 `
             };
         }

@@ -78,7 +78,7 @@ const getDatosBasicosEstudiante = async (estudianteId) => {
                 nombre: data.first_name || data.nombre || 'Estudiante',
                 apellido: data.last_name || data.apellido || '',
                 cedula: data.dni || data.cedula || '',
-                grado_real: data.grade_level_name || data.grade_level || 'Sin Grado'
+                grado_real: data.dance_level_name || data.dance_level || data.grade_level || 'Sin Grado'
             };
         }
 
@@ -98,7 +98,7 @@ const getDatosBasicosEstudiante = async (estudianteId) => {
                     nombre: estudiante.first_name || estudiante.nombre || 'Estudiante',
                     apellido: estudiante.last_name || estudiante.apellido || '',
                     cedula: estudiante.dni || estudiante.cedula || '',
-                    grado_real: estudiante.grade_level_name || estudiante.grade_level || 'Sin Grado'
+                    grado_real: estudiante.dance_level_name || estudiante.dance_level || estudiante.grade_level || 'Sin Grado'
                 };
             }
         }

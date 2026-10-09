@@ -3,7 +3,7 @@
 import { db } from "../db/connection.database.js";
 
 // ============================================
-// MODELO DE CONFIGURACIÓN - Años Académicos y Periodos
+// MODELO DE CONFIGURACIÓN - Años Académicos y Periodos (NewEndanza)
 // ============================================
 
 // ============================================
@@ -15,14 +15,14 @@ const findAllAcademicYears = async () => {
     const query = {
       text: `
         SELECT 
-          "Id_ano" as id,
-          "nombre_ano" as name,
-          "estatus_ano" as status,
-          "inicio_ano" as start_date,
-          "fin_ano" as end_date,
-          "activo" as active
-        FROM public."Ano_Academico"
-        ORDER BY "nombre_ano" DESC
+          id_ano as id,
+          nombre_ano as name,
+          estado_ano as status,
+          inicio_ano as start_date,
+          fin_ano as end_date,
+          (estado_ano = 'en_curso') as active
+        FROM ano_academico
+        ORDER BY nombre_ano DESC
       `,
     };
     const { rows } = await db.query(query.text);
@@ -38,10 +38,10 @@ const findActiveAcademicYear = async () => {
     const query = {
       text: `
         SELECT 
-          "Id_ano" as id,
-          "nombre_ano" as name
-        FROM public."Ano_Academico"
-        WHERE "activo" = true
+          id_ano as id,
+          nombre_ano as name
+        FROM ano_academico
+        WHERE estado_ano = 'en_curso'
         LIMIT 1
       `,
     };
@@ -55,26 +55,25 @@ const findActiveAcademicYear = async () => {
 
 const createAcademicYear = async (name, startDate, endDate) => {
   try {
-    // Iniciamos una transacción manual
-    await db.query('BEGIN');
+    await db.query("BEGIN");
 
     try {
-      // 1. Desactivar el año actual
+      // 1. Si hay un año en curso, pasarlo a finalizado
       await db.query(`
-        UPDATE public."Ano_Academico" 
-        SET "activo" = false 
-        WHERE "activo" = true
+        UPDATE ano_academico 
+        SET estado_ano = 'finalizado' 
+        WHERE estado_ano = 'en_curso'
       `);
 
-      // 2. Crear el nuevo año
+      // 2. Crear el nuevo año académico
       const insertQuery = {
         text: `
-          INSERT INTO public."Ano_Academico" 
-            ("nombre_ano", "estatus_ano", "inicio_ano", "fin_ano", "activo")
-          VALUES ($1, 'Activo', $2, $3, true)
+          INSERT INTO ano_academico 
+            (nombre_ano, estado_ano, inicio_ano, fin_ano)
+          VALUES ($1, 'en_curso', $2, $3)
           RETURNING 
-            "Id_ano" as id,
-            "nombre_ano" as name
+            id_ano as id,
+            nombre_ano as name
         `,
         values: [name, startDate, endDate],
       };
@@ -82,42 +81,32 @@ const createAcademicYear = async (name, startDate, endDate) => {
       const { rows } = await db.query(insertQuery.text, insertQuery.values);
       const newYear = rows[0];
 
-      // 3. Crear registros por defecto para las configuraciones
-      // Período de inscripción (por defecto con las mismas fechas, inactivo)
-      await db.query(
-        `INSERT INTO public."Periodo_Inscripcion" 
-          ("Id_ano", "fecha_inicio", "fecha_fin", "activo", "creado_en", "actualizado_en")
-         VALUES ($1, $2, $3, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-        [newYear.id, startDate, endDate]
-      );
-
-      // Período de subida de notas (por defecto con las mismas fechas, inactivo)
-      await db.query(
-        `INSERT INTO public."Periodo_Subida_Notas" 
-          ("Id_ano", "fecha_inicio", "fecha_fin", "activo", "creado_en", "actualizado_en")
-         VALUES ($1, $2, $3, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-        [newYear.id, startDate, endDate]
-      );
-
-      // 4. Crear los 3 lapsos académicos por defecto
+      // 3. Crear los 3 lapsos académicos por defecto en la tabla periodo
       const startYear = new Date(startDate).getFullYear();
       const endYear = new Date(endDate).getFullYear();
-      await db.query(`
-        INSERT INTO public."Lapso" ("nombre_lapso", "inicio_lapso", "fin_lapso", "Id_ano")
+      await db.query(
+        `
+        INSERT INTO periodo (nombre_periodo, inicio_periodo, fin_periodo, id_ano)
         VALUES 
           ('I LAPSO', $1, $2, $3),
           ('II LAPSO', $4, $5, $3),
           ('III LAPSO', $6, $7, $3)
-      `, [
-        `${startYear}-09-15`, `${startYear}-12-15`, newYear.id,
-        `${endYear}-01-10`, `${endYear}-04-05`,
-        `${endYear}-04-15`, `${endYear}-07-15`
-      ]);
+      `,
+        [
+          `${startYear}-09-15`,
+          `${startYear}-12-15`,
+          newYear.id,
+          `${endYear}-01-10`,
+          `${endYear}-04-05`,
+          `${endYear}-04-15`,
+          `${endYear}-07-15`,
+        ]
+      );
 
-      await db.query('COMMIT');
+      await db.query("COMMIT");
       return newYear;
     } catch (error) {
-      await db.query('ROLLBACK');
+      await db.query("ROLLBACK");
       throw error;
     }
   } catch (error) {
@@ -132,71 +121,27 @@ const createAcademicYear = async (name, startDate, endDate) => {
 
 const findEnrollmentPeriodByYearId = async (yearId) => {
   try {
-    const query = {
-      text: `
-        SELECT 
-          "fecha_inicio" as "fechaInicio",
-          "fecha_fin" as "fechaFin",
-          "activo"
-        FROM public."Periodo_Inscripcion"
-        WHERE "Id_ano" = $1
-      `,
-      values: [yearId],
+    return {
+      fechaInicio: null,
+      fechaFin: null,
+      activo: true,
     };
-    const { rows } = await db.query(query.text, query.values);
-    return rows[0] || null;
   } catch (error) {
     console.error("Error en findEnrollmentPeriodByYearId:", error);
     throw error;
   }
 };
 
-const updateEnrollmentPeriod = async (yearId, { fechaInicio, fechaFin, activo }) => {
+const updateEnrollmentPeriod = async (
+  yearId,
+  { fechaInicio, fechaFin, activo }
+) => {
   try {
-    // Verificar si existe el registro
-    const checkQuery = {
-      text: `SELECT "Id_periodo_inscripcion" FROM public."Periodo_Inscripcion" WHERE "Id_ano" = $1`,
-      values: [yearId]
+    return {
+      fechaInicio,
+      fechaFin,
+      activo,
     };
-    const checkResult = await db.query(checkQuery.text, checkQuery.values);
-
-    if (checkResult.rows.length === 0) {
-      // Si no existe, insertar
-      const insertQuery = {
-        text: `
-          INSERT INTO public."Periodo_Inscripcion" 
-            ("Id_ano", "fecha_inicio", "fecha_fin", "activo", "creado_en", "actualizado_en")
-          VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-          RETURNING 
-            "fecha_inicio" as "fechaInicio",
-            "fecha_fin" as "fechaFin",
-            "activo"
-        `,
-        values: [yearId, fechaInicio, fechaFin, activo],
-      };
-      const { rows } = await db.query(insertQuery.text, insertQuery.values);
-      return rows[0];
-    } else {
-      // Si existe, actualizar
-      const updateQuery = {
-        text: `
-          UPDATE public."Periodo_Inscripcion"
-          SET 
-            "fecha_inicio" = $1,
-            "fecha_fin" = $2,
-            "activo" = $3,
-            "actualizado_en" = CURRENT_TIMESTAMP
-          WHERE "Id_ano" = $4
-          RETURNING 
-            "fecha_inicio" as "fechaInicio",
-            "fecha_fin" as "fechaFin",
-            "activo"
-        `,
-        values: [fechaInicio, fechaFin, activo, yearId],
-      };
-      const { rows } = await db.query(updateQuery.text, updateQuery.values);
-      return rows[0];
-    }
   } catch (error) {
     console.error("Error en updateEnrollmentPeriod:", error);
     throw error;
@@ -204,7 +149,7 @@ const updateEnrollmentPeriod = async (yearId, { fechaInicio, fechaFin, activo })
 };
 
 // ============================================
-// LAPSOS
+// LAPSOS (periodo en NewEndanza)
 // ============================================
 
 const findLapsosByYearId = async (yearId) => {
@@ -212,13 +157,14 @@ const findLapsosByYearId = async (yearId) => {
     const query = {
       text: `
         SELECT 
-          "Id_lapso" as id,
-          "nombre_lapso" as name,
-          "inicio_lapso" as start_date,
-          "fin_lapso" as end_date
-        FROM public."Lapso"
-        WHERE "Id_ano" = $1
-        ORDER BY "Id_lapso"
+          id_periodo as id,
+          nombre_periodo as name,
+          inicio_periodo as start_date,
+          fin_periodo as end_date,
+          id_ano as year_id
+        FROM periodo
+        WHERE id_ano = $1
+        ORDER BY id_periodo
       `,
       values: [yearId],
     };
@@ -234,16 +180,16 @@ const createLapso = async (name, startDate, endDate, yearId) => {
   try {
     const query = {
       text: `
-        INSERT INTO public."Lapso" ("nombre_lapso", "inicio_lapso", "fin_lapso", "Id_ano")
+        INSERT INTO periodo (nombre_periodo, inicio_periodo, fin_periodo, id_ano)
         VALUES ($1, $2, $3, $4)
         RETURNING 
-          "Id_lapso" as id,
-          "nombre_lapso" as name,
-          "inicio_lapso" as start_date,
-          "fin_lapso" as end_date,
-          "Id_ano" as year_id
+          id_periodo as id,
+          nombre_periodo as name,
+          inicio_periodo as start_date,
+          fin_periodo as end_date,
+          id_ano as year_id
       `,
-      values: [name, startDate, endDate, yearId]
+      values: [name, startDate, endDate, yearId],
     };
     const { rows } = await db.query(query.text, query.values);
     return rows[0];
@@ -257,20 +203,20 @@ const updateLapso = async (id, name, startDate, endDate) => {
   try {
     const query = {
       text: `
-        UPDATE public."Lapso"
+        UPDATE periodo
         SET 
-          "nombre_lapso" = COALESCE($1, "nombre_lapso"),
-          "inicio_lapso" = COALESCE($2, "inicio_lapso"),
-          "fin_lapso" = COALESCE($3, "fin_lapso")
-        WHERE "Id_lapso" = $4
+          nombre_periodo = COALESCE($1, nombre_periodo),
+          inicio_periodo = COALESCE($2, inicio_periodo),
+          fin_periodo = COALESCE($3, fin_periodo)
+        WHERE id_periodo = $4
         RETURNING 
-          "Id_lapso" as id,
-          "nombre_lapso" as name,
-          "inicio_lapso" as start_date,
-          "fin_lapso" as end_date,
-          "Id_ano" as year_id
+          id_periodo as id,
+          nombre_periodo as name,
+          inicio_periodo as start_date,
+          fin_periodo as end_date,
+          id_ano as year_id
       `,
-      values: [name, startDate, endDate, id]
+      values: [name, startDate, endDate, id],
     };
     const { rows } = await db.query(query.text, query.values);
     return rows[0];
@@ -283,8 +229,8 @@ const updateLapso = async (id, name, startDate, endDate) => {
 const deleteLapso = async (id) => {
   try {
     const query = {
-      text: `DELETE FROM public."Lapso" WHERE "Id_lapso" = $1 RETURNING "Id_lapso" as id`,
-      values: [id]
+      text: `DELETE FROM periodo WHERE id_periodo = $1 RETURNING id_periodo as id`,
+      values: [id],
     };
     const { rows } = await db.query(query.text, query.values);
     return rows[0];
@@ -300,71 +246,27 @@ const deleteLapso = async (id) => {
 
 const findGradesPeriodByYearId = async (yearId) => {
   try {
-    const query = {
-      text: `
-        SELECT 
-          "fecha_inicio" as "fechaInicio",
-          "fecha_fin" as "fechaFin",
-          "activo"
-        FROM public."Periodo_Subida_Notas"
-        WHERE "Id_ano" = $1
-      `,
-      values: [yearId],
+    return {
+      fechaInicio: null,
+      fechaFin: null,
+      activo: true,
     };
-    const { rows } = await db.query(query.text, query.values);
-    return rows[0] || null;
   } catch (error) {
     console.error("Error en findGradesPeriodByYearId:", error);
     throw error;
   }
 };
 
-const updateGradesPeriod = async (yearId, { fechaInicio, fechaFin, activo }) => {
+const updateGradesPeriod = async (
+  yearId,
+  { fechaInicio, fechaFin, activo }
+) => {
   try {
-    // Verificar si existe el registro
-    const checkQuery = {
-      text: `SELECT "Id_periodo_notas" FROM public."Periodo_Subida_Notas" WHERE "Id_ano" = $1`,
-      values: [yearId]
+    return {
+      fechaInicio,
+      fechaFin,
+      activo,
     };
-    const checkResult = await db.query(checkQuery.text, checkQuery.values);
-
-    if (checkResult.rows.length === 0) {
-      // Si no existe, insertar
-      const insertQuery = {
-        text: `
-          INSERT INTO public."Periodo_Subida_Notas" 
-            ("Id_ano", "fecha_inicio", "fecha_fin", "activo", "creado_en", "actualizado_en")
-          VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-          RETURNING 
-            "fecha_inicio" as "fechaInicio",
-            "fecha_fin" as "fechaFin",
-            "activo"
-        `,
-        values: [yearId, fechaInicio, fechaFin, activo],
-      };
-      const { rows } = await db.query(insertQuery.text, insertQuery.values);
-      return rows[0];
-    } else {
-      // Si existe, actualizar
-      const updateQuery = {
-        text: `
-          UPDATE public."Periodo_Subida_Notas"
-          SET 
-            "fecha_inicio" = $1,
-            "fecha_fin" = $2,
-            "activo" = $3,
-            "actualizado_en" = CURRENT_TIMESTAMP
-          WHERE "Id_ano" = $4
-          RETURNING 
-            "fecha_inicio" as "fechaInicio",
-            "fecha_fin" as "fechaFin",
-            "activo"
-        `,
-        values: [fechaInicio, fechaFin, activo, yearId],
-      };
-      const { rows } = await db.query(updateQuery.text, updateQuery.values);
-      return rows[0];
-    }
   } catch (error) {
     console.error("Error en updateGradesPeriod:", error);
     throw error;

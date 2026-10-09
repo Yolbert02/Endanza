@@ -74,16 +74,32 @@ const editModal = ({
   useEffect(() => {
     if (visible && studentData) {
       // 1. Desglosar datos del Estudiante
+      const rawEstP1 = studentData.EstudiantePrimerNombre || studentData.first_name || ''
+      const rawEstP2 = studentData.EstudianteSegundoNombre || studentData.middle_name || studentData.segundo_nombre || studentData.second_name || ''
+      const rawEstA1 = studentData.EstudiantePrimerApellido || studentData.last_name || ''
+      const rawEstA2 = studentData.EstudianteSegundoApellido || studentData.second_last_name || studentData.segundo_apellido || ''
+
       const estParts = extractFourParts(
-        studentData.EstudiantePrimerNombre 
-          ? `${studentData.EstudiantePrimerNombre} ${studentData.EstudianteSegundoNombre || ''}` 
-          : (studentData.first_name || studentData.NombreEstudiante || studentData.nombre || ''),
-        studentData.EstudiantePrimerApellido 
-          ? `${studentData.EstudiantePrimerApellido} ${studentData.EstudianteSegundoApellido || ''}` 
-          : (studentData.last_name || studentData.ApellidoEstudiante || studentData.apellido || '')
+        rawEstP1 ? `${rawEstP1} ${rawEstP2}`.trim() : (studentData.NombreEstudiante || studentData.nombre || ''),
+        rawEstA1 ? `${rawEstA1} ${rawEstA2}`.trim() : (studentData.ApellidoEstudiante || studentData.apellido || '')
       )
-      const nombreEst = `${estParts.first1} ${estParts.first2}`.trim()
-      const apellidoEst = `${estParts.last1} ${estParts.last2}`.trim()
+
+      let finalEstPrimerNombre = rawEstP1 || estParts.first1 || ''
+      let finalEstSegundoNombre = rawEstP2 || estParts.first2 || ''
+      if (!rawEstP2 && estParts.first2) {
+        finalEstPrimerNombre = estParts.first1 || ''
+        finalEstSegundoNombre = estParts.first2 || ''
+      }
+
+      let finalEstPrimerApellido = rawEstA1 || estParts.last1 || ''
+      let finalEstSegundoApellido = rawEstA2 || estParts.last2 || ''
+      if (!rawEstA2 && estParts.last2) {
+        finalEstPrimerApellido = estParts.last1 || ''
+        finalEstSegundoApellido = estParts.last2 || ''
+      }
+
+      const nombreEst = `${finalEstPrimerNombre} ${finalEstSegundoNombre}`.trim()
+      const apellidoEst = `${finalEstPrimerApellido} ${finalEstSegundoApellido}`.trim()
 
       // Fecha de nacimiento para datepicker (YYYY-MM-DD)
       let fechaNac = studentData.FechaNacimiento || studentData.birth_date || studentData.fecha_nacimiento || ''
@@ -107,8 +123,8 @@ const editModal = ({
       // Estatus
       const estatusVal = studentData.Estatus || studentData.status || studentData.estatus || 'Activo'
 
-      // Grado y Sección
-      const gradoVal = studentData.Grado || studentData.grade_level_name || studentData.dance_level_name || studentData.gradeLevel || studentData.dance_level || ''
+      // Grado y Sección (exclusivamente nivel de danza de ENDANZA)
+      const gradoVal = studentData.dance_level_name || studentData.dance_level || (studentData.Grado !== studentData.grade_level_name ? studentData.Grado : '') || ''
       const seccionVal = studentData.Seccion || (studentData.sections?.[0]?.section_name) || studentData.section || ''
 
       // Contacto / Ubicación
@@ -144,50 +160,80 @@ const editModal = ({
       }
 
       // 4. Desglosar datos existentes de Madre y Padre
+      const rawMadreP1 = studentData.MadrePrimerNombre || ''
+      const rawMadreP2 = studentData.MadreSegundoNombre || ''
+      const rawMadreA1 = studentData.MadrePrimerApellido || ''
+      const rawMadreA2 = studentData.MadreSegundoApellido || ''
+
       const madreParts = extractFourParts(
-        studentData.MadrePrimerNombre 
-          ? `${studentData.MadrePrimerNombre} ${studentData.MadreSegundoNombre || ''}` 
-          : (studentData.MadreNombre || ''),
-        studentData.MadrePrimerApellido 
-          ? `${studentData.MadrePrimerApellido} ${studentData.MadreSegundoApellido || ''}` 
-          : (studentData.MadreApellido || '')
+        rawMadreP1 ? `${rawMadreP1} ${rawMadreP2}`.trim() : (studentData.MadreNombre || ''),
+        rawMadreA1 ? `${rawMadreA1} ${rawMadreA2}`.trim() : (studentData.MadreApellido || '')
       )
 
+      const rawPadreP1 = studentData.PadrePrimerNombre || ''
+      const rawPadreP2 = studentData.PadreSegundoNombre || ''
+      const rawPadreA1 = studentData.PadrePrimerApellido || ''
+      const rawPadreA2 = studentData.PadreSegundoApellido || ''
+
       const padreParts = extractFourParts(
-        studentData.PadrePrimerNombre 
-          ? `${studentData.PadrePrimerNombre} ${studentData.PadreSegundoNombre || ''}` 
-          : (studentData.PadreNombre || ''),
-        studentData.PadrePrimerApellido 
-          ? `${studentData.PadrePrimerApellido} ${studentData.PadreSegundoApellido || ''}` 
-          : (studentData.PadreApellido || '')
+        rawPadreP1 ? `${rawPadreP1} ${rawPadreP2}`.trim() : (studentData.PadreNombre || ''),
+        rawPadreA1 ? `${rawPadreA1} ${rawPadreA2}`.trim() : (studentData.PadreApellido || '')
       )
 
       // Si el representante es Madre, asegurar que la pestaña Madre tenga todos los datos
-      const finalMadrePrimerNombre = madreParts.first1 || (repParentesco === 'Madre' ? repParts.first1 : '')
-      const finalMadreSegundoNombre = madreParts.first2 || (repParentesco === 'Madre' ? repParts.first2 : '')
-      const finalMadrePrimerApellido = madreParts.last1 || (repParentesco === 'Madre' ? repParts.last1 : '')
-      const finalMadreSegundoApellido = madreParts.last2 || (repParentesco === 'Madre' ? repParts.last2 : '')
+      let finalMadrePrimerNombre = rawMadreP1 || madreParts.first1 || (repParentesco === 'Madre' ? repParts.first1 : '')
+      let finalMadreSegundoNombre = rawMadreP2 || madreParts.first2 || (repParentesco === 'Madre' ? repParts.first2 : '')
+      if (!rawMadreP2 && madreParts.first2) {
+        finalMadrePrimerNombre = madreParts.first1 || ''
+        finalMadreSegundoNombre = madreParts.first2 || ''
+      }
+      let finalMadrePrimerApellido = rawMadreA1 || madreParts.last1 || (repParentesco === 'Madre' ? repParts.last1 : '')
+      let finalMadreSegundoApellido = rawMadreA2 || madreParts.last2 || (repParentesco === 'Madre' ? repParts.last2 : '')
+      if (!rawMadreA2 && madreParts.last2) {
+        finalMadrePrimerApellido = madreParts.last1 || ''
+        finalMadreSegundoApellido = madreParts.last2 || ''
+      }
       const finalMadreCedula = studentData.MadreCedula || (repParentesco === 'Madre' ? repCedula : '')
       const finalMadreTelefono = studentData.MadreTelefono || (repParentesco === 'Madre' ? repTelefono : '')
       const finalMadreEmail = studentData.MadreEmail || (repParentesco === 'Madre' ? repEmail : '')
       const finalMadreOcupacion = studentData.MadreOcupacion || (repParentesco === 'Madre' ? repOcupacion : '')
 
       // Si el representante es Padre, asegurar que la pestaña Padre tenga todos los datos
-      const finalPadrePrimerNombre = padreParts.first1 || (repParentesco === 'Padre' ? repParts.first1 : '')
-      const finalPadreSegundoNombre = padreParts.first2 || (repParentesco === 'Padre' ? repParts.first2 : '')
-      const finalPadrePrimerApellido = padreParts.last1 || (repParentesco === 'Padre' ? repParts.last1 : '')
-      const finalPadreSegundoApellido = padreParts.last2 || (repParentesco === 'Padre' ? repParts.last2 : '')
+      let finalPadrePrimerNombre = rawPadreP1 || padreParts.first1 || (repParentesco === 'Padre' ? repParts.first1 : '')
+      let finalPadreSegundoNombre = rawPadreP2 || padreParts.first2 || (repParentesco === 'Padre' ? repParts.first2 : '')
+      if (!rawPadreP2 && padreParts.first2) {
+        finalPadrePrimerNombre = padreParts.first1 || ''
+        finalPadreSegundoNombre = padreParts.first2 || ''
+      }
+      let finalPadrePrimerApellido = rawPadreA1 || padreParts.last1 || (repParentesco === 'Padre' ? repParts.last1 : '')
+      let finalPadreSegundoApellido = rawPadreA2 || padreParts.last2 || (repParentesco === 'Padre' ? repParts.last2 : '')
+      if (!rawPadreA2 && padreParts.last2) {
+        finalPadrePrimerApellido = padreParts.last1 || ''
+        finalPadreSegundoApellido = padreParts.last2 || ''
+      }
       const finalPadreCedula = studentData.PadreCedula || (repParentesco === 'Padre' ? repCedula : '')
       const finalPadreTelefono = studentData.PadreTelefono || (repParentesco === 'Padre' ? repTelefono : '')
       const finalPadreEmail = studentData.PadreEmail || (repParentesco === 'Padre' ? repEmail : '')
       const finalPadreOcupacion = studentData.PadreOcupacion || (repParentesco === 'Padre' ? repOcupacion : '')
 
+      const finalMadreLugarTrabajo = studentData.MadreLugarTrabajo || studentData.trabajo_Madre || (repParentesco === 'Madre' ? (studentData.RepresentanteLugarTrabajo || studentData.trabajo_Rep || studentData.representative_workplace) : '') || ''
+      const finalMadreDireccionTrabajo = studentData.MadreDireccionTrabajo || studentData.direccion_Trabajo_Madre || (repParentesco === 'Madre' ? (studentData.RepresentanteDireccionTrabajo || studentData.direccion_Trabajo_Rep || studentData.representative_work_address || studentData.direccion_trabajo) : '') || ''
+      const finalMadreTelefonoTrabajo = studentData.MadreTelefonoTrabajo || studentData.telefono_trabajo_Madre || (repParentesco === 'Madre' ? (studentData.RepresentanteTelefonoTrabajo || studentData.telefono_trabajo_Rep || studentData.representative_work_phone || studentData.telefono_trabajo) : '') || ''
+
+      const finalPadreLugarTrabajo = studentData.PadreLugarTrabajo || studentData.trabajo_Padre || (repParentesco === 'Padre' ? (studentData.RepresentanteLugarTrabajo || studentData.trabajo_Rep || studentData.representative_workplace) : '') || ''
+      const finalPadreDireccionTrabajo = studentData.PadreDireccionTrabajo || studentData.direccion_Trabajo_Padre || (repParentesco === 'Padre' ? (studentData.RepresentanteDireccionTrabajo || studentData.direccion_Trabajo_Rep || studentData.representative_work_address || studentData.direccion_trabajo) : '') || ''
+      const finalPadreTelefonoTrabajo = studentData.PadreTelefonoTrabajo || studentData.telefono_trabajo_Padre || (repParentesco === 'Padre' ? (studentData.RepresentanteTelefonoTrabajo || studentData.telefono_trabajo_Rep || studentData.representative_work_phone || studentData.telefono_trabajo) : '') || ''
+
+      const finalRepLugarTrabajo = studentData.RepresentanteLugarTrabajo || studentData.trabajo_Rep || studentData.representative_workplace || studentData.lugar_trabajo || (repParentesco === 'Madre' ? finalMadreLugarTrabajo : (repParentesco === 'Padre' ? finalPadreLugarTrabajo : '')) || ''
+      const finalRepDireccionTrabajo = studentData.RepresentanteDireccionTrabajo || studentData.direccion_Trabajo_Rep || studentData.representative_work_address || studentData.direccion_trabajo || (repParentesco === 'Madre' ? finalMadreDireccionTrabajo : (repParentesco === 'Padre' ? finalPadreDireccionTrabajo : '')) || ''
+      const finalRepTelefonoTrabajo = studentData.RepresentanteTelefonoTrabajo || studentData.telefono_trabajo_Rep || studentData.representative_work_phone || studentData.telefono_trabajo || (repParentesco === 'Madre' ? finalMadreTelefonoTrabajo : (repParentesco === 'Padre' ? finalPadreTelefonoTrabajo : '')) || ''
+
       setFormData({
         ...studentData,
-        EstudiantePrimerNombre: estParts.first1,
-        EstudianteSegundoNombre: estParts.first2,
-        EstudiantePrimerApellido: estParts.last1,
-        EstudianteSegundoApellido: estParts.last2,
+        EstudiantePrimerNombre: finalEstPrimerNombre,
+        EstudianteSegundoNombre: finalEstSegundoNombre,
+        EstudiantePrimerApellido: finalEstPrimerApellido,
+        EstudianteSegundoApellido: finalEstSegundoApellido,
         NombreEstudiante: nombreEst,
         ApellidoEstudiante: apellidoEst,
         FechaNacimiento: fechaNac,
@@ -211,6 +257,9 @@ const editModal = ({
         PadreTelefono: finalPadreTelefono,
         PadreEmail: finalPadreEmail,
         PadreOcupacion: finalPadreOcupacion,
+        PadreLugarTrabajo: finalPadreLugarTrabajo,
+        PadreDireccionTrabajo: finalPadreDireccionTrabajo,
+        PadreTelefonoTrabajo: finalPadreTelefonoTrabajo,
         MadrePrimerNombre: finalMadrePrimerNombre,
         MadreSegundoNombre: finalMadreSegundoNombre,
         MadrePrimerApellido: finalMadrePrimerApellido,
@@ -221,6 +270,9 @@ const editModal = ({
         MadreTelefono: finalMadreTelefono,
         MadreEmail: finalMadreEmail,
         MadreOcupacion: finalMadreOcupacion,
+        MadreLugarTrabajo: finalMadreLugarTrabajo,
+        MadreDireccionTrabajo: finalMadreDireccionTrabajo,
+        MadreTelefonoTrabajo: finalMadreTelefonoTrabajo,
         RepresentantePrimerNombre: repParts.first1,
         RepresentanteSegundoNombre: repParts.first2,
         RepresentantePrimerApellido: repParts.last1,
@@ -231,6 +283,9 @@ const editModal = ({
         RepresentanteTelefono: repTelefono,
         RepresentanteEmail: repEmail,
         RepresentanteOcupacion: repOcupacion,
+        RepresentanteLugarTrabajo: finalRepLugarTrabajo,
+        RepresentanteDireccionTrabajo: finalRepDireccionTrabajo,
+        RepresentanteTelefonoTrabajo: finalRepTelefonoTrabajo,
         RepresentanteParentesco: repParentesco
       })
       setActiveTab(0)
@@ -329,6 +384,9 @@ const editModal = ({
         if (name === 'RepresentanteTelefono') updated.MadreTelefono = cleanValue
         if (name === 'RepresentanteEmail') updated.MadreEmail = cleanValue
         if (name === 'RepresentanteOcupacion') updated.MadreOcupacion = cleanValue
+        if (name === 'RepresentanteLugarTrabajo') updated.MadreLugarTrabajo = cleanValue
+        if (name === 'RepresentanteDireccionTrabajo') updated.MadreDireccionTrabajo = cleanValue
+        if (name === 'RepresentanteTelefonoTrabajo') updated.MadreTelefonoTrabajo = cleanValue
 
         if (name === 'MadrePrimerNombre') updated.RepresentantePrimerNombre = cleanValue
         if (name === 'MadreSegundoNombre') updated.RepresentanteSegundoNombre = cleanValue
@@ -338,6 +396,9 @@ const editModal = ({
         if (name === 'MadreTelefono') updated.RepresentanteTelefono = cleanValue
         if (name === 'MadreEmail') updated.RepresentanteEmail = cleanValue
         if (name === 'MadreOcupacion') updated.RepresentanteOcupacion = cleanValue
+        if (name === 'MadreLugarTrabajo') updated.RepresentanteLugarTrabajo = cleanValue
+        if (name === 'MadreDireccionTrabajo') updated.RepresentanteDireccionTrabajo = cleanValue
+        if (name === 'MadreTelefonoTrabajo') updated.RepresentanteTelefonoTrabajo = cleanValue
 
         updated.MadreNombre = `${updated.MadrePrimerNombre || ''} ${updated.MadreSegundoNombre || ''}`.trim()
         updated.MadreApellido = `${updated.MadrePrimerApellido || ''} ${updated.MadreSegundoApellido || ''}`.trim()
@@ -353,6 +414,9 @@ const editModal = ({
         if (name === 'RepresentanteTelefono') updated.PadreTelefono = cleanValue
         if (name === 'RepresentanteEmail') updated.PadreEmail = cleanValue
         if (name === 'RepresentanteOcupacion') updated.PadreOcupacion = cleanValue
+        if (name === 'RepresentanteLugarTrabajo') updated.PadreLugarTrabajo = cleanValue
+        if (name === 'RepresentanteDireccionTrabajo') updated.PadreDireccionTrabajo = cleanValue
+        if (name === 'RepresentanteTelefonoTrabajo') updated.PadreTelefonoTrabajo = cleanValue
 
         if (name === 'PadrePrimerNombre') updated.RepresentantePrimerNombre = cleanValue
         if (name === 'PadreSegundoNombre') updated.RepresentanteSegundoNombre = cleanValue
@@ -362,6 +426,9 @@ const editModal = ({
         if (name === 'PadreTelefono') updated.RepresentanteTelefono = cleanValue
         if (name === 'PadreEmail') updated.RepresentanteEmail = cleanValue
         if (name === 'PadreOcupacion') updated.RepresentanteOcupacion = cleanValue
+        if (name === 'PadreLugarTrabajo') updated.RepresentanteLugarTrabajo = cleanValue
+        if (name === 'PadreDireccionTrabajo') updated.RepresentanteDireccionTrabajo = cleanValue
+        if (name === 'PadreTelefonoTrabajo') updated.RepresentanteTelefonoTrabajo = cleanValue
 
         updated.PadreNombre = `${updated.PadrePrimerNombre || ''} ${updated.PadreSegundoNombre || ''}`.trim()
         updated.PadreApellido = `${updated.PadrePrimerApellido || ''} ${updated.PadreSegundoApellido || ''}`.trim()
@@ -466,8 +533,16 @@ const editModal = ({
           (formData.PadreCedula && String(formData.PadreCedula).trim()) || '';
 
         const telefonoFinal = formData.RepresentanteTelefono || (isMadre ? formData.MadreTelefono : (isPadre ? formData.PadreTelefono : null)) || formData.MadreTelefono || formData.PadreTelefono || '';
-        const emailFinal = formData.RepresentanteEmail || (isMadre ? formData.MadreEmail : (isPadre ? formData.PadreEmail : null)) || formData.MadreEmail || formData.PadreEmail || '';
-        const ocupacionFinal = formData.RepresentanteOcupacion || (isMadre ? formData.MadreOcupacion : (isPadre ? formData.PadreOcupacion : null)) || formData.MadreOcupacion || formData.PadreOcupacion || '';
+        const emailFinal = isMadre
+          ? (formData.MadreEmail || formData.RepresentanteEmail || '')
+          : (isPadre
+              ? (formData.PadreEmail || formData.RepresentanteEmail || '')
+              : (formData.RepresentanteEmail || ''));
+        const ocupacionFinal = isMadre
+          ? (formData.MadreOcupacion || formData.RepresentanteOcupacion || '')
+          : (isPadre
+              ? (formData.PadreOcupacion || formData.RepresentanteOcupacion || '')
+              : (formData.RepresentanteOcupacion || ''));
 
         const padreNombreCompleto = `${formData.PadrePrimerNombre || ''} ${formData.PadreSegundoNombre || ''}`.trim() || (formData.PadreNombre || '').trim()
         const padreApellidoCompleto = `${formData.PadrePrimerApellido || ''} ${formData.PadreSegundoApellido || ''}`.trim() || (formData.PadreApellido || '').trim()
@@ -482,14 +557,23 @@ const editModal = ({
           ...formData,
           nombre: capitalizeWords(nombreCompleto),
           apellido: capitalizeWords(apellidoCompleto),
-          first_name: capitalizeWords(nombreCompleto),
-          last_name: capitalizeWords(apellidoCompleto),
+          first_name: capitalizeWords(formData.EstudiantePrimerNombre || nombreCompleto),
+          middle_name: capitalizeWords(formData.EstudianteSegundoNombre || ''),
+          segundo_nombre: capitalizeWords(formData.EstudianteSegundoNombre || ''),
+          last_name: capitalizeWords(formData.EstudiantePrimerApellido || apellidoCompleto),
+          second_last_name: capitalizeWords(formData.EstudianteSegundoApellido || ''),
+          segundo_apellido: capitalizeWords(formData.EstudianteSegundoApellido || ''),
           NombreEstudiante: capitalizeWords(nombreCompleto),
           ApellidoEstudiante: capitalizeWords(apellidoCompleto),
           EstudiantePrimerNombre: capitalizeWords(formData.EstudiantePrimerNombre),
           EstudianteSegundoNombre: capitalizeWords(formData.EstudianteSegundoNombre),
           EstudiantePrimerApellido: capitalizeWords(formData.EstudiantePrimerApellido),
           EstudianteSegundoApellido: capitalizeWords(formData.EstudianteSegundoApellido),
+          Grado: formData.Grado,
+          grado: formData.Grado,
+          dance_level: formData.Grado,
+          dance_level_name: formData.Grado,
+          grade_level: formData.Grado,
           fecha_nacimiento: formData.FechaNacimiento,
           birth_date: formData.FechaNacimiento,
           genero: formData.Sexo,
@@ -532,12 +616,30 @@ const editModal = ({
           PadreTelefono: isPadre ? telefonoFinal : formData.PadreTelefono,
           RepresentanteEmail: emailFinal,
           representative_email: emailFinal,
-          MadreEmail: isMadre ? emailFinal : formData.MadreEmail,
-          PadreEmail: isPadre ? emailFinal : formData.PadreEmail,
+          MadreEmail: isMadre ? emailFinal : (formData.MadreEmail || ''),
+          PadreEmail: isPadre ? emailFinal : (formData.PadreEmail || ''),
           RepresentanteOcupacion: ocupacionFinal,
           representative_occupation: ocupacionFinal,
-          MadreOcupacion: isMadre ? ocupacionFinal : formData.MadreOcupacion,
-          PadreOcupacion: isPadre ? ocupacionFinal : formData.PadreOcupacion,
+          MadreOcupacion: isMadre ? ocupacionFinal : (formData.MadreOcupacion || ''),
+          PadreOcupacion: isPadre ? ocupacionFinal : (formData.PadreOcupacion || ''),
+          RepresentanteLugarTrabajo: isMadre ? (formData.MadreLugarTrabajo || formData.RepresentanteLugarTrabajo || '') : (isPadre ? (formData.PadreLugarTrabajo || formData.RepresentanteLugarTrabajo || '') : (formData.RepresentanteLugarTrabajo || '')),
+          RepresentanteDireccionTrabajo: isMadre ? (formData.MadreDireccionTrabajo || formData.RepresentanteDireccionTrabajo || '') : (isPadre ? (formData.PadreDireccionTrabajo || formData.RepresentanteDireccionTrabajo || '') : (formData.RepresentanteDireccionTrabajo || '')),
+          RepresentanteTelefonoTrabajo: isMadre ? (formData.MadreTelefonoTrabajo || formData.RepresentanteTelefonoTrabajo || '') : (isPadre ? (formData.PadreTelefonoTrabajo || formData.RepresentanteTelefonoTrabajo || '') : (formData.RepresentanteTelefonoTrabajo || '')),
+          MadreLugarTrabajo: isMadre ? (formData.RepresentanteLugarTrabajo || formData.MadreLugarTrabajo || '') : (formData.MadreLugarTrabajo || ''),
+          MadreDireccionTrabajo: isMadre ? (formData.RepresentanteDireccionTrabajo || formData.MadreDireccionTrabajo || '') : (formData.MadreDireccionTrabajo || ''),
+          MadreTelefonoTrabajo: isMadre ? (formData.RepresentanteTelefonoTrabajo || formData.MadreTelefonoTrabajo || '') : (formData.MadreTelefonoTrabajo || ''),
+          PadreLugarTrabajo: isPadre ? (formData.RepresentanteLugarTrabajo || formData.PadreLugarTrabajo || '') : (formData.PadreLugarTrabajo || ''),
+          PadreDireccionTrabajo: isPadre ? (formData.RepresentanteDireccionTrabajo || formData.PadreDireccionTrabajo || '') : (formData.PadreDireccionTrabajo || ''),
+          PadreTelefonoTrabajo: isPadre ? (formData.RepresentanteTelefonoTrabajo || formData.PadreTelefonoTrabajo || '') : (formData.PadreTelefonoTrabajo || ''),
+          trabajo_Madre: isMadre ? (formData.RepresentanteLugarTrabajo || formData.MadreLugarTrabajo || '') : (formData.MadreLugarTrabajo || ''),
+          direccion_Trabajo_Madre: isMadre ? (formData.RepresentanteDireccionTrabajo || formData.MadreDireccionTrabajo || '') : (formData.MadreDireccionTrabajo || ''),
+          telefono_trabajo_Madre: isMadre ? (formData.RepresentanteTelefonoTrabajo || formData.MadreTelefonoTrabajo || '') : (formData.MadreTelefonoTrabajo || ''),
+          trabajo_Padre: isPadre ? (formData.RepresentanteLugarTrabajo || formData.PadreLugarTrabajo || '') : (formData.PadreLugarTrabajo || ''),
+          direccion_Trabajo_Padre: isPadre ? (formData.RepresentanteDireccionTrabajo || formData.PadreDireccionTrabajo || '') : (formData.PadreDireccionTrabajo || ''),
+          telefono_trabajo_Padre: isPadre ? (formData.RepresentanteTelefonoTrabajo || formData.PadreTelefonoTrabajo || '') : (formData.PadreTelefonoTrabajo || ''),
+          trabajo_Rep: isMadre ? (formData.MadreLugarTrabajo || formData.RepresentanteLugarTrabajo || '') : (isPadre ? (formData.PadreLugarTrabajo || formData.RepresentanteLugarTrabajo || '') : (formData.RepresentanteLugarTrabajo || '')),
+          direccion_Trabajo_Rep: isMadre ? (formData.MadreDireccionTrabajo || formData.RepresentanteDireccionTrabajo || '') : (isPadre ? (formData.PadreDireccionTrabajo || formData.RepresentanteDireccionTrabajo || '') : (formData.RepresentanteDireccionTrabajo || '')),
+          telefono_trabajo_Rep: isMadre ? (formData.MadreTelefonoTrabajo || formData.RepresentanteTelefonoTrabajo || '') : (isPadre ? (formData.PadreTelefonoTrabajo || formData.RepresentanteTelefonoTrabajo || '') : (formData.RepresentanteTelefonoTrabajo || '')),
           RepresentanteParentesco: isMadre ? 'Madre' : (isPadre ? 'Padre' : (formData.RepresentanteParentesco || 'Madre')),
           parentesco: isMadre ? 'Madre' : (isPadre ? 'Padre' : (formData.RepresentanteParentesco || 'Madre')),
         };

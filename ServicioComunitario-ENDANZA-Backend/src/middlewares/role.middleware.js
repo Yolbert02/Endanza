@@ -4,9 +4,9 @@
 export const roleMap = {
   1: 'admin',
   2: 'docente',
-  3: 'estudiante',
+  3: 'secretaria',
   4: 'representante',
-  5: 'secretaria'
+  5: 'estudiante'
 };
 
 // Configuración de permisos por ruta

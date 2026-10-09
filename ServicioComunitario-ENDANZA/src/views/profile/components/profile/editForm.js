@@ -113,6 +113,33 @@ const editForm = ({ formData, onInputChange, activeTab, errors = {} }) => {
     { value: "Retirado", label: "Retirado" }
   ]
 
+  const baseGradoOptions = [
+    { value: "", label: "Seleccionar grado..." },
+    { value: "Pre-Ballet", label: "Pre-Ballet" },
+    { value: "Preparatorio", label: "Preparatorio" },
+    { value: "1er Grado", label: "1er Grado" },
+    { value: "2do Grado", label: "2do Grado" },
+    { value: "3er Grado", label: "3er Grado" },
+    { value: "4to Grado", label: "4to Grado" },
+    { value: "5to Grado - Danza Clásica", label: "5to Grado - Danza Clásica" },
+    { value: "6to Grado - Danza Clásica", label: "6to Grado - Danza Clásica" },
+    { value: "7mo Grado - Danza Clásica", label: "7mo Grado - Danza Clásica" },
+    { value: "8vo Grado - Danza Clásica", label: "8vo Grado - Danza Clásica" },
+    { value: "5to Grado - Danza Tradicional", label: "5to Grado - Danza Tradicional" },
+    { value: "6to Grado - Danza Tradicional", label: "6to Grado - Danza Tradicional" },
+    { value: "7mo Grado - Danza Tradicional", label: "7mo Grado - Danza Tradicional" },
+    { value: "8vo Grado - Danza Tradicional", label: "8vo Grado - Danza Tradicional" },
+    { value: "5to Grado - Danza Contemporánea", label: "5to Grado - Danza Contemporánea" },
+    { value: "6to Grado - Danza Contemporánea", label: "6to Grado - Danza Contemporánea" },
+    { value: "7mo Grado - Danza Contemporánea", label: "7mo Grado - Danza Contemporánea" },
+    { value: "8vo Grado - Danza Contemporánea", label: "8vo Grado - Danza Contemporánea" }
+  ]
+
+  const gradoOptions = [...baseGradoOptions]
+  if (formData.Grado && !baseGradoOptions.some(o => o.value.toLowerCase() === String(formData.Grado).toLowerCase())) {
+    gradoOptions.splice(1, 0, { value: formData.Grado, label: formData.Grado })
+  }
+
   return (
     <CForm className="animate__animated animate__fadeIn">
       {/* SECCIÓN 0: DATOS PERSONALES */}
@@ -224,11 +251,11 @@ const editForm = ({ formData, onInputChange, activeTab, errors = {} }) => {
             </CCol>
             <CCol md={3}>
               <CFormLabel className="fw-bold">Grado</CFormLabel>
-              <CFormInput
-                type="text"
+              <CFormSelect
                 name="Grado"
                 value={formData.Grado || ""}
                 onChange={onInputChange}
+                options={gradoOptions}
                 className="input-premium h-auto py-2"
               />
             </CCol>
@@ -417,6 +444,41 @@ const editForm = ({ formData, onInputChange, activeTab, errors = {} }) => {
               />
             </CCol>
           </CRow>
+          <CRow className="mb-3">
+            <CCol md={4}>
+              <CFormLabel className="fw-bold">Lugar de Trabajo</CFormLabel>
+              <CFormInput
+                type="text"
+                name="PadreLugarTrabajo"
+                value={formData.PadreLugarTrabajo || ""}
+                onChange={onInputChange}
+                placeholder="Empresa o institución"
+                className="input-premium h-auto py-2"
+              />
+            </CCol>
+            <CCol md={4}>
+              <CFormLabel className="fw-bold">Dirección del Trabajo</CFormLabel>
+              <CFormInput
+                type="text"
+                name="PadreDireccionTrabajo"
+                value={formData.PadreDireccionTrabajo || ""}
+                onChange={onInputChange}
+                placeholder="Dirección laboral"
+                className="input-premium h-auto py-2"
+              />
+            </CCol>
+            <CCol md={4}>
+              <CFormLabel className="fw-bold">Teléfono del Trabajo</CFormLabel>
+              <CFormInput
+                type="text"
+                name="PadreTelefonoTrabajo"
+                value={formData.PadreTelefonoTrabajo || ""}
+                onChange={onInputChange}
+                placeholder="Teléfono laboral"
+                className="input-premium h-auto py-2"
+              />
+            </CCol>
+          </CRow>
         </>
       )}
 
@@ -523,6 +585,41 @@ const editForm = ({ formData, onInputChange, activeTab, errors = {} }) => {
               />
             </CCol>
           </CRow>
+          <CRow className="mb-3">
+            <CCol md={4}>
+              <CFormLabel className="fw-bold">Lugar de Trabajo</CFormLabel>
+              <CFormInput
+                type="text"
+                name="MadreLugarTrabajo"
+                value={formData.MadreLugarTrabajo || ""}
+                onChange={onInputChange}
+                placeholder="Empresa o institución"
+                className="input-premium h-auto py-2"
+              />
+            </CCol>
+            <CCol md={4}>
+              <CFormLabel className="fw-bold">Dirección del Trabajo</CFormLabel>
+              <CFormInput
+                type="text"
+                name="MadreDireccionTrabajo"
+                value={formData.MadreDireccionTrabajo || ""}
+                onChange={onInputChange}
+                placeholder="Dirección laboral"
+                className="input-premium h-auto py-2"
+              />
+            </CCol>
+            <CCol md={4}>
+              <CFormLabel className="fw-bold">Teléfono del Trabajo</CFormLabel>
+              <CFormInput
+                type="text"
+                name="MadreTelefonoTrabajo"
+                value={formData.MadreTelefonoTrabajo || ""}
+                onChange={onInputChange}
+                placeholder="Teléfono laboral"
+                className="input-premium h-auto py-2"
+              />
+            </CCol>
+          </CRow>
         </>
       )}
 
@@ -554,6 +651,9 @@ const editForm = ({ formData, onInputChange, activeTab, errors = {} }) => {
                     const tel = formData.MadreTelefono || formData.RepresentanteTelefono || "";
                     const ema = formData.MadreEmail || formData.RepresentanteEmail || "";
                     const ocu = formData.MadreOcupacion || formData.RepresentanteOcupacion || "";
+                    const lug = formData.MadreLugarTrabajo || formData.RepresentanteLugarTrabajo || "";
+                    const dirT = formData.MadreDireccionTrabajo || formData.RepresentanteDireccionTrabajo || "";
+                    const telT = formData.MadreTelefonoTrabajo || formData.RepresentanteTelefonoTrabajo || "";
                     const fullN = `${fn1} ${fn2}`.trim();
                     const fullL = `${ln1} ${ln2}`.trim();
 
@@ -577,6 +677,12 @@ const editForm = ({ formData, onInputChange, activeTab, errors = {} }) => {
                     updatedData.MadreEmail = ema;
                     updatedData.RepresentanteOcupacion = ocu;
                     updatedData.MadreOcupacion = ocu;
+                    updatedData.RepresentanteLugarTrabajo = lug;
+                    updatedData.MadreLugarTrabajo = lug;
+                    updatedData.RepresentanteDireccionTrabajo = dirT;
+                    updatedData.MadreDireccionTrabajo = dirT;
+                    updatedData.RepresentanteTelefonoTrabajo = telT;
+                    updatedData.MadreTelefonoTrabajo = telT;
                   } else if (selection === "Padre") {
                     updatedData.RepresentanteParentesco = "Padre";
                     const fn1 = formData.PadrePrimerNombre || formData.RepresentantePrimerNombre || "";
@@ -587,6 +693,9 @@ const editForm = ({ formData, onInputChange, activeTab, errors = {} }) => {
                     const tel = formData.PadreTelefono || formData.RepresentanteTelefono || "";
                     const ema = formData.PadreEmail || formData.RepresentanteEmail || "";
                     const ocu = formData.PadreOcupacion || formData.RepresentanteOcupacion || "";
+                    const lug = formData.PadreLugarTrabajo || formData.RepresentanteLugarTrabajo || "";
+                    const dirT = formData.PadreDireccionTrabajo || formData.RepresentanteDireccionTrabajo || "";
+                    const telT = formData.PadreTelefonoTrabajo || formData.RepresentanteTelefonoTrabajo || "";
                     const fullN = `${fn1} ${fn2}`.trim();
                     const fullL = `${ln1} ${ln2}`.trim();
 
@@ -610,6 +719,12 @@ const editForm = ({ formData, onInputChange, activeTab, errors = {} }) => {
                     updatedData.PadreEmail = ema;
                     updatedData.RepresentanteOcupacion = ocu;
                     updatedData.PadreOcupacion = ocu;
+                    updatedData.RepresentanteLugarTrabajo = lug;
+                    updatedData.PadreLugarTrabajo = lug;
+                    updatedData.RepresentanteDireccionTrabajo = dirT;
+                    updatedData.PadreDireccionTrabajo = dirT;
+                    updatedData.RepresentanteTelefonoTrabajo = telT;
+                    updatedData.PadreTelefonoTrabajo = telT;
                   } else if (selection === "Otro") {
                     updatedData.RepresentanteParentesco = "OTRO_VALOR"; // Flag para mostrar input
                   } else {
@@ -743,6 +858,42 @@ const editForm = ({ formData, onInputChange, activeTab, errors = {} }) => {
                 value={formData.RepresentanteEmail || ""}
                 onChange={onInputChange}
                 placeholder="correo@ejemplo.com"
+                className="input-premium h-auto py-2"
+              />
+            </CCol>
+          </CRow>
+
+          <CRow className="mb-3">
+            <CCol md={4}>
+              <CFormLabel className="fw-bold">Lugar de Trabajo</CFormLabel>
+              <CFormInput
+                type="text"
+                name="RepresentanteLugarTrabajo"
+                value={formData.RepresentanteLugarTrabajo || ""}
+                onChange={onInputChange}
+                placeholder="Empresa o institución"
+                className="input-premium h-auto py-2"
+              />
+            </CCol>
+            <CCol md={4}>
+              <CFormLabel className="fw-bold">Dirección del Trabajo</CFormLabel>
+              <CFormInput
+                type="text"
+                name="RepresentanteDireccionTrabajo"
+                value={formData.RepresentanteDireccionTrabajo || ""}
+                onChange={onInputChange}
+                placeholder="Dirección laboral"
+                className="input-premium h-auto py-2"
+              />
+            </CCol>
+            <CCol md={4}>
+              <CFormLabel className="fw-bold">Teléfono del Trabajo</CFormLabel>
+              <CFormInput
+                type="text"
+                name="RepresentanteTelefonoTrabajo"
+                value={formData.RepresentanteTelefonoTrabajo || ""}
+                onChange={onInputChange}
+                placeholder="Teléfono laboral"
                 className="input-premium h-auto py-2"
               />
             </CCol>

@@ -9,138 +9,135 @@ const findAll = async (academicYearId = null) => {
         let query;
         
         if (academicYearId) {
-            // Filtrar por año académico
             query = {
                 text: `
                     SELECT 
-                        u."Id_usuario" as id,
-                        u."cedula" as dni,
-                        u."nombre" as first_name,
-                        u."apellido" as last_name,
-                        u."correo" as email,
-                        u."telefono" as phone,
-                        u."estatus_usuario" as status,
-                        u."creado_en" as created_at,
-                        COALESCE(p."Id_profesor", NULL) as teacher_id,
-                        -- ✅ ESPECIALIDAD DEL AÑO ACTUAL (para el badge)
-                        (
-                            SELECT e."nombre_especialidad"
-                            FROM "Profesor_Especialidad" pe
-                            JOIN "Especialidad" e ON pe."Id_especialidad" = e."Id_especialidad"
-                            WHERE pe."Id_profesor" = p."Id_profesor"
-                              AND pe."Id_ano" = $1
-                              AND pe."activo" = true
-                            LIMIT 1
+                        u.id_usuario as id,
+                        p.cedula as dni,
+                        p.nombre as first_name,
+                        p.apellido as last_name,
+                        p.email as email,
+                        p.numero_telefono as phone,
+                        u.estado_usuario as status,
+                        u.created_at as created_at,
+                        d.id_docente as teacher_id,
+                        COALESCE(
+                            (
+                                SELECT esp.nombre_especialidad
+                                FROM horario hor
+                                JOIN seccion sec ON hor.id_seccion = sec.id_seccion
+                                JOIN especialidad esp ON sec.id_especialidad = esp.id_especialidad
+                                WHERE hor.id_docente = d.id_docente
+                                  AND sec.id_ano = $1
+                                LIMIT 1
+                            ),
+                            'Danza Clásica'
                         ) as specialty,
-                        -- ✅ TODAS LAS ESPECIALIDADES CON SU AÑO
                         COALESCE(
                             (
-                                SELECT json_agg(
-                                    json_build_object(
-                                        'id', e."Id_especialidad",
-                                        'name', e."nombre_especialidad",
-                                        'area', e."area",
-                                        'academicYearId', pe."Id_ano"
+                                SELECT jsonb_agg(DISTINCT
+                                    jsonb_build_object(
+                                        'id', esp.id_especialidad,
+                                        'name', esp.nombre_especialidad,
+                                        'area', esp.nombre_especialidad,
+                                        'academicYearId', sec.id_ano
                                     )
                                 )
-                                FROM "Profesor_Especialidad" pe
-                                JOIN "Especialidad" e ON pe."Id_especialidad" = e."Id_especialidad"
-                                WHERE pe."Id_profesor" = p."Id_profesor"
-                                  AND pe."Id_ano" = $1
-                                  AND pe."activo" = true
+                                FROM horario hor
+                                JOIN seccion sec ON hor.id_seccion = sec.id_seccion
+                                JOIN especialidad esp ON sec.id_especialidad = esp.id_especialidad
+                                WHERE hor.id_docente = d.id_docente
+                                  AND sec.id_ano = $1
                             ),
-                            '[]'::json
+                            '[]'::jsonb
                         ) as specialties,
-                        -- ✅ GRADOS DEL AÑO ACTUAL
                         COALESCE(
                             (
-                                SELECT json_agg(
-                                    json_build_object(
-                                        'id', g."Id_grado",
-                                        'name', g."nombre_grado",
-                                        'level', g."nivel",
-                                        'academicYearId', pg."Id_ano"
+                                SELECT jsonb_agg(DISTINCT
+                                    jsonb_build_object(
+                                        'id', nd.id_nivel_danza,
+                                        'name', nd.nivel_danza,
+                                        'level', nd.nivel_danza,
+                                        'academicYearId', sec.id_ano
                                     )
                                 )
-                                FROM "Profesor_Grado" pg
-                                JOIN "Grado" g ON pg."Id_grado" = g."Id_grado"
-                                WHERE pg."Id_profesor" = p."Id_profesor"
-                                  AND pg."Id_ano" = $1
-                                  AND pg."activo" = true
+                                FROM horario hor
+                                JOIN seccion sec ON hor.id_seccion = sec.id_seccion
+                                JOIN nivel_danza nd ON sec.id_nivel_danza = nd.id_nivel_danza
+                                WHERE hor.id_docente = d.id_docente
+                                  AND sec.id_ano = $1
                             ),
-                            '[]'::json
+                            '[]'::jsonb
                         ) as grades
-                    FROM "Usuario" u
-                    LEFT JOIN "Profesor" p ON u."Id_usuario" = p."Id_usuario"
-                    WHERE u."Id_rol" = 2
-                    ORDER BY u."creado_en" DESC
+                    FROM docente d
+                    JOIN usuario u ON d.id_usuario = u.id_usuario
+                    JOIN persona p ON u.id_persona = p.id_persona
+                    ORDER BY u.created_at DESC
                 `,
                 values: [academicYearId]
             };
         } else {
-            // Sin filtro de año - traer TODAS las especialidades y grados
             query = {
                 text: `
                     SELECT 
-                        u."Id_usuario" as id,
-                        u."cedula" as dni,
-                        u."nombre" as first_name,
-                        u."apellido" as last_name,
-                        u."correo" as email,
-                        u."telefono" as phone,
-                        u."estatus_usuario" as status,
-                        u."creado_en" as created_at,
-                        COALESCE(p."Id_profesor", NULL) as teacher_id,
-                        -- Para compatibilidad, traer la especialidad más reciente
-                        (
-                            SELECT e."nombre_especialidad"
-                            FROM "Profesor_Especialidad" pe
-                            JOIN "Especialidad" e ON pe."Id_especialidad" = e."Id_especialidad"
-                            WHERE pe."Id_profesor" = p."Id_profesor"
-                              AND pe."activo" = true
-                            ORDER BY pe."Id_ano" DESC
-                            LIMIT 1
+                        u.id_usuario as id,
+                        p.cedula as dni,
+                        p.nombre as first_name,
+                        p.apellido as last_name,
+                        p.email as email,
+                        p.numero_telefono as phone,
+                        u.estado_usuario as status,
+                        u.created_at as created_at,
+                        d.id_docente as teacher_id,
+                        COALESCE(
+                            (
+                                SELECT esp.nombre_especialidad
+                                FROM horario hor
+                                JOIN seccion sec ON hor.id_seccion = sec.id_seccion
+                                JOIN especialidad esp ON sec.id_especialidad = esp.id_especialidad
+                                WHERE hor.id_docente = d.id_docente
+                                LIMIT 1
+                            ),
+                            'Danza Clásica'
                         ) as specialty,
-                        -- ✅ TODAS LAS ESPECIALIDADES
                         COALESCE(
                             (
-                                SELECT json_agg(
-                                    json_build_object(
-                                        'id', e."Id_especialidad",
-                                        'name', e."nombre_especialidad",
-                                        'area', e."area",
-                                        'academicYearId', pe."Id_ano"
+                                SELECT jsonb_agg(DISTINCT
+                                    jsonb_build_object(
+                                        'id', esp.id_especialidad,
+                                        'name', esp.nombre_especialidad,
+                                        'area', esp.nombre_especialidad,
+                                        'academicYearId', sec.id_ano
                                     )
                                 )
-                                FROM "Profesor_Especialidad" pe
-                                JOIN "Especialidad" e ON pe."Id_especialidad" = e."Id_especialidad"
-                                WHERE pe."Id_profesor" = p."Id_profesor"
-                                  AND pe."activo" = true
+                                FROM horario hor
+                                JOIN seccion sec ON hor.id_seccion = sec.id_seccion
+                                JOIN especialidad esp ON sec.id_especialidad = esp.id_especialidad
+                                WHERE hor.id_docente = d.id_docente
                             ),
-                            '[]'::json
+                            '[]'::jsonb
                         ) as specialties,
-                        -- ✅ TODOS LOS GRADOS
                         COALESCE(
                             (
-                                SELECT json_agg(
-                                    json_build_object(
-                                        'id', g."Id_grado",
-                                        'name', g."nombre_grado",
-                                        'level', g."nivel",
-                                        'academicYearId', pg."Id_ano"
+                                SELECT jsonb_agg(DISTINCT
+                                    jsonb_build_object(
+                                        'id', nd.id_nivel_danza,
+                                        'name', nd.nivel_danza,
+                                        'level', nd.nivel_danza,
+                                        'academicYearId', sec.id_ano
                                     )
                                 )
-                                FROM "Profesor_Grado" pg
-                                JOIN "Grado" g ON pg."Id_grado" = g."Id_grado"
-                                WHERE pg."Id_profesor" = p."Id_profesor"
-                                  AND pg."activo" = true
+                                FROM horario hor
+                                JOIN seccion sec ON hor.id_seccion = sec.id_seccion
+                                JOIN nivel_danza nd ON sec.id_nivel_danza = nd.id_nivel_danza
+                                WHERE hor.id_docente = d.id_docente
                             ),
-                            '[]'::json
+                            '[]'::jsonb
                         ) as grades
-                    FROM "Usuario" u
-                    LEFT JOIN "Profesor" p ON u."Id_usuario" = p."Id_usuario"
-                    WHERE u."Id_rol" = 2
-                    ORDER BY u."creado_en" DESC
+                    FROM docente d
+                    JOIN usuario u ON d.id_usuario = u.id_usuario
+                    JOIN persona p ON u.id_persona = p.id_persona
+                    ORDER BY u.created_at DESC
                 `
             };
         }
@@ -707,12 +704,11 @@ const getAllGrades = async () => {
         const query = {
             text: `
                 SELECT 
-                    "Id_grado" as id,
-                    "nombre_grado" as name,
-                    "nivel" as level
-                FROM "Grado"
-                WHERE activo = true
-                ORDER BY "Id_grado"
+                    id_nivel_danza as id,
+                    nivel_danza as name,
+                    nivel_danza as level
+                FROM nivel_danza
+                ORDER BY id_nivel_danza
             `
         };
         

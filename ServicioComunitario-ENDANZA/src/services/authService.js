@@ -16,18 +16,18 @@ export const authService = {
       if (data.accessToken && data.user) {
         console.log('✅ [3] Token válido detectado, guardando...')
         
-        // ✅ MAPEO CORRECTO DE ROLES USANDO Id_rol
+        // ✅ MAPEO CORRECTO DE ROLES USANDO Id_rol (NewEndanza)
         const roleMap = {
           1: 'admin',
           2: 'docente',
-          3: 'estudiante',
+          3: 'secretaria',
           4: 'representante',
-          5: 'secretaria'
+          5: 'estudiante'
         }
         
-        // ✅ Obtener el rol del Id_rol
+        // ✅ Obtener el rol del usuario o de Id_rol
         const roleId = data.user.Id_rol
-        let roleName = roleMap[roleId] || 'estudiante'
+        let roleName = data.user.rol || roleMap[roleId] || 'estudiante'
         if (roleId === 1 || data.user.username === 'superroot' || data.user.email === 'superroot@gmail.com') {
           roleName = 'superadmin'
         }

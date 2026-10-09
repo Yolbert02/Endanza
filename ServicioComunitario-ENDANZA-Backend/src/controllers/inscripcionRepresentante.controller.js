@@ -64,14 +64,19 @@ export const InscripcionRepresentanteController = {
         });
       }
 
-      // 2. Verificar que el usuario es representante (soporte rol dual)
-      const representante = await resolveRepresentanteFromReq(req);
+      // 2. Verificar que el usuario es representante (soporte rol dual o admin)
+      const isAdmin = req.user?.roles?.includes('admin') || req.user?.roles?.includes('administrador') || req.user?.role === 'admin' || req.user?.Id_rol === 1 || req.user?.id_rol === 1;
 
-      if (!representante) {
-        return res.status(403).json({
-          ok: false,
-          msg: "No tienes permisos para realizar esta acción"
-        });
+      let representante = null;
+      if (!isAdmin) {
+        representante = await resolveRepresentanteFromReq(req);
+
+        if (!representante) {
+          return res.status(403).json({
+            ok: false,
+            msg: "No tienes permisos para realizar esta acción"
+          });
+        }
       }
 
       // 3. Verificar que el estudiante pertenece al representante
@@ -84,20 +89,24 @@ export const InscripcionRepresentanteController = {
         });
       }
 
-      if (!checkStudentOwnership(student, representante, userId)) {
+      if (!isAdmin && !checkStudentOwnership(student, representante, userId)) {
         return res.status(403).json({
           ok: false,
           msg: "No tienes permiso para inscribir este estudiante"
         });
       }
 
+      if (!representante && student.representative_id) {
+        representante = await RepresentanteModel.findById(student.representative_id);
+      }
+
       // 3.1 Validación de inscripción única previa (antes de iniciar la transacción)
       const checkPreviaQuery = {
         text: `
-          SELECT es."Id_estudiante_seccion", s."Id_seccion", s."nombre_seccion"
-          FROM "Estudiante_Seccion" es
-          JOIN "Seccion" s ON es."Id_seccion" = s."Id_seccion"
-          WHERE es."Id_estudiante" = $1 AND s."Id_ano" = $2
+          SELECT i.id_inscripcion, s.id_seccion, s.nombre_seccion
+          FROM inscripcion i
+          JOIN seccion s ON i.id_seccion = s.id_seccion
+          WHERE i.id_estudiante = $1 AND i.id_ano = $2
           LIMIT 1
         `,
         values: [id_estudiante, id_ano_academico]
@@ -111,7 +120,7 @@ export const InscripcionRepresentanteController = {
           msg: `El estudiante ya se encuentra inscrito en este período escolar (Sección: ${inscripcionPrevia.rows[0].nombre_seccion || 'Asignada'}).`,
           yaInscrito: true,
           data: {
-            id_seccion: inscripcionPrevia.rows[0].Id_seccion,
+            id_seccion: inscripcionPrevia.rows[0].id_seccion,
             nombre_seccion: inscripcionPrevia.rows[0].nombre_seccion
           }
         });
@@ -136,17 +145,27 @@ export const InscripcionRepresentanteController = {
 
         const peso = datos.peso && !isNaN(parseFloat(datos.peso)) ? parseFloat(datos.peso) : null;
 
-        // 5. Crear historial médico
+        // Mapear termino_nacimiento al enum válido
+        let terminoNac = null;
+        if (datos.nacimiento) {
+          const nacLower = datos.nacimiento.toLowerCase().trim();
+          if (nacLower === 'a_termino' || nacLower === 'a termino' || nacLower === 'a término') {
+            terminoNac = 'a_termino';
+          } else if (nacLower === 'prematuro') {
+            terminoNac = 'prematuro';
+          }
+        }
+
+        // 5. Crear historial médico (tabla: historial_medico en NewEndanza)
         const historialQuery = {
           text: `
-            INSERT INTO "Historial_Medico" (
-              peso_kg, altura_m, intolerancia_comida, descripcion_intolerancia,
-              dolores_frecuentes, tiene_cirugia, descripcion_cirugia,
-              control_hormonal, descripcion_hormonal, tiene_alergias,
-              descripcion_alergias, antecedentes_familiares, termino_nacimiento,
-              tipo_sangre
+            INSERT INTO historial_medico (
+              peso_kg, altura_m, intolerancia_alimentos, descripcion_intolerancia,
+              dolores_frecuentes, constipacion_frecuente, tiene_cirugia, descripcion_cirugia,
+              control_hormonal, descripcion_control_hormonal, tiene_alergias,
+              descripcion_alergias, historial_familiar_desc, termino_nacimiento
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-            RETURNING "Id_historial" as id
+            RETURNING id_historia
           `,
           values: [
             peso,
@@ -154,6 +173,7 @@ export const InscripcionRepresentanteController = {
             datos.intolerancia === "Si",
             datos.textIntolerancia || null,
             false, // dolores_frecuentes (por defecto)
+            false, // constipacion_frecuente (por defecto)
             datos.operaciones === "Si",
             datos.textOperaciones || null,
             datos.control_Hormonal === "Si",
@@ -161,75 +181,85 @@ export const InscripcionRepresentanteController = {
             datos.alergias === "Si",
             datos.textAlergia || null,
             datos.antecedentesFamiliares || null,
-            datos.nacimiento || null,
-            datos.tipo_sangre || null
+            terminoNac
           ]
         };
 
         const historialResult = await client.query(historialQuery.text, historialQuery.values);
-        const id_historial = historialResult.rows[0].id;
+        const id_historial = historialResult.rows[0].id_historia;
+        console.log("✅ Historial médico creado con ID:", id_historial);
 
-        // 6. Actualizar estudiante con los campos adicionales
-        await client.query(`
-          ALTER TABLE "Estudiante" 
-          ADD COLUMN IF NOT EXISTS "direccion" VARCHAR(255),
-          ADD COLUMN IF NOT EXISTS "telefono" VARCHAR(12),
-          ADD COLUMN IF NOT EXISTS "grado_escuela" VARCHAR(20),
-          ADD COLUMN IF NOT EXISTS "nombre_seguro" VARCHAR(100)
-        `);
-
-        // Resolver escuela
+        // 6. Resolver escuela regular
         const id_escuela = datos.escuela ? await getOrCreateEscuela(datos.escuela, client) : null;
-        const seguroEscolar = datos.Seguro_Escolar === "si" || datos.Seguro_Escolar === true;
 
-        // Actualizar estudiante
-        await client.query(
-          `UPDATE "Estudiante" SET 
-            "Id_historial" = $1,
-            "direccion" = $2,
-            "telefono" = $3,
-            "Id_escuela" = $4,
-            "grado_escuela" = $5,
-            "seguro_escolar" = $6,
-            "nombre_seguro" = $7
-           WHERE "Id_estudiante" = $8`,
-          [
-            id_historial,
-            datos.direccion_Habitacion || null,
-            datos.Telefono_Celular || datos.telefono || null,
-            id_escuela,
-            datos.Grado_Escuela || null,
-            seguroEscolar,
-            datos.nombre_Seguro || null,
-            id_estudiante
-          ]
-        );
+        // 7. Resolver seguro médico
+        const id_seguro = datos.nombre_Seguro ? await getOrCreateSeguro(datos.nombre_Seguro, client) : null;
 
-        // 7. Guardar datos de los padres
-        await guardarPadresEnTablaPadre(id_estudiante, datos, client);
-
-        // 8. Verificar si ya está inscrito en el año actual
-        const checkInscripcionQuery = {
-          text: `
-            SELECT es."Id_estudiante_seccion"
-            FROM "Estudiante_Seccion" es
-            JOIN "Seccion" s ON es."Id_seccion" = s."Id_seccion"
-            WHERE es."Id_estudiante" = $1 AND s."Id_ano" = $2
-          `,
-          values: [id_estudiante, id_ano_academico]
-        };
-
-        const inscripcionExistente = await client.query(checkInscripcionQuery.text, checkInscripcionQuery.values);
-
-        if (inscripcionExistente.rows.length > 0) {
-          await client.query('ROLLBACK');
-          return res.status(400).json({
-            ok: false,
-            msg: "El estudiante ya está inscrito en este año académico"
-          });
+        // 8. Resolver nivel escolar desde la tabla nivel_escolar
+        let id_nivel_escolar = null;
+        if (datos.Grado_Escuela) {
+          const nivelRes = await client.query(
+            'SELECT id_nivel FROM nivel_escolar WHERE LOWER(nivel) = LOWER($1) LIMIT 1',
+            [datos.Grado_Escuela.trim()]
+          );
+          if (nivelRes.rows.length > 0) {
+            id_nivel_escolar = nivelRes.rows[0].id_nivel;
+          }
         }
 
-        // 9. Determinar y vincular especialidad académica (requerida para 6to, 7mo u 8vo grado)
+        // 9. Resolver nivel de danza desde la tabla nivel_danza
+        let id_nivel_danza = null;
+        if (datos.grado) {
+          // Mapear el value del frontend al nombre en la BD (en ENDANZA son Grados, no Años)
+          const gradoMap = {
+            'pre_ballet': 'Pre-Ballet',
+            'preparatorio': 'Preparatorio',
+            '1er_grado': '1er Grado',
+            '2do_grado': '2do Grado',
+            '3er_grado': '3er Grado',
+            '4to_grado': '4to Grado',
+            '5to_grado': '5to Grado',
+            '6to_grado': '6to Grado',
+            '7mo_grado': '7mo Grado',
+            '8vo_grado': '8vo Grado'
+          };
+
+          const baseGrado = gradoMap[datos.grado] || datos.grado;
+          let gradoBuscar = baseGrado;
+
+          // Si tiene especialidad, buscar primero con el sufijo de especialidad
+          if (datos.especialidad && ['5to_grado', '6to_grado', '7mo_grado', '8vo_grado'].includes(datos.grado)) {
+            gradoBuscar = `${baseGrado} - ${datos.especialidad}`;
+          }
+
+          // 1) Búsqueda exacta (con o sin especialidad)
+          let ndRes = await client.query(
+            'SELECT id_nivel_danza FROM nivel_danza WHERE LOWER(nivel_danza) = LOWER($1) LIMIT 1',
+            [gradoBuscar]
+          );
+
+          // 2) Si no encontró y buscaba con especialidad, intentar con grado base
+          if (ndRes.rows.length === 0 && gradoBuscar !== baseGrado) {
+            ndRes = await client.query(
+              'SELECT id_nivel_danza FROM nivel_danza WHERE LOWER(nivel_danza) = LOWER($1) LIMIT 1',
+              [baseGrado]
+            );
+          }
+
+          // 3) Búsqueda parcial si aún no se encuentra
+          if (ndRes.rows.length === 0) {
+            ndRes = await client.query(
+              'SELECT id_nivel_danza FROM nivel_danza WHERE LOWER(nivel_danza) LIKE LOWER($1) LIMIT 1',
+              [`%${baseGrado}%`]
+            );
+          }
+
+          if (ndRes.rows.length > 0) {
+            id_nivel_danza = ndRes.rows[0].id_nivel_danza;
+          }
+        }
+
+        // 10. Resolver especialidad
         let idEspecialidad = datos.id_especialidad || datos.especialidad_id || datos.Id_especialidad || null;
         if (!idEspecialidad && datos.especialidad) {
           const espFound = await EspecialidadModel.findByName(datos.especialidad);
@@ -241,52 +271,49 @@ export const InscripcionRepresentanteController = {
           idEspecialidad = student.specialty_id || student.Id_especialidad;
         }
 
-        if (idEspecialidad) {
-          await client.query(
-            'UPDATE "Estudiante" SET "Id_especialidad" = $1 WHERE "Id_estudiante" = $2',
-            [idEspecialidad, id_estudiante]
-          );
-        }
+        const seguroEscolar = datos.Seguro_Escolar === "si" || datos.Seguro_Escolar === true;
 
-        // 10. Buscar o crear sección para el grado y especialidad del estudiante
-        await client.query(`
-          ALTER TABLE "Seccion" 
-          ADD COLUMN IF NOT EXISTS "nivel_academico" VARCHAR(50),
-          ADD COLUMN IF NOT EXISTS "Id_especialidad" INTEGER
-        `);
-        const nivelAcademico = datos.grado || student.dance_level_name || student.grade_level_name || 'Preparatorio';
-        const id_seccion = await obtenerOCrearSeccion(id_ano_academico, nivelAcademico, client, idEspecialidad);
+        // 11. Actualizar tabla estudiante
+        await client.query(
+          `UPDATE estudiante SET 
+            id_historia = $1,
+            id_escuela = $2,
+            id_seguro = $3,
+            id_nivel = $4,
+            id_nivel_danza = $5,
+            id_especialidad = $6,
+            seguro_escolar = $7
+           WHERE id_estudiante = $8`,
+          [
+            id_historial,
+            id_escuela,
+            id_seguro,
+            id_nivel_escolar,
+            id_nivel_danza,
+            idEspecialidad,
+            seguroEscolar,
+            id_estudiante
+          ]
+        );
+        console.log("✅ Estudiante actualizado");
 
-        if (datos.grado) {
-          try {
-            const ndRes = await client.query(
-              'SELECT "Id_nivel_danza" FROM "Nivel_Danza" WHERE LOWER("nivel_danza") = LOWER($1) OR LOWER("nivel_danza") LIKE LOWER($2) LIMIT 1',
-              [datos.grado, `${datos.grado.replace('Grado', 'Año')}%`]
-            );
-            if (ndRes.rows.length > 0) {
-              await client.query(
-                'UPDATE "Estudiante" SET "Id_nivel_danza" = $1 WHERE "Id_estudiante" = $2',
-                [ndRes.rows[0].Id_nivel_danza, id_estudiante]
-              );
-            }
-          } catch (err) {
-            console.error("Error actualizando Id_nivel_danza en inscripción:", err);
-          }
-        }
+        // 12. Guardar datos de los padres (madre y padre) usando estudiante_familiar + persona
+        await guardarFamiliares(id_estudiante, datos, client);
 
-        // 11. Inscribir al estudiante en la sección con su especialidad correspondiente
-        await client.query(`
-          ALTER TABLE "Estudiante_Seccion" 
-          ADD COLUMN IF NOT EXISTS "Id_especialidad" INTEGER
-        `);
+        // 13. Actualizar datos del representante según quién es
+        await actualizarDatosRepresentante(representante, datos, client);
 
+        // 14. Buscar o crear sección y crear inscripción
+        const id_seccion = await obtenerOCrearSeccion(id_ano_academico, id_nivel_danza, client, idEspecialidad);
+
+        // 15. Insertar inscripción en la tabla inscripcion
         const inscripcionQuery = {
           text: `
-            INSERT INTO "Estudiante_Seccion" ("Id_estudiante", "Id_seccion", "Id_especialidad")
-            VALUES ($1, $2, $3)
-            RETURNING "Id_estudiante_seccion" as id
+            INSERT INTO inscripcion (id_estudiante, id_ano, id_seccion, estado_inscripcion, fecha_inscripcion)
+            VALUES ($1, $2, $3, 'activo', NOW())
+            RETURNING id_inscripcion
           `,
-          values: [id_estudiante, id_seccion, idEspecialidad]
+          values: [id_estudiante, id_ano_academico, id_seccion]
         };
 
         await client.query(inscripcionQuery.text, inscripcionQuery.values);
@@ -360,13 +387,13 @@ export const InscripcionRepresentanteController = {
         });
       }
 
-      // Verificar inscripción en el año escolar
+      // Verificar inscripción en el año escolar (tabla: inscripcion + seccion)
       const query = {
         text: `
-          SELECT es."Id_estudiante_seccion", s."Id_seccion", s."nombre_seccion"
-          FROM "Estudiante_Seccion" es
-          JOIN "Seccion" s ON es."Id_seccion" = s."Id_seccion"
-          WHERE es."Id_estudiante" = $1 AND s."Id_ano" = $2
+          SELECT i.id_inscripcion, s.id_seccion, s.nombre_seccion
+          FROM inscripcion i
+          JOIN seccion s ON i.id_seccion = s.id_seccion
+          WHERE i.id_estudiante = $1 AND i.id_ano = $2
           LIMIT 1
         `,
         values: [studentId, ano]
@@ -380,7 +407,7 @@ export const InscripcionRepresentanteController = {
         data: {
           inscrito: estaInscrito,
           seccion: estaInscrito ? result.rows[0].nombre_seccion : null,
-          id_seccion: estaInscrito ? result.rows[0].Id_seccion : null
+          id_seccion: estaInscrito ? result.rows[0].id_seccion : null
         }
       });
 
@@ -410,16 +437,21 @@ export const InscripcionRepresentanteController = {
         });
       }
 
-      // 1. Verificar representante (soporte rol dual)
-      const representante = await resolveRepresentanteFromReq(req);
-      if (!representante) {
-        return res.status(403).json({
-          ok: false,
-          msg: "No tienes permisos para realizar esta acción"
-        });
+      // 1. Verificar representante (soporte rol dual o admin)
+      const isAdmin = req.user?.roles?.includes('admin') || req.user?.roles?.includes('administrador') || req.user?.role === 'admin' || req.user?.Id_rol === 1 || req.user?.id_rol === 1;
+
+      let representante = null;
+      if (!isAdmin) {
+        representante = await resolveRepresentanteFromReq(req);
+        if (!representante) {
+          return res.status(403).json({
+            ok: false,
+            msg: "No tienes permisos para realizar esta acción"
+          });
+        }
       }
 
-      // 2. Verificar estudiante
+      // 2. Verificar estudiante (usa StudentModel que ya trabaja con NewEndanza)
       const student = await StudentModel.findById(studentId);
       if (!student) {
         return res.status(404).json({
@@ -428,27 +460,23 @@ export const InscripcionRepresentanteController = {
         });
       }
 
-      if (!checkStudentOwnership(student, representante, userId)) {
+      if (!isAdmin && !checkStudentOwnership(student, representante, userId)) {
         return res.status(403).json({
           ok: false,
           msg: "No tienes permiso para consultar este estudiante"
         });
       }
 
-      // 3. Obtener datos adicionales directos de la tabla Estudiante
-      const extraRes = await db.query(`
-        SELECT "direccion", "telefono", "grado_escuela", "nombre_seguro", "Id_historial"
-        FROM "Estudiante"
-        WHERE "Id_estudiante" = $1
-      `, [studentId]);
-      const extra = extraRes.rows[0] || {};
+      if (!representante && student.representative_id) {
+        representante = await RepresentanteModel.findById(student.representative_id);
+      }
 
-      // 4. Obtener historial médico completo si existe
+      // 3. Obtener historial médico completo si existe (tabla: historial_medico)
       let historial = {};
-      const histId = student.medical_history_id || extra.Id_historial;
+      const histId = student.medical_history_id;
       if (histId) {
         const histRes = await db.query(
-          'SELECT * FROM "Historial_Medico" WHERE "Id_historial" = $1',
+          'SELECT * FROM historial_medico WHERE id_historia = $1',
           [histId]
         );
         if (histRes.rows.length > 0) {
@@ -456,28 +484,30 @@ export const InscripcionRepresentanteController = {
         }
       }
 
-      // 5. Obtener padres asociados desde Estudiante_Padre -> Padre
-      const padresRes = await db.query(`
-        SELECT p.*
-        FROM "Estudiante_Padre" ep
-        JOIN "Padre" p ON ep."Id_padre" = p."Id_padre"
-        WHERE ep."Id_estudiante" = $1
-        ORDER BY ep."Id_padre" ASC
+      // 4. Obtener familiares asociados desde estudiante_familiar + persona
+      const familiaresRes = await db.query(`
+        SELECT ef.parentesco, ef.es_representante_legal, ef.vive_con_estudiante,
+               p.nombre, p.apellido, p.cedula, p.numero_telefono, p.email, p.genero
+        FROM estudiante_familiar ef
+        JOIN persona p ON ef.id_persona = p.id_persona
+        WHERE ef.id_estudiante = $1
+        ORDER BY ef.id_estudiante_familiar ASC
       `, [studentId]);
 
-      const madre = padresRes.rows[0] || null;
-      const padre = padresRes.rows[1] || null;
+      // Identificar madre y padre por parentesco
+      const madre = familiaresRes.rows.find(r => r.parentesco === 'Madre') || null;
+      const padre = familiaresRes.rows.find(r => r.parentesco === 'Padre') || null;
 
-      // 6. Verificar si ya se encuentra inscrito en el año especificado
+      // 5. Verificar si ya se encuentra inscrito en el año especificado (tabla: inscripcion)
       let yaInscrito = false;
       let inscripcionData = null;
       if (ano) {
         const checkQuery = {
           text: `
-            SELECT es."Id_estudiante_seccion", s."Id_seccion", s."nombre_seccion", s."Id_ano"
-            FROM "Estudiante_Seccion" es
-            JOIN "Seccion" s ON es."Id_seccion" = s."Id_seccion"
-            WHERE es."Id_estudiante" = $1 AND s."Id_ano" = $2
+            SELECT i.id_inscripcion, s.id_seccion, s.nombre_seccion, i.id_ano
+            FROM inscripcion i
+            JOIN seccion s ON i.id_seccion = s.id_seccion
+            WHERE i.id_estudiante = $1 AND i.id_ano = $2
             LIMIT 1
           `,
           values: [studentId, ano]
@@ -489,6 +519,10 @@ export const InscripcionRepresentanteController = {
         }
       }
 
+      // 6. Obtener dirección del usuario representante
+      const repPersonaId = representante ? (representante.id_persona || null) : null;
+      let direccionHab = student.address || "";
+
       return res.json({
         ok: true,
         data: {
@@ -499,64 +533,88 @@ export const InscripcionRepresentanteController = {
             cedula: student.dni,
             fecha_nacimiento: student.birth_date,
             genero: student.gender,
-            direccion: extra.direccion || student.address || "",
-            telefono: extra.telefono || "",
-            grado_escuela: extra.grado_escuela || "",
+            direccion: direccionHab,
+            telefono: "",
+            grado_escuela: student.grade_level_name || "",
             escuela: student.school_name || "",
             seguro_escolar: student.school_insurance || false,
-            nombre_seguro: extra.nombre_seguro || student.insurance_name || "",
+            nombre_seguro: student.insurance_name || "",
             dance_level_name: student.dance_level_name || "",
             grade_level_name: student.grade_level_name || "",
             especialidad: student.specialty_name || student.nombre_especialidad || student.especialidad || "",
             id_especialidad: student.specialty_id || student.Id_especialidad || null,
             especialidad_id: student.specialty_id || student.Id_especialidad || null
           },
-          representante: {
-            id: representante.id,
-            nombres: student.representative_first_name || representante.nombre,
-            apellidos: student.representative_last_name || representante.apellido,
-            cedula: student.representative_dni || representante.cedula,
+          representante: representante ? {
+            id: representante.id_representante || representante.id,
+            nombres: student.representative_first_name || representante.nombre || representante.first_name,
+            apellidos: student.representative_last_name || representante.apellido || representante.last_name,
+            cedula: student.representative_dni || representante.cedula || representante.dni,
             telefono: student.representative_phone || "",
             correo: student.representative_email || representante.email,
-            parentesco: student.representative_relationship || (student.representative_es_familiar ? "Madre" : "Otro"),
-            profesion: student.representative_occupation || "",
-            direccion_trabajo: student.representative_work_address || ""
+            parentesco: student.representative_relationship || "Madre",
+            profesion: student.representative_occupation || representante.profesion_rep || "",
+            direccion_trabajo: representante.direccion || "",
+            genero: student.representative_gender || ""
+          } : {
+            id: null,
+            nombres: student.representative_first_name || "",
+            apellidos: student.representative_last_name || "",
+            cedula: student.representative_dni || "",
+            telefono: student.representative_phone || "",
+            correo: student.representative_email || "",
+            parentesco: student.representative_relationship || "Madre",
+            profesion: "",
+            direccion_trabajo: "",
+            genero: student.representative_gender || ""
           },
+          quien_es_representante: (() => {
+            const relFromModel = student.representative_relationship;
+            if (relFromModel && relFromModel !== 'Madre') return relFromModel;
+            const genero = (student.representative_gender || '').toLowerCase();
+            if (genero.startsWith('m') && genero !== 'masculino') {
+              // 'm' could be masculino too, check more carefully
+            }
+            if (genero === 'masculino' || genero === 'male') {
+              return 'Padre';
+            }
+            return relFromModel || 'Madre';
+          })(),
           madre: madre ? {
             nombre: madre.nombre,
             apellido: madre.apellido,
             cedula: madre.cedula,
-            profesion: madre.profesion_padre,
-            direccion_trabajo: madre.direccion_trabajo_padre,
-            telefono: madre.telefono
+            profesion: "",
+            direccion_trabajo: "",
+            telefono: madre.numero_telefono || ""
           } : null,
           padre: padre ? {
             nombre: padre.nombre,
             apellido: padre.apellido,
             cedula: padre.cedula,
-            profesion: padre.profesion_padre,
-            direccion_trabajo: padre.direccion_trabajo_padre,
-            telefono: padre.telefono
+            profesion: "",
+            direccion_trabajo: "",
+            telefono: padre.numero_telefono || ""
           } : null,
           historial_medico: {
             peso: historial.peso_kg ? parseFloat(historial.peso_kg).toString() : "",
             talla: historial.altura_m ? Math.round(parseFloat(historial.altura_m) * 100).toString() : "",
-            tipo_sangre: historial.tipo_sangre || student.blood_type || "",
-            intolerancia: historial.intolerancia_comida ? "Si" : "No",
+            tipo_sangre: student.blood_type || "",
+            intolerancia: historial.intolerancia_alimentos ? "Si" : "No",
             textIntolerancia: historial.descripcion_intolerancia || "",
             operaciones: historial.tiene_cirugia ? "Si" : "No",
             textOperaciones: historial.descripcion_cirugia || "",
             control_hormonal: historial.control_hormonal ? "Si" : "No",
-            textcontrolHormonal: historial.descripcion_hormonal || "",
+            textcontrolHormonal: historial.descripcion_control_hormonal || "",
             alergias: historial.tiene_alergias ? "Si" : "No",
             textAlergia: historial.descripcion_alergias || "",
             termino_nacimiento: historial.termino_nacimiento || "",
-            antecedentes_familiares: historial.antecedentes_familiares || ""
+            antecedentes_familiares: historial.historial_familiar_desc || ""
           },
           inscripcion_actual: {
             ya_inscrito: yaInscrito,
             seccion: inscripcionData ? inscripcionData.nombre_seccion : null,
-            id_seccion: inscripcionData ? inscripcionData.Id_seccion : null
+            id_seccion: inscripcionData ? inscripcionData.id_seccion : null
           }
         }
       });
@@ -577,123 +635,276 @@ export const InscripcionRepresentanteController = {
 // ============================================
 
 /**
- * Guarda los datos de la madre y el padre en la tabla Padre
+ * Guarda los datos de la madre y el padre usando la tabla persona + estudiante_familiar.
+ * Busca o crea persona por cédula, luego vincula con estudiante_familiar.
  */
-async function guardarPadresEnTablaPadre(id_estudiante, datos, client = db) {
+async function guardarFamiliares(id_estudiante, datos, client = db) {
   try {
-    console.log("👪 Guardando padres para estudiante:", id_estudiante);
+    console.log("👪 Guardando familiares para estudiante:", id_estudiante);
 
-    // 1. Insertar MADRE
-    let id_madre = null;
+    // Guardar MADRE
     if (datos.nombre_Madre && datos.apellido_Madre) {
       const nombreMadre = capitalizeWords(datos.nombre_Madre);
       const apellidoMadre = capitalizeWords(datos.apellido_Madre);
-      console.log("📝 Insertando madre:", nombreMadre, apellidoMadre);
+      const cedulaMadre = datos.cedula_Madre || null;
+      const ocupacionMadre = datos.ocupacion_Madre || null;
+      const trabajoMadre = datos.trabajo_Madre || datos.lugar_trabajo_Madre || null;
+      const dirTrabajoMadre = datos.direccion_Trabajo_Madre || datos.direccion_trabajo_Madre || null;
+      const telTrabajoMadre = datos.telefono_trabajo_Madre || null;
 
-      const madreQuery = {
-        text: `
-          INSERT INTO "Padre" (
-            nombre, apellido, cedula, profesion_padre, direccion_trabajo_padre, telefono
-          ) VALUES ($1, $2, $3, $4, $5, $6)
-          RETURNING "Id_padre" as id
-        `,
-        values: [
-          nombreMadre,
-          apellidoMadre,
-          datos.cedula_Madre || null,
-          datos.ocupacion_Madre || null,
-          datos.direccion_Trabajo_Madre || null,
-          datos.telefono_Madre || null
-        ]
-      };
-      const madreResult = await client.query(madreQuery.text, madreQuery.values);
-      id_madre = madreResult.rows[0].id;
-      console.log("✅ Madre insertada con ID:", id_madre);
+      console.log("📝 Procesando madre:", nombreMadre, apellidoMadre);
+
+      let personaIdMadre;
+
+      // Buscar persona existente por cédula
+      if (cedulaMadre) {
+        const existRes = await client.query(
+          'SELECT id_persona FROM persona WHERE cedula = $1',
+          [cedulaMadre]
+        );
+        if (existRes.rows.length > 0) {
+          personaIdMadre = existRes.rows[0].id_persona;
+          // Actualizar datos
+          await client.query(
+            `UPDATE persona SET nombre = $1, apellido = $2, genero = 'femenino',
+             numero_telefono = COALESCE($3, numero_telefono),
+             ocupacion = COALESCE($4, ocupacion)
+             WHERE id_persona = $5`,
+            [nombreMadre, apellidoMadre, datos.telefono_Madre || null, ocupacionMadre, personaIdMadre]
+          );
+        }
+      }
+
+      if (!personaIdMadre) {
+        // Crear nueva persona
+        const insertRes = await client.query(
+          `INSERT INTO persona (nombre, apellido, cedula, numero_telefono, genero, ocupacion)
+           VALUES ($1, $2, $3, $4, 'femenino', $5)
+           RETURNING id_persona`,
+          [nombreMadre, apellidoMadre, cedulaMadre, datos.telefono_Madre || null, ocupacionMadre]
+        );
+        personaIdMadre = insertRes.rows[0].id_persona;
+      }
+
+      // Verificar si ya existe vínculo en estudiante_familiar
+      const vincExist = await client.query(
+        'SELECT id_estudiante_familiar FROM estudiante_familiar WHERE id_estudiante = $1 AND id_persona = $2',
+        [id_estudiante, personaIdMadre]
+      );
+
+      if (vincExist.rows.length === 0) {
+        await client.query(
+          `INSERT INTO estudiante_familiar (id_estudiante, id_persona, parentesco, es_representante_legal, vive_con_estudiante, ocupacion, lugar_trabajo, direccion_trabajo, telefono_trabajo)
+           VALUES ($1, $2, 'Madre', false, true, $3, $4, $5, $6)`,
+          [id_estudiante, personaIdMadre, ocupacionMadre, trabajoMadre, dirTrabajoMadre, telTrabajoMadre]
+        );
+      } else {
+        await client.query(
+          `UPDATE estudiante_familiar 
+           SET parentesco = 'Madre',
+               ocupacion = COALESCE($1, ocupacion),
+               lugar_trabajo = COALESCE($2, lugar_trabajo),
+               direccion_trabajo = COALESCE($3, direccion_trabajo),
+               telefono_trabajo = COALESCE($4, telefono_trabajo)
+           WHERE id_estudiante = $5 AND id_persona = $6`,
+          [ocupacionMadre, trabajoMadre, dirTrabajoMadre, telTrabajoMadre, id_estudiante, personaIdMadre]
+        );
+      }
+
+      console.log("✅ Madre vinculada con ID persona:", personaIdMadre);
     }
 
-    // 2. Insertar PADRE
-    let id_padre = null;
+    // Guardar PADRE
     if (datos.nombre_Padre && datos.apellido_Padre) {
       const nombrePadre = capitalizeWords(datos.nombre_Padre);
       const apellidoPadre = capitalizeWords(datos.apellido_Padre);
-      console.log("📝 Insertando padre:", nombrePadre, apellidoPadre);
+      const cedulaPadre = datos.cedula_Padre || null;
+      const ocupacionPadre = datos.ocupacion_Padre || null;
+      const trabajoPadre = datos.trabajo_Padre || datos.lugar_trabajo_Padre || null;
+      const dirTrabajoPadre = datos.direccion_Trabajo_Padre || datos.direccion_trabajo_Padre || null;
+      const telTrabajoPadre = datos.telefono_trabajo_Padre || null;
 
-      const padreQuery = {
-        text: `
-          INSERT INTO "Padre" (
-            nombre, apellido, cedula, profesion_padre, direccion_trabajo_padre, telefono
-          ) VALUES ($1, $2, $3, $4, $5, $6)
-          RETURNING "Id_padre" as id
-        `,
-        values: [
-          nombrePadre,
-          apellidoPadre,
-          datos.cedula_Padre || null,
-          datos.ocupacion_Padre || null,
-          datos.direccion_Trabajo_Padre || null,
-          datos.telefono_Padre || null
-        ]
-      };
-      const padreResult = await client.query(padreQuery.text, padreQuery.values);
-      id_padre = padreResult.rows[0].id;
-      console.log("✅ Padre insertado con ID:", id_padre);
-    }
+      console.log("📝 Procesando padre:", nombrePadre, apellidoPadre);
 
-    // 3. Eliminar relaciones existentes en Estudiante_Padre
-    await client.query(
-      'DELETE FROM "Estudiante_Padre" WHERE "Id_estudiante" = $1',
-      [id_estudiante]
-    );
-    console.log("🗑️ Relaciones anteriores eliminadas");
+      let personaIdPadre;
 
-    // 4. Crear nuevas relaciones
-    if (id_madre) {
-      await client.query(
-        'INSERT INTO "Estudiante_Padre" ("Id_estudiante", "Id_padre") VALUES ($1, $2)',
-        [id_estudiante, id_madre]
+      // Buscar persona existente por cédula
+      if (cedulaPadre) {
+        const existRes = await client.query(
+          'SELECT id_persona FROM persona WHERE cedula = $1',
+          [cedulaPadre]
+        );
+        if (existRes.rows.length > 0) {
+          personaIdPadre = existRes.rows[0].id_persona;
+          // Actualizar datos
+          await client.query(
+            `UPDATE persona SET nombre = $1, apellido = $2, genero = 'masculino',
+             numero_telefono = COALESCE($3, numero_telefono),
+             ocupacion = COALESCE($4, ocupacion)
+             WHERE id_persona = $5`,
+            [nombrePadre, apellidoPadre, datos.telefono_Padre || null, ocupacionPadre, personaIdPadre]
+          );
+        }
+      }
+
+      if (!personaIdPadre) {
+        // Crear nueva persona
+        const insertRes = await client.query(
+          `INSERT INTO persona (nombre, apellido, cedula, numero_telefono, genero, ocupacion)
+           VALUES ($1, $2, $3, $4, 'masculino', $5)
+           RETURNING id_persona`,
+          [nombrePadre, apellidoPadre, cedulaPadre, datos.telefono_Padre || null, ocupacionPadre]
+        );
+        personaIdPadre = insertRes.rows[0].id_persona;
+      }
+
+      // Verificar si ya existe vínculo en estudiante_familiar
+      const vincExist = await client.query(
+        'SELECT id_estudiante_familiar FROM estudiante_familiar WHERE id_estudiante = $1 AND id_persona = $2',
+        [id_estudiante, personaIdPadre]
       );
-      console.log("🔗 Relación madre-estudiante creada");
+
+      if (vincExist.rows.length === 0) {
+        await client.query(
+          `INSERT INTO estudiante_familiar (id_estudiante, id_persona, parentesco, es_representante_legal, vive_con_estudiante, ocupacion, lugar_trabajo, direccion_trabajo, telefono_trabajo)
+           VALUES ($1, $2, 'Padre', false, true, $3, $4, $5, $6)`,
+          [id_estudiante, personaIdPadre, ocupacionPadre, trabajoPadre, dirTrabajoPadre, telTrabajoPadre]
+        );
+      } else {
+        await client.query(
+          `UPDATE estudiante_familiar 
+           SET parentesco = 'Padre',
+               ocupacion = COALESCE($1, ocupacion),
+               lugar_trabajo = COALESCE($2, lugar_trabajo),
+               direccion_trabajo = COALESCE($3, direccion_trabajo),
+               telefono_trabajo = COALESCE($4, telefono_trabajo)
+           WHERE id_estudiante = $5 AND id_persona = $6`,
+          [ocupacionPadre, trabajoPadre, dirTrabajoPadre, telTrabajoPadre, id_estudiante, personaIdPadre]
+        );
+      }
+
+      console.log("✅ Padre vinculado con ID persona:", personaIdPadre);
     }
 
-    if (id_padre) {
-      await client.query(
-        'INSERT INTO "Estudiante_Padre" ("Id_estudiante", "Id_padre") VALUES ($1, $2)',
-        [id_estudiante, id_padre]
-      );
-      console.log("🔗 Relación padre-estudiante creada");
-    }
-
-    console.log(`✅ Padres guardados exitosamente: Madre=${id_madre || 'no'}, Padre=${id_padre || 'no'}`);
+    console.log("✅ Familiares guardados exitosamente");
 
   } catch (error) {
-    console.error("❌ Error en guardarPadresEnTablaPadre:", error);
+    console.error("❌ Error en guardarFamiliares:", error);
     throw error;
   }
 }
 
 /**
- * Obtiene o crea una escuela regular
+ * Actualiza los datos del representante (profesión, dirección de trabajo)
+ * según quién fue seleccionado como representante (Madre, Padre u Otro).
+ */
+async function actualizarDatosRepresentante(representante, datos, client = db) {
+  try {
+    const repId = representante.id_representante || representante.id;
+    const quienEsRep = datos.quien_es_representante || 'Madre';
+
+    console.log(`📋 Actualizando representante ID=${repId}, tipo=${quienEsRep}`);
+
+    let profesion = null;
+    let lugarTrabajo = null;
+    let direccionTrabajo = null;
+    let telefonoTrabajo = null;
+
+    if (quienEsRep === 'Madre') {
+      profesion = datos.ocupacion_Madre || null;
+      lugarTrabajo = datos.trabajo_Madre || datos.lugar_trabajo_Madre || null;
+      direccionTrabajo = datos.direccion_Trabajo_Madre || datos.direccion_trabajo_Madre || null;
+      telefonoTrabajo = datos.telefono_trabajo_Madre || null;
+    } else if (quienEsRep === 'Padre') {
+      profesion = datos.ocupacion_Padre || null;
+      lugarTrabajo = datos.trabajo_Padre || datos.lugar_trabajo_Padre || null;
+      direccionTrabajo = datos.direccion_Trabajo_Padre || datos.direccion_trabajo_Padre || null;
+      telefonoTrabajo = datos.telefono_trabajo_Padre || null;
+    } else {
+      // Otro representante
+      profesion = datos.profesion_Rep || null;
+      lugarTrabajo = datos.trabajo_Rep || null;
+      direccionTrabajo = datos.direccion_Trabajo_Rep || null;
+      telefonoTrabajo = datos.telefono_trabajo_Rep || null;
+    }
+
+    // Actualizar campos del representante (tabla: representante en NewEndanza)
+    await client.query(`
+      UPDATE representante SET
+        profesion = COALESCE($1, profesion),
+        lugar_trabajo = COALESCE($2, lugar_trabajo),
+        direccion_trabajo = COALESCE($3, direccion_trabajo),
+        telefono_trabajo = COALESCE($4, telefono_trabajo)
+      WHERE id_representante = $5
+    `, [profesion, lugarTrabajo, direccionTrabajo, telefonoTrabajo, repId]);
+
+    // Actualizar el parentesco en estudiante_familiar si existe el vínculo
+    const repPersonaId = representante.id_persona;
+    if (repPersonaId) {
+      // Buscar todos los estudiantes de este representante
+      const estudiantesRes = await client.query(
+        'SELECT id_estudiante FROM estudiante WHERE id_representante = $1',
+        [repId]
+      );
+
+      for (const est of estudiantesRes.rows) {
+        // Verificar o crear vínculo en estudiante_familiar
+        const vincExist = await client.query(
+          'SELECT id_estudiante_familiar FROM estudiante_familiar WHERE id_estudiante = $1 AND id_persona = $2',
+          [est.id_estudiante, repPersonaId]
+        );
+
+        if (vincExist.rows.length > 0) {
+          await client.query(
+            `UPDATE estudiante_familiar 
+             SET parentesco = $1, 
+                 es_representante_legal = true,
+                 ocupacion = COALESCE($4, ocupacion),
+                 lugar_trabajo = COALESCE($5, lugar_trabajo),
+                 direccion_trabajo = COALESCE($6, direccion_trabajo),
+                 telefono_trabajo = COALESCE($7, telefono_trabajo)
+             WHERE id_estudiante = $2 AND id_persona = $3`,
+            [quienEsRep, est.id_estudiante, repPersonaId, profesion, lugarTrabajo, direccionTrabajo, telefonoTrabajo]
+          );
+        } else {
+          await client.query(
+            `INSERT INTO estudiante_familiar (id_estudiante, id_persona, parentesco, es_representante_legal, vive_con_estudiante, ocupacion, lugar_trabajo, direccion_trabajo, telefono_trabajo)
+             VALUES ($1, $2, $3, true, true, $4, $5, $6, $7)`,
+            [est.id_estudiante, repPersonaId, quienEsRep, profesion, lugarTrabajo, direccionTrabajo, telefonoTrabajo]
+          );
+        }
+      }
+    }
+
+    console.log(`✅ Representante actualizado: profesion=${profesion}, lugar_trabajo=${lugarTrabajo}`);
+
+  } catch (error) {
+    console.error("⚠️ Error actualizando representante (no crítico):", error.message);
+    // No lanzar error - no es crítico para la inscripción
+  }
+}
+
+/**
+ * Obtiene o crea una escuela regular (tabla: escuela_regular)
  */
 async function getOrCreateEscuela(nombreEscuela, client = db) {
   if (!nombreEscuela) return null;
 
   try {
-    const query = {
-      text: `SELECT "Id_escuela" FROM "Escuela_Regular" WHERE "nombre_escuela" = $1`,
-      values: [nombreEscuela]
-    };
-    const result = await client.query(query.text, query.values);
+    const result = await client.query(
+      'SELECT id_escuela FROM escuela_regular WHERE LOWER(nombre_escuela) = LOWER($1)',
+      [nombreEscuela]
+    );
 
     if (result.rows.length > 0) {
-      return result.rows[0].Id_escuela;
+      return result.rows[0].id_escuela;
     }
 
-    const insertQuery = {
-      text: `INSERT INTO "Escuela_Regular" ("nombre_escuela") VALUES ($1) RETURNING "Id_escuela"`,
-      values: [nombreEscuela]
-    };
-    const insertResult = await client.query(insertQuery.text, insertQuery.values);
-    return insertResult.rows[0].Id_escuela;
+    const insertResult = await client.query(
+      'INSERT INTO escuela_regular (nombre_escuela) VALUES ($1) RETURNING id_escuela',
+      [nombreEscuela]
+    );
+    return insertResult.rows[0].id_escuela;
   } catch (error) {
     console.error("Error en getOrCreateEscuela:", error);
     return null;
@@ -701,104 +912,80 @@ async function getOrCreateEscuela(nombreEscuela, client = db) {
 }
 
 /**
- * Obtiene o crea una sección para el estudiante (incluyendo especialidad si aplica)
+ * Obtiene o crea un seguro médico (tabla: seguro_medico)
  */
-async function obtenerOCrearSeccion(id_ano_academico, nivelAcademico, client = db, idEspecialidad = null) {
-  // Buscar sección disponible que coincida en año, nivel académico y especialidad
+async function getOrCreateSeguro(tipoSeguro, client = db) {
+  if (!tipoSeguro) return null;
+
+  try {
+    const result = await client.query(
+      'SELECT id_seguro FROM seguro_medico WHERE LOWER(tipo_seguro) = LOWER($1)',
+      [tipoSeguro]
+    );
+
+    if (result.rows.length > 0) {
+      return result.rows[0].id_seguro;
+    }
+
+    const insertResult = await client.query(
+      'INSERT INTO seguro_medico (tipo_seguro) VALUES ($1) RETURNING id_seguro',
+      [tipoSeguro]
+    );
+    return insertResult.rows[0].id_seguro;
+  } catch (error) {
+    console.error("Error en getOrCreateSeguro:", error);
+    return null;
+  }
+}
+
+/**
+ * Obtiene o crea una sección para el estudiante
+ * Tabla: seccion (columnas: id_seccion, nombre_seccion, id_ano, id_nivel_danza, id_especialidad)
+ */
+async function obtenerOCrearSeccion(id_ano_academico, id_nivel_danza, client = db, idEspecialidad = null) {
+  // Buscar sección disponible que coincida en año, nivel de danza y especialidad
   const seccionQuery = {
     text: `
-      SELECT s."Id_seccion"
-      FROM "Seccion" s
-      WHERE s."Id_ano" = $1 
+      SELECT s.id_seccion
+      FROM seccion s
+      WHERE s.id_ano = $1 
         AND (
-          LOWER(TRIM(s.nivel_academico)) = LOWER(TRIM($2))
-          OR s.nivel_academico = $2
-          OR $2 IS NULL
+          ($2::INTEGER IS NULL AND s.id_nivel_danza IS NULL)
+          OR s.id_nivel_danza = $2::INTEGER
         )
         AND (
-          ($3::INTEGER IS NULL AND s."Id_especialidad" IS NULL)
-          OR s."Id_especialidad" = $3::INTEGER
+          ($3::INTEGER IS NULL AND s.id_especialidad IS NULL)
+          OR s.id_especialidad = $3::INTEGER
         )
-        AND s."capacidad" > (
-          SELECT COUNT(es."Id_estudiante_seccion")
-          FROM "Estudiante_Seccion" es
-          WHERE es."Id_seccion" = s."Id_seccion"
-        )
-      ORDER BY s."nombre_seccion" ASC
+      ORDER BY s.nombre_seccion ASC
       LIMIT 1
     `,
-    values: [id_ano_academico, nivelAcademico || 'Sin materia', idEspecialidad]
+    values: [id_ano_academico, id_nivel_danza, idEspecialidad]
   };
 
   const seccionResult = await client.query(seccionQuery.text, seccionQuery.values);
 
   if (seccionResult.rows.length > 0) {
-    return seccionResult.rows[0].Id_seccion;
+    return seccionResult.rows[0].id_seccion;
   }
 
-  // Buscar lapso para este año académico
-  let lapsoResult = await client.query(
-    'SELECT "Id_lapso" FROM "Lapso" WHERE "Id_ano" = $1 ORDER BY "Id_lapso" ASC LIMIT 1',
-    [id_ano_academico]
-  );
-
-  // Si no hay lapsos configurados para este año académico, crearlos automáticamente
-  if (lapsoResult.rows.length === 0) {
-    console.log(`⚠️ No se encontraron lapsos para el año ${id_ano_academico}. Creando lapsos por defecto...`);
-    try {
-      const anoRes = await client.query(
-        'SELECT "inicio_ano", "fin_ano" FROM "Ano_Academico" WHERE "Id_ano" = $1',
-        [id_ano_academico]
-      );
-
-      let startYear = new Date().getFullYear();
-      let endYear = startYear + 1;
-
-      if (anoRes.rows.length > 0 && anoRes.rows[0].inicio_ano) {
-        startYear = new Date(anoRes.rows[0].inicio_ano).getFullYear();
-        endYear = anoRes.rows[0].fin_ano ? new Date(anoRes.rows[0].fin_ano).getFullYear() : startYear + 1;
-      }
-
-      await client.query(`
-        INSERT INTO "Lapso" ("nombre_lapso", "inicio_lapso", "fin_lapso", "Id_ano")
-        VALUES 
-          ('I LAPSO', $1, $2, $3),
-          ('II LAPSO', $4, $5, $3),
-          ('III LAPSO', $6, $7, $3)
-      `, [
-        `${startYear}-09-15`, `${startYear}-12-15`, id_ano_academico,
-        `${endYear}-01-10`, `${endYear}-04-05`,
-        `${endYear}-04-15`, `${endYear}-07-15`
-      ]);
-
-      lapsoResult = await client.query(
-        'SELECT "Id_lapso" FROM "Lapso" WHERE "Id_ano" = $1 ORDER BY "Id_lapso" ASC LIMIT 1',
-        [id_ano_academico]
-      );
-    } catch (lapErr) {
-      console.warn("⚠️ No se pudieron crear los lapsos automáticamente:", lapErr.message);
-    }
-  }
-
-  const lapsoId = lapsoResult.rows[0]?.Id_lapso || null;
-
+  // Si no existe, crear nueva sección
   const crearSeccionQuery = {
     text: `
-      INSERT INTO "Seccion" (
-        "nombre_seccion", "capacidad", "Id_lapso", "Id_ano", "nivel_academico", "Id_especialidad"
-      ) VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING "Id_seccion"
+      INSERT INTO seccion (
+        nombre_seccion, id_ano, id_nivel_danza, id_especialidad
+      ) VALUES ($1, $2, $3, $4)
+      RETURNING id_seccion
     `,
     values: [
       'A',
-      30,
-      lapsoId,
       id_ano_academico,
-      nivelAcademico || 'Sin materia',
+      id_nivel_danza,
       idEspecialidad
     ]
   };
 
   const nuevaSeccion = await client.query(crearSeccionQuery.text, crearSeccionQuery.values);
-  return nuevaSeccion.rows[0].Id_seccion;
+  console.log("✅ Nueva sección creada con ID:", nuevaSeccion.rows[0].id_seccion);
+  return nuevaSeccion.rows[0].id_seccion;
 }

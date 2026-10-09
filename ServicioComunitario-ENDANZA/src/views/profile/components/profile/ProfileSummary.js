@@ -61,8 +61,8 @@ const ProfileSummary = ({ student }) => {
         )
     }
 
-    // Grado actual (usando nivel de danza/anterior si no hay grado escolar específico en la BD)
-    const gradoActual = student.grade_level_name || student.dance_level_name || student.grade_level || student.dance_level || 'N/A'
+    // Grado actual (exclusivamente nivel de danza de ENDANZA)
+    const gradoActual = student.dance_level_name || student.dance_level || (student.grade_level && student.grade_level !== student.grade_level_name ? student.grade_level : '') || 'Sin Asignar'
 
     // Obtener la primera sección si existe
     const seccionActual = student.sections && student.sections.length > 0 
@@ -94,7 +94,9 @@ const ProfileSummary = ({ student }) => {
                         <div className="position-absolute bottom-0 end-0 p-2 bg-success summary-status-border rounded-circle shadow-sm"></div>
                     </div>
 
-                    <h4 className="mb-1 fw-bold summary-title">{student.first_name || ''} {student.last_name || ''}</h4>
+                    <h4 className="mb-1 fw-bold summary-title">
+                        {student.full_name || student.fullName || `${student.first_name || ''} ${student.middle_name || student.segundo_nombre ? (student.middle_name || student.segundo_nombre) + ' ' : ''}${student.last_name || ''} ${student.second_last_name || student.segundo_apellido || ''}`.trim() || `${student.first_name || ''} ${student.last_name || ''}`.trim()}
+                    </h4>
                     <p className="summary-subtitle small mb-3 text-uppercase ls-1">Expediente Académico #{student.id}</p>
                     <StatusBadge status={student.status} />
                 </div>
@@ -103,7 +105,7 @@ const ProfileSummary = ({ student }) => {
                     <SummaryItem 
                         icon={cilSchool} 
                         label="Grado / Sección" 
-                        value={`${gradoActual} - ${seccionActual}`} 
+                        value={seccionActual && seccionActual !== 'Sin asignar' ? `${gradoActual} - ${seccionActual}` : `${gradoActual} (Sin asignar)`} 
                     />
                     <SummaryItem 
                         icon={cilCalendar} 

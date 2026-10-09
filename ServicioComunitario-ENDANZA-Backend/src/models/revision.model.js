@@ -33,8 +33,7 @@ const initTable = async () => {
   }
 };
 
-// Ejecutar inicialización al cargar el módulo
-initTable();
+// initTable(); // Deshabilitado: NewEndanza ya tiene tabla nativa revision_materia
 
 // ============================================
 // FUNCIONES CRUD

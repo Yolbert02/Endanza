@@ -164,9 +164,8 @@ export const verifyAdmin = async (req, res, next) => {
       });
     }
 
-    // Verificar si tiene permisos de administrador (Id_rol = 1 es "Administrador")
-    // Ajusta este valor según tu base de datos
-    if (user.Id_rol !== 1) { // CORREGIDO: Usar Id_rol, no permiso_id
+    const isAdmin = user.Id_rol === 1 || user.rol === 'admin' || user.roles?.includes('admin');
+    if (!isAdmin) {
       return res.status(403).json({
         ok: false,
         msg: "Admin access required",

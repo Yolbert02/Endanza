@@ -17,56 +17,78 @@ const findAll = async (filters = {}) => {
     let query = {
       text: `
         SELECT 
-          e."Id_estudiante" as id,
-          e."nombre" as first_name,
-          e."apellido" as last_name,
-          e."cedula" as dni,
-          e."fecha_nacimiento" as birth_date,
-          e."genero" as gender,
-          e."seguro_escolar" as school_insurance,
-          e."Id_nivel" as grade_level_id,
-          nl."nivel" as grade_level_name,
-          e."Id_nivel_danza" as dance_level_id,
-          nd."nivel_danza" as dance_level_name,
-          e."Id_especialidad" as specialty_id,
-          e."Id_especialidad" as especialidad_id,
-          e."Id_especialidad" as id_especialidad,
-          esp."nombre_especialidad" as specialty_name,
-          esp."nombre_especialidad" as especialidad,
-          esp."nombre_especialidad" as nombre_especialidad,
-          e."Id_escuela" as school_id,
-          er."nombre_escuela" as school_name,
-          e."Id_seguro" as insurance_id,
-          s."tipo_seguro" as insurance_name,
-          e."Id_representante" as representative_id,
-          r."Id_usuario" as representative_user_id,
-          u_r."nombre" as representative_first_name,
-          u_r."apellido" as representative_last_name,
-          u_r."cedula" as representative_dni,
-          u_r."telefono" as representative_phone,
-          u_r."correo" as representative_email,
-          e."Id_historial" as medical_history_id,
-          (
-            SELECT json_agg(json_build_object(
-              'id', es."Id_estudiante_seccion",
-              'section_id', s."Id_seccion",
-              'section_name', s."nombre_seccion",
-              'academic_year', a."nombre_ano"
-            ))
-            FROM "Estudiante_Seccion" es
-            JOIN "Seccion" s ON es."Id_seccion" = s."Id_seccion"
-            JOIN "Lapso" l ON s."Id_lapso" = l."Id_lapso"
-            JOIN "Ano_Academico" a ON l."Id_ano" = a."Id_ano"
-            WHERE es."Id_estudiante" = e."Id_estudiante"
+          e.id_estudiante as id,
+          p.nombre as first_name,
+          p.segundo_nombre as middle_name,
+          p.segundo_nombre as segundo_nombre,
+          p.apellido as last_name,
+          p.segundo_apellido as second_last_name,
+          p.segundo_apellido as segundo_apellido,
+          p.cedula as dni,
+          p.fecha_nacimiento as birth_date,
+          p.genero as gender,
+          e.seguro_escolar as school_insurance,
+          e.id_nivel as grade_level_id,
+          nl.nivel as grade_level_name,
+          e.id_nivel_danza as dance_level_id,
+          nd.nivel_danza as dance_level_name,
+          e.id_especialidad as specialty_id,
+          e.id_especialidad as especialidad_id,
+          e.id_especialidad as id_especialidad,
+          esp.nombre_especialidad as specialty_name,
+          esp.nombre_especialidad as especialidad,
+          esp.nombre_especialidad as nombre_especialidad,
+          e.id_escuela as school_id,
+          er.nombre_escuela as school_name,
+          e.id_seguro as insurance_id,
+          s.tipo_seguro as insurance_name,
+          e.id_representante as representative_id,
+          r.id_usuario as representative_user_id,
+          p_r.nombre as representative_first_name,
+          p_r.segundo_nombre as representative_second_name,
+          p_r.apellido as representative_last_name,
+          p_r.segundo_apellido as representative_second_last_name,
+          p_r.cedula as representative_dni,
+          p_r.numero_telefono as representative_phone,
+          p_r.email as representative_email,
+          p_r.genero as representative_gender,
+          r.profesion as representative_occupation,
+          r.lugar_trabajo as representative_workplace,
+          r.direccion_trabajo as representative_work_address,
+          r.telefono_trabajo as representative_work_phone,
+          r.lugar_trabajo,
+          r.direccion_trabajo,
+          r.telefono_trabajo,
+          ef.parentesco as representative_relationship,
+          ef.parentesco as parentesco,
+          e.id_historia as medical_history_id,
+          COALESCE(
+            (
+              SELECT jsonb_agg(
+                jsonb_build_object(
+                  'id', i.id_inscripcion,
+                  'section_id', sec.id_seccion,
+                  'section_name', sec.nombre_seccion,
+                  'academic_year', a.nombre_ano
+                )
+              )
+              FROM inscripcion i
+              JOIN seccion sec ON i.id_seccion = sec.id_seccion
+              JOIN ano_academico a ON i.id_ano = a.id_ano
+              WHERE i.id_estudiante = e.id_estudiante
+            ),
+            '[]'::jsonb
           ) as sections
-        FROM "Estudiante" e
-        LEFT JOIN "Nivel_Escolar" nl ON e."Id_nivel" = nl."Id_nivel"
-        LEFT JOIN "Nivel_Danza" nd ON e."Id_nivel_danza" = nd."Id_nivel_danza"
-        LEFT JOIN "Especialidad" esp ON e."Id_especialidad" = esp."Id_especialidad"
-        LEFT JOIN "Escuela_Regular" er ON e."Id_escuela" = er."Id_escuela"
-        LEFT JOIN "Seguro" s ON e."Id_seguro" = s."Id_seguro"
-        LEFT JOIN "Representante" r ON e."Id_representante" = r."Id_representante"
-        LEFT JOIN "Usuario" u_r ON r."Id_usuario" = u_r."Id_usuario"
+        FROM estudiante e
+        JOIN persona p ON e.id_persona = p.id_persona
+        LEFT JOIN nivel_escolar nl ON e.id_nivel = nl.id_nivel
+        LEFT JOIN nivel_danza nd ON e.id_nivel_danza = nd.id_nivel_danza
+        LEFT JOIN especialidad esp ON e.id_especialidad = esp.id_especialidad
+        LEFT JOIN escuela_regular er ON e.id_escuela = er.id_escuela
+        LEFT JOIN seguro_medico s ON e.id_seguro = s.id_seguro
+        LEFT JOIN representante r ON e.id_representante = r.id_representante
+        LEFT JOIN persona p_r ON r.id_persona = p_r.id_persona
+        LEFT JOIN estudiante_familiar ef ON ef.id_estudiante = e.id_estudiante AND ef.id_persona = r.id_persona
         WHERE 1=1
       `
     };
@@ -74,14 +96,12 @@ const findAll = async (filters = {}) => {
     const values = [];
     let paramIndex = 1;
 
-    // Filtro por año académico (a través de las secciones)
+    // Filtro por año académico (a través de las inscripciones)
     if (filters.academicYearId) {
       query.text += ` AND EXISTS (
-        SELECT 1 FROM "Estudiante_Seccion" es
-        JOIN "Seccion" s ON es."Id_seccion" = s."Id_seccion"
-        JOIN "Lapso" l ON s."Id_lapso" = l."Id_lapso"
-        WHERE es."Id_estudiante" = e."Id_estudiante"
-        AND l."Id_ano" = $${paramIndex}
+        SELECT 1 FROM inscripcion i
+        WHERE i.id_estudiante = e.id_estudiante
+        AND i.id_ano = $${paramIndex}
       )`;
       values.push(filters.academicYearId);
       paramIndex++;
@@ -90,15 +110,15 @@ const findAll = async (filters = {}) => {
     // Filtro por sección específica
     if (filters.sectionId) {
       query.text += ` AND EXISTS (
-        SELECT 1 FROM "Estudiante_Seccion" es
-        WHERE es."Id_estudiante" = e."Id_estudiante"
-        AND es."Id_seccion" = $${paramIndex}
+        SELECT 1 FROM inscripcion i
+        WHERE i.id_estudiante = e.id_estudiante
+        AND i.id_seccion = $${paramIndex}
       )`;
       values.push(filters.sectionId);
       paramIndex++;
     }
 
-    query.text += ` ORDER BY e."apellido", e."nombre"`;
+    query.text += ` ORDER BY p.apellido, p.nombre`;
     query.values = values;
 
     const { rows } = await db.query(query.text, query.values);
@@ -119,68 +139,81 @@ const findById = async (id) => {
     const query = {
       text: `
         SELECT 
-          e."Id_estudiante" as id,
-          e."nombre" as first_name,
-          e."apellido" as last_name,
-          e."cedula" as dni,
-          TO_CHAR(e."fecha_nacimiento", 'YYYY-MM-DD') as birth_date,
-          e."genero" as gender,
-          COALESCE(e."estatus", 'Activo') as status,
-          hm."tipo_sangre" as blood_type,
-          e."seguro_escolar" as school_insurance,
-          e."Id_nivel" as grade_level_id,
-          nl."nivel" as grade_level_name,
-          e."Id_nivel_danza" as dance_level_id,
-          nd."nivel_danza" as dance_level_name,
-          e."Id_especialidad" as specialty_id,
-          e."Id_especialidad" as especialidad_id,
-          e."Id_especialidad" as id_especialidad,
-          esp."nombre_especialidad" as specialty_name,
-          esp."nombre_especialidad" as especialidad,
-          esp."nombre_especialidad" as nombre_especialidad,
-          e."Id_escuela" as school_id,
-          er."nombre_escuela" as school_name,
-          e."Id_seguro" as insurance_id,
-          s."tipo_seguro" as insurance_name,
-          e."Id_representante" as representative_id,
-          r."Id_usuario" as representative_user_id,
-          u_r."nombre" as representative_first_name,
-          u_r."apellido" as representative_last_name,
-          u_r."cedula" as representative_dni,
-          u_r."telefono" as representative_phone,
-          u_r."correo" as representative_email,
-          u_r."genero" as representative_gender,
-          r."es_familiar" as representative_es_familiar,
-          r."profesion_rep" as representative_occupation,
-          CASE 
-            WHEN r."es_familiar" = true THEN (
-              CASE 
-                WHEN LOWER(u_r."genero") LIKE 'f%' OR LOWER(u_r."nombre") LIKE 'diana%' OR LOWER(u_r."nombre") LIKE '%maría%' OR LOWER(u_r."nombre") LIKE '%maria%' THEN 'Madre'
-                WHEN LOWER(u_r."genero") LIKE 'm%' THEN 'Padre'
-                ELSE 'Madre'
-              END
-            )
-            ELSE 'Otro'
-          END as representative_relationship,
-          d."nombre_direccion" as address,
-          c."nombre_ciudad" as city,
-          st."nombre_estado" as state,
-          e."Id_historial" as medical_history_id
-        FROM "Estudiante" e
-        LEFT JOIN "Historial_Medico" hm ON e."Id_historial" = hm."Id_historial"
-        LEFT JOIN "Nivel_Escolar" nl ON e."Id_nivel" = nl."Id_nivel"
-        LEFT JOIN "Nivel_Danza" nd ON e."Id_nivel_danza" = nd."Id_nivel_danza"
-        LEFT JOIN "Especialidad" esp ON e."Id_especialidad" = esp."Id_especialidad"
-        LEFT JOIN "Escuela_Regular" er ON e."Id_escuela" = er."Id_escuela"
-        LEFT JOIN "Seguro" s ON e."Id_seguro" = s."Id_seguro"
-        LEFT JOIN "Representante" r ON e."Id_representante" = r."Id_representante"
-        LEFT JOIN "Usuario" u_r ON r."Id_usuario" = u_r."Id_usuario"
-        LEFT JOIN "Direccion" d ON u_r."Id_direccion" = d."Id_direccion"
-        LEFT JOIN "Ciudad" c ON d."Id_ciudad" = c."Id_ciudad"
-        LEFT JOIN "Parroquia" p ON c."Id_parroquia" = p."Id_parroquia"
-        LEFT JOIN "Municipio" m ON p."Id_municipio" = m."Id_municipio"
-        LEFT JOIN "Estado" st ON m."Id_estado" = st."Id_estado"
-        WHERE e."Id_estudiante" = $1
+          e.id_estudiante as id,
+          p.nombre as first_name,
+          p.segundo_nombre as middle_name,
+          p.segundo_nombre as segundo_nombre,
+          p.segundo_nombre as second_name,
+          p.apellido as last_name,
+          p.segundo_apellido as second_last_name,
+          p.segundo_apellido as segundo_apellido,
+          p.cedula as dni,
+          TO_CHAR(p.fecha_nacimiento, 'YYYY-MM-DD') as birth_date,
+          p.genero as gender,
+          COALESCE(hm.tipo_sangre, 'O+') as blood_type,
+          COALESCE(hm.tipo_sangre, 'O+') as tipo_sangre,
+          COALESCE(hm.tipo_sangre, 'O+') as "TipoSangre",
+          e.id_nivel as grade_level_id,
+          nl.nivel as grade_level_name,
+          e.id_nivel_danza as dance_level_id,
+          nd.nivel_danza as dance_level_name,
+          e.id_especialidad as specialty_id,
+          e.id_especialidad as especialidad_id,
+          e.id_especialidad as id_especialidad,
+          esp.nombre_especialidad as specialty_name,
+          esp.nombre_especialidad as especialidad,
+          esp.nombre_especialidad as nombre_especialidad,
+          e.id_escuela as school_id,
+          er.nombre_escuela as school_name,
+          e.id_seguro as insurance_id,
+          s.tipo_seguro as insurance_name,
+          e.id_representante as representative_id,
+          r.id_usuario as representative_user_id,
+          p_r.nombre as representative_first_name,
+          p_r.segundo_nombre as representative_second_name,
+          p_r.segundo_nombre as representative_segundo_nombre,
+          p_r.apellido as representative_last_name,
+          p_r.segundo_apellido as representative_second_last_name,
+          p_r.segundo_apellido as representative_segundo_apellido,
+          p_r.cedula as representative_dni,
+          p_r.numero_telefono as representative_phone,
+          p_r.email as representative_email,
+          p_r.genero as representative_gender,
+          true as representative_es_familiar,
+          r.profesion as representative_occupation,
+          r.lugar_trabajo as representative_workplace,
+          r.direccion_trabajo as representative_work_address,
+          r.telefono_trabajo as representative_work_phone,
+          r.lugar_trabajo,
+          r.direccion_trabajo,
+          r.telefono_trabajo,
+          COALESCE(ef.parentesco, 'Madre') as representative_relationship,
+          COALESCE(dir.direccion, r.direccion_trabajo, '') as address,
+          'San Cristóbal' as city,
+          'Táchira' as state,
+          e.id_historia as medical_history_id,
+          hm.peso_kg,
+          hm.altura_m,
+          hm.tiene_alergias,
+          hm.descripcion_alergias,
+          hm.tiene_cirugia,
+          hm.descripcion_cirugia,
+          hm.intolerancia_alimentos,
+          hm.descripcion_intolerancia
+        FROM estudiante e
+        JOIN persona p ON e.id_persona = p.id_persona
+        LEFT JOIN nivel_escolar nl ON e.id_nivel = nl.id_nivel
+        LEFT JOIN nivel_danza nd ON e.id_nivel_danza = nd.id_nivel_danza
+        LEFT JOIN especialidad esp ON e.id_especialidad = esp.id_especialidad
+        LEFT JOIN escuela_regular er ON e.id_escuela = er.id_escuela
+        LEFT JOIN seguro_medico s ON e.id_seguro = s.id_seguro
+        LEFT JOIN representante r ON e.id_representante = r.id_representante
+        LEFT JOIN persona p_r ON r.id_persona = p_r.id_persona
+        LEFT JOIN usuario u_r ON r.id_usuario = u_r.id_usuario
+        LEFT JOIN direccion dir ON u_r.id_direccion = dir.id_direccion
+        LEFT JOIN estudiante_familiar ef ON ef.id_estudiante = e.id_estudiante AND ef.id_persona = r.id_persona
+        LEFT JOIN historial_medico hm ON e.id_historia = hm.id_historia
+        WHERE e.id_estudiante = $1
       `,
       values: [id]
     };
@@ -202,18 +235,17 @@ const findSectionsByStudentId = async (studentId) => {
     const query = {
       text: `
         SELECT 
-          es."Id_estudiante_seccion" as id,
-          es."Id_seccion" as section_id,
-          s."nombre_seccion" as section_name,
-          l."Id_ano" as academic_year_id,
-          a."nombre_ano" as academic_year_name,
-          l."nombre_lapso" as period_name
-        FROM "Estudiante_Seccion" es
-        JOIN "Seccion" s ON es."Id_seccion" = s."Id_seccion"
-        JOIN "Lapso" l ON s."Id_lapso" = l."Id_lapso"
-        JOIN "Ano_Academico" a ON l."Id_ano" = a."Id_ano"
-        WHERE es."Id_estudiante" = $1
-        ORDER BY a."nombre_ano" DESC, l."nombre_lapso"
+          i.id_inscripcion as id,
+          i.id_seccion as section_id,
+          s.nombre_seccion as section_name,
+          i.id_ano as academic_year_id,
+          a.nombre_ano as academic_year_name,
+          'Año Completo' as period_name
+        FROM inscripcion i
+        JOIN seccion s ON i.id_seccion = s.id_seccion
+        JOIN ano_academico a ON i.id_ano = a.id_ano
+        WHERE i.id_estudiante = $1
+        ORDER BY a.nombre_ano DESC
       `,
       values: [studentId]
     };
@@ -300,284 +332,433 @@ const create = async (studentData) => {
  * @returns {Promise<Object>}
  */
 const update = async (id, studentData) => {
+  const client = await db.pool.connect();
   try {
-    const rawNombre = studentData.EstudiantePrimerNombre
-      ? `${studentData.EstudiantePrimerNombre} ${studentData.EstudianteSegundoNombre || ''}`.trim()
-      : (studentData.nombre ?? studentData.first_name ?? studentData.NombreEstudiante);
-    const rawApellido = studentData.EstudiantePrimerApellido
-      ? `${studentData.EstudiantePrimerApellido} ${studentData.EstudianteSegundoApellido || ''}`.trim()
-      : (studentData.apellido ?? studentData.last_name ?? studentData.ApellidoEstudiante);
-    const cedula = studentData.cedula ?? studentData.dni ?? studentData.Cedula;
-    const fecha_nacimiento = studentData.fecha_nacimiento ?? studentData.birth_date ?? studentData.FechaNacimiento;
-    const genero = studentData.genero ?? studentData.gender ?? studentData.Sexo;
-    const seguro_escolar = studentData.seguro_escolar ?? studentData.school_insurance;
-    const Id_nivel = studentData.Id_nivel ?? studentData.grade_level_id;
-    const Id_nivel_danza = studentData.Id_nivel_danza ?? studentData.dance_level_id;
-    const Id_escuela = studentData.Id_escuela ?? studentData.school_id;
-    const Id_seguro = studentData.Id_seguro ?? studentData.insurance_id;
-    const Id_representante = studentData.Id_representante ?? studentData.representative_id;
-    const Id_historial = studentData.Id_historial ?? studentData.medical_history_id;
-    const estatus = studentData.estatus ?? studentData.status ?? studentData.Estatus;
+    await client.query('BEGIN');
 
-    let Id_especialidad = studentData.Id_especialidad ?? studentData.especialidad_id ?? studentData.id_especialidad ?? studentData.specialty_id;
-    if (Id_especialidad === undefined && studentData.especialidad) {
-      const esp = await EspecialidadModel.findByName(studentData.especialidad);
-      if (esp) Id_especialidad = esp.id;
+    // 1. Obtener datos actuales del estudiante
+    const estRes = await client.query(`
+      SELECT 
+        e.id_estudiante,
+        e.id_persona,
+        e.id_representante,
+        e.id_nivel_danza,
+        e.id_nivel,
+        e.id_especialidad,
+        e.seguro_escolar,
+        r.id_persona as id_persona_rep,
+        r.id_usuario as id_usuario_rep
+      FROM estudiante e
+      LEFT JOIN representante r ON e.id_representante = r.id_representante
+      WHERE e.id_estudiante = $1
+    `, [id]);
+
+    if (estRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      throw new Error(`Estudiante con ID ${id} no encontrado`);
     }
 
-    const formattedNombre = rawNombre !== undefined ? capitalizeWords(rawNombre) : undefined;
-    const formattedApellido = rawApellido !== undefined ? capitalizeWords(rawApellido) : undefined;
+    const currentStudent = estRes.rows[0];
+    const studentPersonaId = currentStudent.id_persona;
 
-    const query = {
-      text: `
-        UPDATE "Estudiante"
-        SET 
-          "nombre" = COALESCE($1, "nombre"),
-          "apellido" = COALESCE($2, "apellido"),
-          "cedula" = COALESCE($3, "cedula"),
-          "fecha_nacimiento" = COALESCE($4, "fecha_nacimiento"),
-          "genero" = COALESCE($5, "genero"),
-          "seguro_escolar" = COALESCE($6, "seguro_escolar"),
-          "Id_nivel" = COALESCE($7, "Id_nivel"),
-          "Id_nivel_danza" = COALESCE($8, "Id_nivel_danza"),
-          "Id_escuela" = COALESCE($9, "Id_escuela"),
-          "Id_seguro" = COALESCE($10, "Id_seguro"),
-          "Id_representante" = COALESCE($11, "Id_representante"),
-          "Id_historial" = COALESCE($12, "Id_historial"),
-          "estatus" = COALESCE($13, "estatus"),
-          "Id_especialidad" = COALESCE($14, "Id_especialidad")
-        WHERE "Id_estudiante" = $15
-        RETURNING 
-          "Id_estudiante" as id,
-          "nombre" as first_name,
-          "apellido" as last_name,
-          "cedula" as dni
-      `,
-      values: [
-        formattedNombre, formattedApellido, cedula, fecha_nacimiento, genero,
-        seguro_escolar, Id_nivel, Id_nivel_danza, Id_escuela,
-        Id_seguro, Id_representante, Id_historial, estatus, Id_especialidad, id
-      ]
+    // 2. Extraer y formatear datos personales del estudiante
+    const p1Nombre = studentData.EstudiantePrimerNombre ? capitalizeWords(studentData.EstudiantePrimerNombre.trim()) : undefined;
+    const p2Nombre = studentData.EstudianteSegundoNombre !== undefined ? capitalizeWords(studentData.EstudianteSegundoNombre.trim()) : undefined;
+    const p1Apellido = studentData.EstudiantePrimerApellido ? capitalizeWords(studentData.EstudiantePrimerApellido.trim()) : undefined;
+    const p2Apellido = studentData.EstudianteSegundoApellido !== undefined ? capitalizeWords(studentData.EstudianteSegundoApellido.trim()) : undefined;
+
+    let rawNombre = p1Nombre || (studentData.nombre ? capitalizeWords(studentData.nombre.trim()) : undefined) || (studentData.first_name ? capitalizeWords(studentData.first_name.trim()) : undefined);
+    let finalSegundoNombre = p2Nombre;
+    if (!finalSegundoNombre && rawNombre && rawNombre.includes(' ')) {
+      const parts = rawNombre.split(/\s+/).filter(Boolean);
+      rawNombre = parts[0];
+      finalSegundoNombre = parts.slice(1).join(' ');
+    }
+
+    let rawApellido = p1Apellido || (studentData.apellido ? capitalizeWords(studentData.apellido.trim()) : undefined) || (studentData.last_name ? capitalizeWords(studentData.last_name.trim()) : undefined);
+    let finalSegundoApellido = p2Apellido;
+    if (!finalSegundoApellido && rawApellido && rawApellido.includes(' ')) {
+      const parts = rawApellido.split(/\s+/).filter(Boolean);
+      rawApellido = parts[0];
+      finalSegundoApellido = parts.slice(1).join(' ');
+    }
+
+    const normalizeGenero = (val) => {
+      if (!val) return null;
+      const str = String(val).trim().toLowerCase();
+      if (str.startsWith('m')) return 'masculino';
+      if (str.startsWith('f')) return 'femenino';
+      return null;
     };
 
-    const { rows } = await db.query(query.text, query.values);
+    const cedula = studentData.cedula ?? studentData.dni ?? studentData.Cedula;
+    const fechaNac = studentData.fecha_nacimiento ?? studentData.birth_date ?? studentData.FechaNacimiento;
+    const rawGenero = studentData.genero ?? studentData.gender ?? studentData.Sexo;
+    const normalizedGenero = normalizeGenero(rawGenero);
 
-    // Actualizar o crear datos del representante vinculado
-    let existingStudent = await findById(id);
-    const isMadre = studentData.RepresentanteParentesco === 'Madre' ||
-      existingStudent?.representative_relationship === 'Madre' ||
-      (existingStudent?.representative_gender && String(existingStudent.representative_gender).toLowerCase().startsWith('f')) ||
-      (!['Padre', 'Tío', 'Abuelo', 'Hermano'].includes(studentData.RepresentanteParentesco));
+    // Actualizar persona del estudiante
+    if (studentPersonaId) {
+      const studentTel = studentData.Telefono ?? studentData.telefono ?? studentData.phone;
+      const studentEmail = studentData.Email ?? studentData.email;
 
-    const isPadre = studentData.RepresentanteParentesco === 'Padre' ||
-      existingStudent?.representative_relationship === 'Padre' ||
-      (existingStudent?.representative_gender && String(existingStudent.representative_gender).toLowerCase().startsWith('m'));
+      await client.query(`
+        UPDATE persona
+        SET
+          nombre = COALESCE($1, nombre),
+          segundo_nombre = COALESCE($2, segundo_nombre),
+          apellido = COALESCE($3, apellido),
+          segundo_apellido = COALESCE($4, segundo_apellido),
+          cedula = COALESCE($5, cedula),
+          fecha_nacimiento = COALESCE($6, fecha_nacimiento),
+          genero = COALESCE($7, genero),
+          numero_telefono = CASE WHEN $8 THEN $9 ELSE numero_telefono END,
+          email = CASE WHEN $10 THEN $11 ELSE email END
+        WHERE id_persona = $12
+      `, [
+        rawNombre || null,
+        p2Nombre !== undefined ? (p2Nombre || null) : null,
+        rawApellido || null,
+        p2Apellido !== undefined ? (p2Apellido || null) : null,
+        cedula || null,
+        fechaNac || null,
+        normalizedGenero || null,
+        studentTel !== undefined,
+        studentTel || null,
+        studentEmail !== undefined,
+        studentEmail || null,
+        studentPersonaId
+      ]);
+    }
 
-    const repFirstName = studentData.RepresentantePrimerNombre
-      ? `${studentData.RepresentantePrimerNombre} ${studentData.RepresentanteSegundoNombre || ''}`.trim()
-      : (studentData.representative_first_name ?? studentData.RepresentanteNombre ?? (isMadre ? (studentData.MadrePrimerNombre || studentData.MadreNombre) : (isPadre ? (studentData.PadrePrimerNombre || studentData.PadreNombre) : null)));
-    const repLastName = studentData.RepresentantePrimerApellido
-      ? `${studentData.RepresentantePrimerApellido} ${studentData.RepresentanteSegundoApellido || ''}`.trim()
-      : (studentData.representative_last_name ?? studentData.RepresentanteApellido ?? (isMadre ? (studentData.MadrePrimerApellido || studentData.MadreApellido) : (isPadre ? (studentData.PadrePrimerApellido || studentData.PadreApellido) : null)));
+    // 3. Resolver nivel de danza de ENDANZA
+    const gradoMap = {
+      'pre_ballet': 'Pre-Ballet',
+      'preparatorio': 'Preparatorio',
+      '1er_grado': '1er Grado',
+      '2do_grado': '2do Grado',
+      '3er_grado': '3er Grado',
+      '4to_grado': '4to Grado',
+      '5to_grado': '5to Grado',
+      '6to_grado': '6to Grado',
+      '7mo_grado': '7mo Grado',
+      '8vo_grado': '8vo Grado'
+    };
+    const rawGrado = (studentData.Grado || studentData.grado || studentData.dance_level || studentData.dance_level_name || '').trim();
+    const gradoStr = gradoMap[rawGrado.toLowerCase()] || rawGrado;
+    let danceLevelId = null;
 
-    // Extraer cédula limpia
-    const rawRepDni = (studentData.RepresentanteCedula && String(studentData.RepresentanteCedula).trim()) ||
-      (isMadre && studentData.MadreCedula && String(studentData.MadreCedula).trim()) ||
-      (isPadre && studentData.PadreCedula && String(studentData.PadreCedula).trim()) ||
-      (studentData.MadreCedula && String(studentData.MadreCedula).trim()) ||
-      (studentData.PadreCedula && String(studentData.PadreCedula).trim()) ||
-      studentData.representative_dni;
-    const repDni = rawRepDni ? String(rawRepDni).replace(/[^0-9]/g, '').slice(0, 8) : null;
+    if (gradoStr) {
+      const ndRes = await client.query(
+        'SELECT id_nivel_danza FROM nivel_danza WHERE LOWER(nivel_danza) = LOWER($1) OR LOWER(nivel_danza) LIKE LOWER($2) ORDER BY CASE WHEN LOWER(nivel_danza) = LOWER($1) THEN 1 ELSE 2 END, id_nivel_danza LIMIT 1',
+        [gradoStr, `%${gradoStr}%`]
+      );
+      if (ndRes.rows.length > 0) {
+        danceLevelId = ndRes.rows[0].id_nivel_danza;
+      }
+    }
 
-    const rawRepPhone = (studentData.RepresentanteTelefono && String(studentData.RepresentanteTelefono).trim()) ||
-      (isMadre && studentData.MadreTelefono && String(studentData.MadreTelefono).trim()) ||
-      (isPadre && studentData.PadreTelefono && String(studentData.PadreTelefono).trim()) ||
-      (studentData.MadreTelefono && String(studentData.MadreTelefono).trim()) ||
-      studentData.representative_phone;
-    const repPhone = rawRepPhone || null;
+    if (!danceLevelId) {
+      danceLevelId = studentData.Id_nivel_danza ?? studentData.dance_level_id ?? null;
+    }
 
-    const rawRepEmail = (studentData.RepresentanteEmail && String(studentData.RepresentanteEmail).trim()) ||
-      (isMadre && studentData.MadreEmail && String(studentData.MadreEmail).trim()) ||
-      (isPadre && studentData.PadreEmail && String(studentData.PadreEmail).trim()) ||
-      (studentData.MadreEmail && String(studentData.MadreEmail).trim()) ||
-      studentData.representative_email;
-    const repEmail = rawRepEmail || null;
+    // Especialidad si aplica
+    let espId = studentData.Id_especialidad ?? studentData.especialidad_id ?? studentData.id_especialidad ?? studentData.specialty_id;
+    if (!espId && gradoStr.includes(' - ')) {
+      const espName = gradoStr.split(' - ')[1].trim();
+      const espRes = await client.query(
+        'SELECT id_especialidad FROM especialidad WHERE LOWER(nombre_especialidad) = LOWER($1) LIMIT 1',
+        [espName]
+      );
+      if (espRes.rows.length > 0) espId = espRes.rows[0].id_especialidad;
+    }
 
-    const repOccupation = studentData.RepresentanteOcupacion || (isMadre ? studentData.MadreOcupacion : (isPadre ? studentData.PadreOcupacion : null)) || studentData.representative_occupation;
-    const repParentesco = studentData.RepresentanteParentesco ?? studentData.parentesco ?? (isMadre ? 'Madre' : (isPadre ? 'Padre' : 'Otro'));
+    const seguroEscolar = studentData.seguro_escolar ?? studentData.school_insurance;
 
-    console.log('🔍 [UPDATE] Datos del representante a actualizar:', {
-      repFirstName,
-      repLastName,
-      repDni,
-      repPhone,
-      repEmail,
-      representative_user_id: existingStudent?.representative_user_id,
-      representative_id: existingStudent?.representative_id,
-      isMadre,
-      isPadre
-    });
+    // Actualizar tabla estudiante
+    await client.query(`
+      UPDATE estudiante
+      SET
+        id_nivel_danza = COALESCE($1, id_nivel_danza),
+        id_especialidad = COALESCE($2, id_especialidad),
+        seguro_escolar = COALESCE($3, seguro_escolar)
+      WHERE id_estudiante = $4
+    `, [
+      danceLevelId || null,
+      espId || null,
+      seguroEscolar !== undefined ? seguroEscolar : null,
+      id
+    ]);
 
-    // CASO 1: Si no tiene representante asignado en Estudiante pero se enviaron datos, crearlo o vincularlo
-    if (!existingStudent?.representative_user_id && (repFirstName || repLastName || repDni || repPhone || repEmail)) {
-      let usuarioId = null;
-      if (repDni) {
-        const uRes = await db.query(
-          'SELECT "Id_usuario" FROM "Usuario" WHERE "cedula" = $1 OR "cedula" = $2',
-          [repDni, `V-${repDni}`]
-        );
-        if (uRes.rows.length > 0) {
-          usuarioId = uRes.rows[0].Id_usuario;
-        }
+    // 4. Si se envió Sección, actualizar inscripción
+    const seccionName = (studentData.Seccion || studentData.seccion || '').trim();
+    if (seccionName) {
+      let targetSectionQuery = `SELECT id_seccion FROM seccion WHERE LOWER(nombre_seccion) = LOWER($1)`;
+      const queryParams = [seccionName];
+      if (danceLevelId || currentStudent.id_nivel_danza) {
+        targetSectionQuery += ` AND id_nivel_danza = $2`;
+        queryParams.push(danceLevelId || currentStudent.id_nivel_danza);
+      }
+      targetSectionQuery += ` LIMIT 1`;
+      let secMatch = await client.query(targetSectionQuery, queryParams);
+      if (secMatch.rows.length === 0) {
+        secMatch = await client.query('SELECT id_seccion FROM seccion WHERE LOWER(nombre_seccion) = LOWER($1) LIMIT 1', [seccionName]);
       }
 
-      if (!usuarioId) {
-        const insertUser = await db.query(`
-          INSERT INTO "Usuario" ("nombre", "apellido", "cedula", "telefono", "correo", "Id_rol")
-          VALUES ($1, $2, $3, $4, $5, 2)
-          RETURNING "Id_usuario"
-        `, [
-          repFirstName ? capitalizeWords(repFirstName) : 'Representante',
-          repLastName ? capitalizeWords(repLastName) : '',
-          repDni,
-          repPhone,
-          repEmail
-        ]);
-        usuarioId = insertUser.rows[0].Id_usuario;
+      if (secMatch.rows.length > 0) {
+        const targetSectionId = secMatch.rows[0].id_seccion;
+        await client.query(`
+          UPDATE inscripcion
+          SET id_seccion = $1
+          WHERE id_inscripcion = (
+            SELECT id_inscripcion FROM inscripcion WHERE id_estudiante = $2 ORDER BY id_inscripcion DESC LIMIT 1
+          )
+        `, [targetSectionId, id]);
       }
+    }
 
-      let repId = null;
-      const existRep = await db.query('SELECT "Id_representante" FROM "Representante" WHERE "Id_usuario" = $1', [usuarioId]);
-      if (existRep.rows.length > 0) {
-        repId = existRep.rows[0].Id_representante;
+    // 5. Actualizar representante y usuario del representante
+    const repP1Nombre = studentData.RepresentantePrimerNombre ? capitalizeWords(studentData.RepresentantePrimerNombre.trim()) : undefined;
+    const repP2Nombre = studentData.RepresentanteSegundoNombre !== undefined ? capitalizeWords(studentData.RepresentanteSegundoNombre.trim()) : undefined;
+    const repP1Apellido = studentData.RepresentantePrimerApellido ? capitalizeWords(studentData.RepresentantePrimerApellido.trim()) : undefined;
+    const repP2Apellido = studentData.RepresentanteSegundoApellido !== undefined ? capitalizeWords(studentData.RepresentanteSegundoApellido.trim()) : undefined;
+    const repDni = studentData.RepresentanteCedula || studentData.representative_dni;
+    let repPhone = studentData.RepresentanteTelefono !== undefined ? studentData.RepresentanteTelefono : studentData.representative_phone;
+    let repEmail = studentData.RepresentanteEmail !== undefined ? studentData.RepresentanteEmail : studentData.representative_email;
+    let repOcupacion = studentData.RepresentanteOcupacion !== undefined ? studentData.RepresentanteOcupacion : studentData.representative_occupation;
+    if (studentData.RepresentanteParentesco === 'Madre' || currentStudent.representative_relationship === 'Madre') {
+      if (repOcupacion === undefined || repOcupacion === null || repOcupacion === '') {
+        repOcupacion = studentData.MadreOcupacion;
+      }
+      if (repEmail === undefined || repEmail === null || repEmail === '') {
+        repEmail = studentData.MadreEmail;
+      }
+      if (repPhone === undefined || repPhone === null || repPhone === '') {
+        repPhone = studentData.MadreTelefono;
+      }
+    } else if (studentData.RepresentanteParentesco === 'Padre' || currentStudent.representative_relationship === 'Padre') {
+      if (repOcupacion === undefined || repOcupacion === null || repOcupacion === '') {
+        repOcupacion = studentData.PadreOcupacion;
+      }
+      if (repEmail === undefined || repEmail === null || repEmail === '') {
+        repEmail = studentData.PadreEmail;
+      }
+      if (repPhone === undefined || repPhone === null || repPhone === '') {
+        repPhone = studentData.PadreTelefono;
+      }
+    }
+
+    if (currentStudent.id_persona_rep) {
+      await client.query(`
+        UPDATE persona
+        SET
+          nombre = COALESCE($1, nombre),
+          segundo_nombre = COALESCE($2, segundo_nombre),
+          apellido = COALESCE($3, apellido),
+          segundo_apellido = COALESCE($4, segundo_apellido),
+          cedula = COALESCE($5, cedula),
+          numero_telefono = CASE WHEN $6 THEN $7 ELSE numero_telefono END,
+          email = CASE WHEN $8 THEN $9 ELSE email END
+        WHERE id_persona = $10
+      `, [
+        repP1Nombre || (studentData.representative_first_name ? capitalizeWords(studentData.representative_first_name) : null),
+        repP2Nombre !== undefined ? (repP2Nombre || null) : null,
+        repP1Apellido || (studentData.representative_last_name ? capitalizeWords(studentData.representative_last_name) : null),
+        repP2Apellido !== undefined ? (repP2Apellido || null) : null,
+        repDni || null,
+        repPhone !== undefined,
+        repPhone || null,
+        repEmail !== undefined,
+        repEmail || null,
+        currentStudent.id_persona_rep
+      ]);
+    }
+
+    const repLugarTrabajo = studentData.RepresentanteLugarTrabajo ?? studentData.trabajo_Rep ?? studentData.representative_workplace;
+    const repDirTrabajo = studentData.RepresentanteDireccionTrabajo ?? studentData.direccion_Trabajo_Rep ?? studentData.representative_work_address ?? studentData.direccion_trabajo;
+    const repTelTrabajo = studentData.RepresentanteTelefonoTrabajo ?? studentData.telefono_trabajo_Rep ?? studentData.representative_work_phone ?? studentData.telefono_trabajo;
+
+    if (currentStudent.id_representante) {
+      await client.query(`
+        UPDATE representante
+        SET
+          profesion = CASE WHEN $1 THEN $2 ELSE profesion END,
+          lugar_trabajo = CASE WHEN $3 THEN $4 ELSE lugar_trabajo END,
+          direccion_trabajo = CASE WHEN $5 THEN $6 ELSE direccion_trabajo END,
+          telefono_trabajo = CASE WHEN $7 THEN $8 ELSE telefono_trabajo END
+        WHERE id_representante = $9
+      `, [
+        repOcupacion !== undefined, repOcupacion || null,
+        repLugarTrabajo !== undefined, repLugarTrabajo || null,
+        repDirTrabajo !== undefined, repDirTrabajo || null,
+        repTelTrabajo !== undefined, repTelTrabajo || null,
+        currentStudent.id_representante
+      ]);
+    }
+
+    // 6. Dirección de habitación
+    const dirVal = (studentData.Direccion || studentData.address || studentData.direccion || '').trim();
+    if (dirVal && currentStudent.id_usuario_rep) {
+      const uRes = await client.query('SELECT id_direccion FROM usuario WHERE id_usuario = $1', [currentStudent.id_usuario_rep]);
+      const currentDirId = uRes.rows[0]?.id_direccion;
+      if (currentDirId) {
+        await client.query('UPDATE direccion SET direccion = $1 WHERE id_direccion = $2', [dirVal, currentDirId]);
       } else {
-        const insertRep = await db.query(`
-          INSERT INTO "Representante" ("Id_usuario", "es_familiar", "profesion_rep")
-          VALUES ($1, $2, $3)
-          RETURNING "Id_representante"
-        `, [
-          usuarioId,
-          repParentesco !== 'Otro',
-          repOccupation || null
-        ]);
-        repId = insertRep.rows[0].Id_representante;
-      }
-
-      await db.query(`UPDATE "Estudiante" SET "Id_representante" = $1 WHERE "Id_estudiante" = $2`, [repId, id]);
-    } else if (existingStudent?.representative_user_id) {
-      // CASO 2: Ya tiene representante asignado
-      // Verificar si la cédula ya pertenece a otro Usuario para evitar error de constraint UNIQUE
-      if (repDni) {
-        const dupCheck = await db.query(
-          'SELECT "Id_usuario" FROM "Usuario" WHERE ("cedula" = $1 OR "cedula" = $2) AND "Id_usuario" != $3',
-          [repDni, `V-${repDni}`, existingStudent.representative_user_id]
-        );
-        if (dupCheck.rows.length > 0) {
-          const otherUserId = dupCheck.rows[0].Id_usuario;
-          const repCheck = await db.query('SELECT "Id_representante" FROM "Representante" WHERE "Id_usuario" = $1', [otherUserId]);
-          let otherRepId = repCheck.rows[0]?.Id_representante;
-          if (!otherRepId) {
-            const newRep = await db.query('INSERT INTO "Representante" ("Id_usuario", "es_familiar") VALUES ($1, true) RETURNING "Id_representante"', [otherUserId]);
-            otherRepId = newRep.rows[0].Id_representante;
-          }
-          await db.query('UPDATE "Estudiante" SET "Id_representante" = $1 WHERE "Id_estudiante" = $2', [otherRepId, id]);
-          existingStudent.representative_user_id = otherUserId;
-          existingStudent.representative_id = otherRepId;
-        }
-      }
-
-      if (repFirstName || repLastName || repDni || repPhone || repEmail) {
-        const updateResult = await db.query(`
-          UPDATE "Usuario"
-          SET
-            "nombre" = COALESCE($1, "nombre"),
-            "apellido" = COALESCE($2, "apellido"),
-            "cedula" = COALESCE($3, "cedula"),
-            "telefono" = COALESCE($4, "telefono"),
-            "correo" = COALESCE($5, "correo"),
-            "actualizado_en" = NOW()
-          WHERE "Id_usuario" = $6
-          RETURNING "Id_usuario", "cedula"
-        `, [
-          repFirstName ? capitalizeWords(repFirstName) : null,
-          repLastName ? capitalizeWords(repLastName) : null,
-          repDni,
-          repPhone,
-          repEmail,
-          existingStudent.representative_user_id
-        ]);
-        console.log('✅ [UPDATE] Resultado de UPDATE Usuario:', updateResult.rows);
-      }
-
-      if (existingStudent.representative_id && (repOccupation !== undefined || repParentesco !== undefined)) {
-        await db.query(`
-          UPDATE "Representante"
-          SET
-            "profesion_rep" = COALESCE($1, "profesion_rep"),
-            "es_familiar" = COALESCE($2, "es_familiar")
-          WHERE "Id_representante" = $3
-        `, [
-          repOccupation || null,
-          repParentesco ? (repParentesco !== 'Otro') : null,
-          existingStudent.representative_id
-        ]);
+        const insDir = await client.query('INSERT INTO direccion (direccion) VALUES ($1) RETURNING id_direccion', [dirVal]);
+        await client.query('UPDATE usuario SET id_direccion = $1 WHERE id_usuario = $2', [insDir.rows[0].id_direccion, currentStudent.id_usuario_rep]);
       }
     }
 
-    // Actualizar tipo de sangre en Historial_Medico
-    const tipoSangre = studentData.tipo_sangre ?? studentData.blood_type ?? studentData.TipoSangre;
-    if (tipoSangre) {
-      if (existingStudent?.medical_history_id) {
-        await db.query(
-          'UPDATE "Historial_Medico" SET "tipo_sangre" = $1 WHERE "Id_historial" = $2',
-          [tipoSangre, existingStudent.medical_history_id]
+    // 7. Familiares (Madre y Padre) en estudiante_familiar + persona
+    const updateOrCreateFamiliar = async (parentesco, data) => {
+      const { primerNombre, segundoNombre, primerApellido, segundoApellido, cedula, telefono, email, ocupacion, lugarTrabajo, direccionTrabajo, telefonoTrabajo } = data;
+      const fn = primerNombre ? capitalizeWords(primerNombre.trim()) : '';
+      const ln = primerApellido ? capitalizeWords(primerApellido.trim()) : '';
+      if (!fn && !ln && !cedula && !telefono && !email && ocupacion === undefined && lugarTrabajo === undefined && direccionTrabajo === undefined && telefonoTrabajo === undefined) return;
+
+      const famCheck = await client.query(`
+        SELECT ef.id_estudiante_familiar, ef.id_persona
+        FROM estudiante_familiar ef
+        WHERE ef.id_estudiante = $1 AND ef.parentesco = $2
+        LIMIT 1
+      `, [id, parentesco]);
+
+      if (famCheck.rows.length > 0) {
+        const famRow = famCheck.rows[0];
+        const personaFamId = famRow.id_persona;
+        if (personaFamId) {
+          await client.query(`
+            UPDATE persona
+            SET
+              nombre = COALESCE($1, nombre),
+              segundo_nombre = COALESCE($2, segundo_nombre),
+              apellido = COALESCE($3, apellido),
+              segundo_apellido = COALESCE($4, segundo_apellido),
+              cedula = COALESCE($5, cedula),
+              numero_telefono = CASE WHEN $6 THEN $7 ELSE numero_telefono END,
+              email = CASE WHEN $8 THEN $9 ELSE email END,
+              ocupacion = CASE WHEN $10 THEN $11 ELSE ocupacion END
+            WHERE id_persona = $12
+          `, [
+            fn || null,
+            segundoNombre ? capitalizeWords(segundoNombre.trim()) : null,
+            ln || null,
+            segundoApellido ? capitalizeWords(segundoApellido.trim()) : null,
+            cedula || null,
+            telefono !== undefined,
+            telefono || null,
+            email !== undefined,
+            email || null,
+            ocupacion !== undefined,
+            ocupacion || null,
+            personaFamId
+          ]);
+        }
+        
+        await client.query(`
+          UPDATE estudiante_familiar
+          SET
+            ocupacion = CASE WHEN $1 THEN $2 ELSE ocupacion END,
+            lugar_trabajo = CASE WHEN $3 THEN $4 ELSE lugar_trabajo END,
+            direccion_trabajo = CASE WHEN $5 THEN $6 ELSE direccion_trabajo END,
+            telefono_trabajo = CASE WHEN $7 THEN $8 ELSE telefono_trabajo END
+          WHERE id_estudiante_familiar = $9
+        `, [
+          ocupacion !== undefined, ocupacion || null,
+          lugarTrabajo !== undefined, lugarTrabajo || null,
+          direccionTrabajo !== undefined, direccionTrabajo || null,
+          telefonoTrabajo !== undefined, telefonoTrabajo || null,
+          famRow.id_estudiante_familiar
+        ]);
+      } else if (fn || ln || cedula || telefono || email || ocupacion || lugarTrabajo || direccionTrabajo || telefonoTrabajo) {
+        const insPersona = await client.query(`
+          INSERT INTO persona (nombre, segundo_nombre, apellido, segundo_apellido, cedula, numero_telefono, email, genero, ocupacion)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          RETURNING id_persona
+        `, [
+          fn || parentesco,
+          segundoNombre ? capitalizeWords(segundoNombre.trim()) : null,
+          ln || '',
+          segundoApellido ? capitalizeWords(segundoApellido.trim()) : null,
+          cedula || null,
+          telefono || null,
+          email || null,
+          parentesco === 'Madre' ? 'femenino' : 'masculino',
+          ocupacion || null
+        ]);
+
+        await client.query(`
+          INSERT INTO estudiante_familiar (id_estudiante, id_persona, parentesco, es_representante_legal, vive_con_estudiante, ocupacion, lugar_trabajo, direccion_trabajo, telefono_trabajo)
+          VALUES ($1, $2, $3, false, true, $4, $5, $6, $7)
+        `, [
+          id,
+          insPersona.rows[0].id_persona,
+          parentesco,
+          ocupacion || null,
+          lugarTrabajo || null,
+          direccionTrabajo || null,
+          telefonoTrabajo || null
+        ]);
+      }
+    };
+
+    if (studentData.MadrePrimerNombre || studentData.MadrePrimerApellido || studentData.MadreCedula || studentData.MadreTelefono !== undefined || studentData.MadreEmail !== undefined || studentData.MadreOcupacion !== undefined || studentData.MadreLugarTrabajo !== undefined || studentData.trabajo_Madre !== undefined || studentData.MadreDireccionTrabajo !== undefined || studentData.direccion_Trabajo_Madre !== undefined || studentData.MadreTelefonoTrabajo !== undefined || studentData.telefono_trabajo_Madre !== undefined) {
+      await updateOrCreateFamiliar('Madre', {
+        primerNombre: studentData.MadrePrimerNombre,
+        segundoNombre: studentData.MadreSegundoNombre,
+        primerApellido: studentData.MadrePrimerApellido,
+        segundoApellido: studentData.MadreSegundoApellido,
+        cedula: studentData.MadreCedula,
+        telefono: studentData.MadreTelefono,
+        email: studentData.MadreEmail,
+        ocupacion: studentData.MadreOcupacion,
+        lugarTrabajo: studentData.MadreLugarTrabajo ?? studentData.trabajo_Madre,
+        direccionTrabajo: studentData.MadreDireccionTrabajo ?? studentData.direccion_Trabajo_Madre,
+        telefonoTrabajo: studentData.MadreTelefonoTrabajo ?? studentData.telefono_trabajo_Madre
+      });
+    }
+
+    if (studentData.PadrePrimerNombre || studentData.PadrePrimerApellido || studentData.PadreCedula || studentData.PadreTelefono !== undefined || studentData.PadreEmail !== undefined || studentData.PadreOcupacion !== undefined || studentData.PadreLugarTrabajo !== undefined || studentData.trabajo_Padre !== undefined || studentData.PadreDireccionTrabajo !== undefined || studentData.direccion_Trabajo_Padre !== undefined || studentData.PadreTelefonoTrabajo !== undefined || studentData.telefono_trabajo_Padre !== undefined) {
+      await updateOrCreateFamiliar('Padre', {
+        primerNombre: studentData.PadrePrimerNombre,
+        segundoNombre: studentData.PadreSegundoNombre,
+        primerApellido: studentData.PadrePrimerApellido,
+        segundoApellido: studentData.PadreSegundoApellido,
+        cedula: studentData.PadreCedula,
+        telefono: studentData.PadreTelefono,
+        email: studentData.PadreEmail,
+        ocupacion: studentData.PadreOcupacion,
+        lugarTrabajo: studentData.PadreLugarTrabajo ?? studentData.trabajo_Padre,
+        direccionTrabajo: studentData.PadreDireccionTrabajo ?? studentData.direccion_Trabajo_Padre,
+        telefonoTrabajo: studentData.PadreTelefonoTrabajo ?? studentData.telefono_trabajo_Padre
+      });
+    }
+
+    // 8. Actualizar tipo de sangre en historial_medico
+    const bloodTypeVal = studentData.TipoSangre ?? studentData.tipo_sangre ?? studentData.blood_type;
+    if (bloodTypeVal) {
+      if (currentStudent.id_historia) {
+        await client.query(
+          'UPDATE historial_medico SET tipo_sangre = $1 WHERE id_historia = $2',
+          [bloodTypeVal, currentStudent.id_historia]
         );
       } else {
-        const insHist = await db.query(
-          'INSERT INTO "Historial_Medico" ("tipo_sangre") VALUES ($1) RETURNING "Id_historial"',
-          [tipoSangre]
+        const insHm = await client.query(
+          'INSERT INTO historial_medico (tipo_sangre) VALUES ($1) RETURNING id_historia',
+          [bloodTypeVal]
         );
-        const newHistId = insHist.rows[0].Id_historial;
-        await db.query('UPDATE "Estudiante" SET "Id_historial" = $1 WHERE "Id_estudiante" = $2', [newHistId, id]);
+        await client.query('UPDATE estudiante SET id_historia = $1 WHERE id_estudiante = $2', [insHm.rows[0].id_historia, id]);
+        currentStudent.id_historia = insHm.rows[0].id_historia;
       }
     }
 
-    // Actualizar Dirección / Ciudad si se proporcionó
-    const dirVal = studentData.Direccion ?? studentData.address ?? studentData.direccion;
-    const ciudadVal = studentData.Ciudad ?? studentData.city ?? studentData.ciudad;
-    if (dirVal || ciudadVal) {
-      let ciudadId = null;
-      if (ciudadVal) {
-        const cRes = await db.query('SELECT "Id_ciudad" FROM "Ciudad" WHERE LOWER("nombre_ciudad") = LOWER($1)', [ciudadVal]);
-        if (cRes.rows.length > 0) {
-          ciudadId = cRes.rows[0].Id_ciudad;
-        }
-      }
-
-      const repUserId = existingStudent?.representative_user_id;
-      if (repUserId) {
-        const uDirRes = await db.query('SELECT "Id_direccion" FROM "Usuario" WHERE "Id_usuario" = $1', [repUserId]);
-        const currentDirId = uDirRes.rows[0]?.Id_direccion;
-        if (currentDirId) {
-          await db.query(
-            'UPDATE "Direccion" SET "nombre_direccion" = COALESCE($1, "nombre_direccion"), "Id_ciudad" = COALESCE($2, "Id_ciudad") WHERE "Id_direccion" = $3',
-            [dirVal, ciudadId, currentDirId]
-          );
-        } else if (dirVal) {
-          const insDir = await db.query(
-            'INSERT INTO "Direccion" ("nombre_direccion", "Id_ciudad") VALUES ($1, $2) RETURNING "Id_direccion"',
-            [dirVal, ciudadId]
-          );
-          await db.query('UPDATE "Usuario" SET "Id_direccion" = $1 WHERE "Id_usuario" = $2', [insDir.rows[0].Id_direccion, repUserId]);
-        }
-      }
-    }
-
-    const fullUpdated = await findById(id);
-    return fullUpdated || rows[0];
+    await client.query('COMMIT');
+    return await findById(id);
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error("Error en update student:", error);
     throw error;
+  } finally {
+    client.release();
   }
 };
 
@@ -697,17 +878,18 @@ const search = async (searchTerm) => {
     const query = {
       text: `
         SELECT 
-          e."Id_estudiante" as id,
-          e."nombre" as first_name,
-          e."apellido" as last_name,
-          e."cedula" as dni,
-          e."fecha_nacimiento" as birth_date,
-          e."genero" as gender
-        FROM "Estudiante" e
-        WHERE e."nombre" ILIKE $1
-           OR e."apellido" ILIKE $1
-           OR e."cedula" ILIKE $1
-        ORDER BY e."apellido", e."nombre"
+          e.id_estudiante as id,
+          p.nombre as first_name,
+          p.apellido as last_name,
+          p.cedula as dni,
+          p.fecha_nacimiento as birth_date,
+          p.genero as gender
+        FROM estudiante e
+        JOIN persona p ON e.id_persona = p.id_persona
+        WHERE p.nombre ILIKE $1
+           OR p.apellido ILIKE $1
+           OR p.cedula ILIKE $1
+        ORDER BY p.apellido, p.nombre
         LIMIT 50
       `,
       values: [`%${searchTerm}%`]
@@ -729,12 +911,17 @@ const search = async (searchTerm) => {
 const existsByCedula = async (cedula, excludeId = null) => {
   try {
     let query = {
-      text: 'SELECT "Id_estudiante" as id FROM "Estudiante" WHERE "cedula" = $1',
+      text: `
+        SELECT e.id_estudiante as id 
+        FROM estudiante e 
+        JOIN persona p ON e.id_persona = p.id_persona 
+        WHERE p.cedula = $1
+      `,
       values: [cedula]
     };
 
     if (excludeId) {
-      query.text += ' AND "Id_estudiante" != $2';
+      query.text += ' AND e.id_estudiante != $2';
       query.values.push(excludeId);
     }
 
@@ -745,10 +932,6 @@ const existsByCedula = async (cedula, excludeId = null) => {
     throw error;
   }
 };
-
-
-
-
 
 /**
  * Obtiene estudiantes por ID de representante
@@ -761,33 +944,55 @@ const findByRepresentante = async (representanteId) => {
     const query = {
       text: `
         SELECT 
-          e."Id_estudiante" as id,
-          e."nombre" as first_name,
-          e."apellido" as last_name,
-          e."cedula" as dni,
-          e."fecha_nacimiento" as birth_date,
-          e."genero" as gender,
-          nl."nivel" as grade_level,
-          nd."nivel_danza" as dance_level,
-          e."Id_especialidad" as specialty_id,
-          e."Id_especialidad" as especialidad_id,
-          esp."nombre_especialidad" as specialty_name,
-          esp."nombre_especialidad" as especialidad,
-          e."seguro_escolar" as school_insurance,
-          e."Id_representante" as representative_id
-        FROM "Estudiante" e
-        LEFT JOIN "Nivel_Escolar" nl ON e."Id_nivel" = nl."Id_nivel"
-        LEFT JOIN "Nivel_Danza" nd ON e."Id_nivel_danza" = nd."Id_nivel_danza"
-        LEFT JOIN "Especialidad" esp ON e."Id_especialidad" = esp."Id_especialidad"
-        WHERE e."Id_representante" IN (
-          SELECT r."Id_representante" 
-          FROM "Representante" r 
-          WHERE r."Id_representante" = $1
-             OR r."Id_usuario" = (
-               SELECT r2."Id_usuario" FROM "Representante" r2 WHERE r2."Id_representante" = $1
-             )
-        )
-        ORDER BY e."apellido", e."nombre"
+          e.id_estudiante as id,
+          p.nombre as first_name,
+          p.segundo_nombre as middle_name,
+          p.segundo_nombre as segundo_nombre,
+          p.segundo_nombre as second_name,
+          p.apellido as last_name,
+          p.segundo_apellido as second_last_name,
+          p.segundo_apellido as segundo_apellido,
+          p.cedula as dni,
+          TO_CHAR(p.fecha_nacimiento, 'YYYY-MM-DD') as birth_date,
+          p.genero as gender,
+          nl.nivel as grade_level,
+          e.id_nivel_danza as dance_level_id,
+          nd.nivel_danza as dance_level_name,
+          nd.nivel_danza as dance_level,
+          e.id_especialidad as specialty_id,
+          e.id_especialidad as especialidad_id,
+          esp.nombre_especialidad as specialty_name,
+          esp.nombre_especialidad as especialidad,
+          e.seguro_escolar as school_insurance,
+          e.id_representante as representative_id,
+          p_r.nombre as representative_first_name,
+          p_r.segundo_nombre as representative_second_name,
+          p_r.segundo_nombre as representative_segundo_nombre,
+          p_r.apellido as representative_last_name,
+          p_r.segundo_apellido as representative_second_last_name,
+          p_r.segundo_apellido as representative_segundo_apellido,
+          p_r.cedula as representative_dni,
+          p_r.numero_telefono as representative_phone,
+          p_r.email as representative_email,
+          ef.parentesco as parentesco
+        FROM estudiante e
+        JOIN persona p ON e.id_persona = p.id_persona
+        LEFT JOIN nivel_escolar nl ON e.id_nivel = nl.id_nivel
+        LEFT JOIN nivel_danza nd ON e.id_nivel_danza = nd.id_nivel_danza
+        LEFT JOIN especialidad esp ON e.id_especialidad = esp.id_especialidad
+        LEFT JOIN representante r ON e.id_representante = r.id_representante
+        LEFT JOIN persona p_r ON r.id_persona = p_r.id_persona
+        LEFT JOIN estudiante_familiar ef ON ef.id_estudiante = e.id_estudiante AND ef.id_persona = r.id_persona
+        WHERE e.id_representante = $1
+           OR e.id_representante IN (
+             SELECT r2.id_representante FROM representante r2 
+             WHERE r2.id_usuario = (SELECT r3.id_usuario FROM representante r3 WHERE r3.id_representante = $1)
+           )
+           OR e.id_estudiante IN (
+             SELECT ef2.id_estudiante FROM estudiante_familiar ef2
+             WHERE ef2.id_persona = (SELECT r4.id_persona FROM representante r4 WHERE r4.id_representante = $1)
+           )
+        ORDER BY p.apellido, p.nombre
       `,
       values: [repId]
     };

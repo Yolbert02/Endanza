@@ -816,7 +816,7 @@ const RegistroRepresentante = ({ onNext, initialData = {}, onChange, loading = f
                                         <CFormInput
                                             placeholder="Ej: Tío, Abuela, Tutor Legal..."
                                             value={formData.parentesco_otro}
-                                            onChange={(e) => setFormData({ ...formData, parentesco_otro: e.target.value })}
+                                            onChange={(e) => handleFormChange('parentesco_otro', e.target.value)}
                                             className="input-premium py-2 border-warning border-opacity-25"
                                             invalid={!!errors.parentesco_otro}
                                         />
