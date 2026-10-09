@@ -1,7 +1,7 @@
 import { db } from "../db/connection.database.js";
 
 // ============================================
-// MODELO DE SECCIONES
+// MODELO DE SECCIONES (NewEndanza)
 // ============================================
 
 const findAll = async (academicYearId = null) => {
@@ -9,48 +9,47 @@ const findAll = async (academicYearId = null) => {
     let query = {
       text: `
         SELECT 
-          s."Id_seccion" as id,
-          s."nombre_seccion" as section_name,
-          s."capacidad" as capacity,
-          s."Id_materia" as subject_id,
-          m."nombre_materia" as subject_name,
-          s."Id_ano" as academic_year_id,
-          a."nombre_ano" as academic_year_name,
-          COALESCE(g."Id_grado", NULL) as grade_id,
-          COALESCE(s."nivel_academico", g."nombre_grado", 'General') as grade_name,
-          s."nivel_academico",
-          s."Id_especialidad" as specialty_id,
-          esp."nombre_especialidad" as specialty_name,
-          COUNT(DISTINCT es."Id_estudiante") as student_count
-        FROM "Seccion" s
-        LEFT JOIN "Materia" m ON s."Id_materia" = m."Id_materia"
-        LEFT JOIN "Grado" g ON m."ano_materia" = g."Id_grado"
-        LEFT JOIN "Ano_Academico" a ON s."Id_ano" = a."Id_ano"
-        LEFT JOIN "Especialidad" esp ON s."Id_especialidad" = esp."Id_especialidad"
-        LEFT JOIN "Estudiante_Seccion" es ON s."Id_seccion" = es."Id_seccion"
-      `
+          s.id_seccion as id,
+          s.nombre_seccion as section_name,
+          30 as capacity,
+          COALESCE(m.id_materia, NULL) as subject_id,
+          COALESCE(m.nombre_materia, 'General') as subject_name,
+          s.id_ano as academic_year_id,
+          a.nombre_ano as academic_year_name,
+          s.id_nivel_danza as grade_id,
+          COALESCE(nd.nivel_danza, 'General') as grade_name,
+          nd.nivel_danza as nivel_academico,
+          s.id_especialidad as specialty_id,
+          esp.nombre_especialidad as specialty_name,
+          COUNT(DISTINCT i.id_estudiante) as student_count
+        FROM seccion s
+        LEFT JOIN ano_academico a ON s.id_ano = a.id_ano
+        LEFT JOIN nivel_danza nd ON s.id_nivel_danza = nd.id_nivel_danza
+        LEFT JOIN especialidad esp ON s.id_especialidad = esp.id_especialidad
+        LEFT JOIN horario h ON s.id_seccion = h.id_seccion
+        LEFT JOIN materia m ON h.id_materia = m.id_materia
+        LEFT JOIN inscripcion i ON s.id_seccion = i.id_seccion AND i.estado_inscripcion = 'activo'
+      `,
     };
 
     if (academicYearId) {
-      query.text += ` WHERE s."Id_ano" = $1`;
+      query.text += ` WHERE s.id_ano = $1`;
       query.values = [academicYearId];
     }
 
     query.text += ` 
       GROUP BY 
-        s."Id_seccion", 
-        s."nombre_seccion", 
-        s."capacidad", 
-        s."Id_materia", 
-        m."nombre_materia", 
-        s."Id_ano", 
-        a."nombre_ano", 
-        g."Id_grado", 
-        g."nombre_grado",
-        s."nivel_academico",
-        s."Id_especialidad",
-        esp."nombre_especialidad"
-      ORDER BY COALESCE(s."nivel_academico", g."nombre_grado", 'General'), s."nombre_seccion"
+        s.id_seccion, 
+        s.nombre_seccion, 
+        m.id_materia, 
+        m.nombre_materia, 
+        s.id_ano, 
+        a.nombre_ano, 
+        s.id_nivel_danza, 
+        nd.nivel_danza, 
+        s.id_especialidad, 
+        esp.nombre_especialidad
+      ORDER BY nd.nivel_danza, s.nombre_seccion
     `;
 
     const { rows } = await db.query(query.text, query.values || []);
@@ -66,28 +65,25 @@ const findById = async (id) => {
     const query = {
       text: `
         SELECT 
-          s."Id_seccion" as id,
-          s."nombre_seccion" as section_name,
-          s."capacidad" as capacity,
-          s."Id_materia" as subject_id,
-          m."nombre_materia" as subject_name,
-          s."Id_lapso" as period_id,
-          l."nombre_lapso" as period_name,
-          l."Id_ano" as academic_year_id,
-          a."nombre_ano" as academic_year_name,
-          s."Id_especialidad" as specialty_id,
-          s."Id_especialidad" as especialidad_id,
-          s."Id_especialidad" as id_especialidad,
-          esp."nombre_especialidad" as specialty_name,
-          esp."nombre_especialidad" as especialidad
-        FROM "Seccion" s
-        LEFT JOIN "Materia" m ON s."Id_materia" = m."Id_materia"
-        LEFT JOIN "Lapso" l ON s."Id_lapso" = l."Id_lapso"
-        LEFT JOIN "Ano_Academico" a ON l."Id_ano" = a."Id_ano"
-        LEFT JOIN "Especialidad" esp ON s."Id_especialidad" = esp."Id_especialidad"
-        WHERE s."Id_seccion" = $1
+          s.id_seccion as id,
+          s.nombre_seccion as section_name,
+          30 as capacity,
+          s.id_ano as academic_year_id,
+          a.nombre_ano as academic_year_name,
+          s.id_nivel_danza as grade_id,
+          nd.nivel_danza as grade_name,
+          s.id_especialidad as specialty_id,
+          s.id_especialidad as especialidad_id,
+          s.id_especialidad as id_especialidad,
+          esp.nombre_especialidad as specialty_name,
+          esp.nombre_especialidad as especialidad
+        FROM seccion s
+        LEFT JOIN ano_academico a ON s.id_ano = a.id_ano
+        LEFT JOIN nivel_danza nd ON s.id_nivel_danza = nd.id_nivel_danza
+        LEFT JOIN especialidad esp ON s.id_especialidad = esp.id_especialidad
+        WHERE s.id_seccion = $1
       `,
-      values: [id]
+      values: [id],
     };
     const { rows } = await db.query(query.text, query.values);
     return rows[0] || null;
@@ -101,40 +97,48 @@ const create = async (sectionData) => {
   try {
     const {
       nombre_seccion,
-      capacidad,
-      Id_materia,
-      Id_lapso,
       Id_ano,
       academic_year_id,
-      nivel_academico,
-      grade_level,
       Id_especialidad,
-      especialidad_id
+      especialidad_id,
+      Id_nivel_danza,
+      id_nivel_danza,
+      grade_id,
     } = sectionData;
     const specialtyId = Id_especialidad ?? especialidad_id ?? null;
-    const gradeLevelVal = nivel_academico ?? grade_level ?? null;
+    let danceLevelId = Id_nivel_danza ?? id_nivel_danza ?? grade_id ?? null;
     let yearId = Id_ano ?? academic_year_id ?? null;
 
+    if (!danceLevelId && sectionData.nivel_academico) {
+      const ndRes = await db.query(
+        "SELECT id_nivel_danza FROM nivel_danza WHERE LOWER(nivel_danza) = LOWER($1) OR LOWER(nivel_danza) LIKE LOWER($2) LIMIT 1",
+        [sectionData.nivel_academico.trim(), `%${sectionData.nivel_academico.trim()}%`]
+      );
+      if (ndRes.rows.length > 0) {
+        danceLevelId = ndRes.rows[0].id_nivel_danza;
+      }
+    }
+
     if (!yearId) {
-      const activeYearRes = await db.query('SELECT "Id_ano" FROM "Ano_Academico" WHERE "activo" = true LIMIT 1');
-      yearId = activeYearRes.rows[0]?.Id_ano || 3;
+      const activeYearRes = await db.query(
+        "SELECT id_ano FROM ano_academico WHERE estado_ano = 'en_curso' LIMIT 1"
+      );
+      yearId = activeYearRes.rows[0]?.id_ano || 1;
     }
 
     const query = {
       text: `
-        INSERT INTO "Seccion" ("nombre_seccion", "capacidad", "Id_materia", "Id_lapso", "Id_ano", "nivel_academico", "Id_especialidad")
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO seccion (nombre_seccion, id_ano, id_nivel_danza, id_especialidad)
+        VALUES ($1, $2, $3, $4)
         RETURNING 
-          "Id_seccion" as id,
-          "nombre_seccion" as section_name,
-          "capacidad" as capacity,
-          "Id_materia" as subject_id,
-          "Id_lapso" as period_id,
-          "Id_ano" as academic_year_id,
-          "nivel_academico",
-          "Id_especialidad" as specialty_id
+          id_seccion as id,
+          nombre_seccion as section_name,
+          30 as capacity,
+          id_ano as academic_year_id,
+          id_nivel_danza as grade_id,
+          id_especialidad as specialty_id
       `,
-      values: [nombre_seccion, capacidad || 30, Id_materia || null, Id_lapso || null, yearId, gradeLevelVal, specialtyId]
+      values: [nombre_seccion, yearId, danceLevelId, specialtyId],
     };
 
     const { rows } = await db.query(query.text, query.values);
@@ -149,41 +153,36 @@ const update = async (id, sectionData) => {
   try {
     const {
       nombre_seccion,
-      capacidad,
-      Id_materia,
-      Id_lapso,
       Id_ano,
-      nivel_academico,
-      grade_level,
+      academic_year_id,
       Id_especialidad,
-      especialidad_id
+      especialidad_id,
+      Id_nivel_danza,
+      id_nivel_danza,
+      grade_id,
     } = sectionData;
     const specialtyId = Id_especialidad ?? especialidad_id;
-    const gradeLevelVal = nivel_academico ?? grade_level;
+    const danceLevelId = Id_nivel_danza ?? id_nivel_danza ?? grade_id;
+    const yearId = Id_ano ?? academic_year_id;
 
     const query = {
       text: `
-        UPDATE "Seccion"
+        UPDATE seccion
         SET 
-          "nombre_seccion" = COALESCE($1, "nombre_seccion"),
-          "capacidad" = COALESCE($2, "capacidad"),
-          "Id_materia" = COALESCE($3, "Id_materia"),
-          "Id_lapso" = COALESCE($4, "Id_lapso"),
-          "Id_especialidad" = COALESCE($5, "Id_especialidad"),
-          "nivel_academico" = COALESCE($6, "nivel_academico"),
-          "Id_ano" = COALESCE($7, "Id_ano")
-        WHERE "Id_seccion" = $8
+          nombre_seccion = COALESCE($1, nombre_seccion),
+          id_especialidad = COALESCE($2, id_especialidad),
+          id_nivel_danza = COALESCE($3, id_nivel_danza),
+          id_ano = COALESCE($4, id_ano)
+        WHERE id_seccion = $5
         RETURNING 
-          "Id_seccion" as id,
-          "nombre_seccion" as section_name,
-          "capacidad" as capacity,
-          "Id_materia" as subject_id,
-          "Id_lapso" as period_id,
-          "Id_ano" as academic_year_id,
-          "nivel_academico",
-          "Id_especialidad" as specialty_id
+          id_seccion as id,
+          nombre_seccion as section_name,
+          30 as capacity,
+          id_ano as academic_year_id,
+          id_nivel_danza as grade_id,
+          id_especialidad as specialty_id
       `,
-      values: [nombre_seccion, capacidad, Id_materia, Id_lapso, specialtyId, gradeLevelVal, Id_ano, id]
+      values: [nombre_seccion, specialtyId, danceLevelId, yearId, id],
     };
 
     const { rows } = await db.query(query.text, query.values);
@@ -197,8 +196,8 @@ const update = async (id, sectionData) => {
 const remove = async (id) => {
   try {
     const query = {
-      text: `DELETE FROM "Seccion" WHERE "Id_seccion" = $1 RETURNING "Id_seccion" as id`,
-      values: [id]
+      text: `DELETE FROM seccion WHERE id_seccion = $1 RETURNING id_seccion as id`,
+      values: [id],
     };
     const { rows } = await db.query(query.text, query.values);
     return rows[0];
@@ -217,33 +216,34 @@ const findSchedulesBySectionId = async (sectionId) => {
     const query = {
       text: `
         SELECT 
-          h."Id_horario" as id,
-          h."Id_seccion" as section_id,
-          h."Id_aula" as classroom_id,
-          a."nombre_aula" as classroom_name,
-          h."Id_profesor" as teacher_id,
-          p."Id_usuario" as user_id,
-          u."nombre" as teacher_name,
-          u."apellido" as teacher_lastname,
-          h."Id_bloque" as block_id,
-          b."nombre_bloque" as block_name,
-          b."inicio_bloque" as start_time,
-          b."fin_bloque" as end_time,
-          h."Id_dia" as day_id,
-          d."nombre_dia" as day_name,
-          h."Id_materia" as subject_id,
-          COALESCE(mat."nombre_materia", 'Sin materia') as subject_name
-        FROM "Horario" h
-        LEFT JOIN "Aula" a ON h."Id_aula" = a."Id_aula"
-        LEFT JOIN "Profesor" p ON h."Id_profesor" = p."Id_profesor"
-        LEFT JOIN "Usuario" u ON p."Id_usuario" = u."Id_usuario"
-        LEFT JOIN "Bloque_Horario" b ON h."Id_bloque" = b."Id_bloque"
-        LEFT JOIN "Dia" d ON h."Id_dia" = d."Id_dia"
-        LEFT JOIN "Materia" mat ON h."Id_materia" = mat."Id_materia"
-        WHERE h."Id_seccion" = $1
-        ORDER BY d."Id_dia", b."inicio_bloque"
+          h.id_horario as id,
+          h.id_seccion as section_id,
+          h.id_aula as classroom_id,
+          a.nombre_aula as classroom_name,
+          h.id_docente as teacher_id,
+          u.id_usuario as user_id,
+          p.nombre as teacher_name,
+          p.apellido as teacher_lastname,
+          h.id_bloque as block_id,
+          b.nombre_bloque as block_name,
+          b.inicio_bloque as start_time,
+          b.fin_bloque as end_time,
+          d.id_dia as day_id,
+          d.nombre_dia as day_name,
+          h.id_materia as subject_id,
+          COALESCE(mat.nombre_materia, 'Sin materia') as subject_name
+        FROM horario h
+        LEFT JOIN aula a ON h.id_aula = a.id_aula
+        LEFT JOIN docente doc ON h.id_docente = doc.id_docente
+        LEFT JOIN usuario u ON doc.id_usuario = u.id_usuario
+        LEFT JOIN persona p ON u.id_persona = p.id_persona
+        LEFT JOIN tiempo_bloque b ON h.id_bloque = b.id_bloque
+        LEFT JOIN dia d ON b.id_dia = d.id_dia
+        LEFT JOIN materia mat ON h.id_materia = mat.id_materia
+        WHERE h.id_seccion = $1
+        ORDER BY d.id_dia, b.inicio_bloque
       `,
-      values: [sectionId]
+      values: [sectionId],
     };
     const { rows } = await db.query(query.text, query.values);
     return rows;
@@ -255,20 +255,20 @@ const findSchedulesBySectionId = async (sectionId) => {
 
 export const addSchedule = async (scheduleData) => {
   try {
+    const { sectionId, aula, prof, bloque, materia } = scheduleData;
     const query = {
       text: `
-        INSERT INTO "Horario" ("Id_seccion", "Id_aula", "Id_profesor", "Id_bloque", "Id_dia", "Id_materia")
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO horario (id_seccion, id_aula, id_docente, id_bloque, id_materia)
+        VALUES ($1, $2, $3, $4, $5)
         RETURNING 
-          "Id_horario" as id,
-          "Id_seccion" as section_id,
-          "Id_aula" as classroom_id,
-          "Id_profesor" as teacher_id,
-          "Id_bloque" as block_id,
-          "Id_dia" as day_id,
-          "Id_materia" as subject_id
+          id_horario as id,
+          id_seccion as section_id,
+          id_aula as classroom_id,
+          id_docente as teacher_id,
+          id_bloque as block_id,
+          id_materia as subject_id
       `,
-      values: [sectionId, aula, prof, bloque, dia, materia]
+      values: [sectionId, aula, prof, bloque, materia],
     };
 
     const { rows } = await db.query(query.text, query.values);
@@ -282,8 +282,8 @@ export const addSchedule = async (scheduleData) => {
 const removeSchedule = async (scheduleId) => {
   try {
     const query = {
-      text: `DELETE FROM "Horario" WHERE "Id_horario" = $1 RETURNING "Id_horario" as id`,
-      values: [scheduleId]
+      text: `DELETE FROM horario WHERE id_horario = $1 RETURNING id_horario as id`,
+      values: [scheduleId],
     };
     const { rows } = await db.query(query.text, query.values);
     return rows[0];
@@ -303,58 +303,62 @@ const checkClassroomAvailability = async ({
   startTime,
   endTime,
   classroom,
-  excludeSectionId
+  excludeSectionId,
 }) => {
   try {
-    // Convertir día a ID
     const dayMap = {
-      'LUNES': 1, 'MARTES': 2, 'MIÉRCOLES': 3, 'JUEVES': 4, 'VIERNES': 5
+      LUNES: 1,
+      MARTES: 2,
+      MIÉRCOLES: 3,
+      MIERCOLES: 3,
+      JUEVES: 4,
+      VIERNES: 5,
+      SÁBADO: 6,
+      SABADO: 6,
     };
-    const dayId = dayMap[day];
+    const dayId = dayMap[day?.toUpperCase()];
 
     if (!dayId) {
       return { available: false, error: "Día inválido" };
     }
 
-    // Obtener IDs de bloques que se solapan con el horario
     const blocksQuery = {
       text: `
-        SELECT "Id_bloque" as id
-        FROM "Bloque_Horario"
-        WHERE ($1::time, $2::time) OVERLAPS ("inicio_bloque", "fin_bloque")
+        SELECT id_bloque as id
+        FROM tiempo_bloque
+        WHERE id_dia = $1 AND ($2::time, $3::time) OVERLAPS (inicio_bloque, fin_bloque)
       `,
-      values: [startTime, endTime]
+      values: [dayId, startTime, endTime],
     };
     const blocks = await db.query(blocksQuery.text, blocksQuery.values);
-    const blockIds = blocks.rows.map(b => b.id);
+    const blockIds = blocks.rows.map((b) => b.id);
 
     if (blockIds.length === 0) {
       return { available: true };
     }
 
-    // Verificar conflictos
     let conflictQuery = {
       text: `
         SELECT 
-          h."Id_horario" as id,
-          s."nombre_seccion" as section_name,
-          b."nombre_bloque" as block_name,
-          b."inicio_bloque" as start_time,
-          b."fin_bloque" as end_time,
-          d."nombre_dia" as day_name
-        FROM "Horario" h
-        JOIN "Seccion" s ON h."Id_seccion" = s."Id_seccion"
-        JOIN "Bloque_Horario" b ON h."Id_bloque" = b."Id_bloque"
-        JOIN "Dia" d ON h."Id_dia" = d."Id_dia"
-        WHERE h."Id_aula" = (SELECT "Id_aula" FROM "Aula" WHERE "nombre_aula" = $1)
-          AND h."Id_dia" = $2
-          AND h."Id_bloque" = ANY($3::int[])
+          h.id_horario as id,
+          s.nombre_seccion as section_name,
+          b.nombre_bloque as block_name,
+          b.inicio_bloque as start_time,
+          b.fin_bloque as end_time,
+          d.nombre_dia as day_name
+        FROM horario h
+        JOIN seccion s ON h.id_seccion = s.id_seccion
+        JOIN tiempo_bloque b ON h.id_bloque = b.id_bloque
+        JOIN dia d ON b.id_dia = d.id_dia
+        WHERE h.id_aula = (SELECT id_aula FROM aula WHERE nombre_aula = $1 LIMIT 1)
+          AND b.id_dia = $2
+          AND h.id_bloque = ANY($3::int[])
       `,
-      values: [classroom, dayId, blockIds]
+      values: [classroom, dayId, blockIds],
     };
 
     if (excludeSectionId) {
-      conflictQuery.text += ` AND h."Id_seccion" != $4`;
+      conflictQuery.text += ` AND h.id_seccion != $4`;
       conflictQuery.values.push(excludeSectionId);
     }
 
@@ -367,8 +371,8 @@ const checkClassroomAvailability = async ({
         conflict: {
           sectionName: conflict.section_name,
           startTime: conflict.start_time,
-          endTime: conflict.end_time
-        }
+          endTime: conflict.end_time,
+        },
       };
     }
 
@@ -379,29 +383,29 @@ const checkClassroomAvailability = async ({
   }
 };
 
-
 const getStudentsBySection = async (sectionId) => {
   try {
     const query = {
       text: `
         SELECT 
-          e."Id_estudiante" as id,
-          e."nombre" as first_name,
-          e."apellido" as last_name,
-          e."cedula" as dni,
-          e."fecha_nacimiento" as birth_date,
-          e."genero" as gender,
-          CONCAT(u_rep."nombre", ' ', u_rep."apellido") as representative_name,
-          u_rep."telefono" as representative_phone,
-          u_rep."correo" as representative_email
-        FROM "Estudiante_Seccion" es
-        JOIN "Estudiante" e ON es."Id_estudiante" = e."Id_estudiante"
-        LEFT JOIN "Representante" r ON e."Id_representante" = r."Id_representante"
-        LEFT JOIN "Usuario" u_rep ON r."Id_usuario" = u_rep."Id_usuario"
-        WHERE es."Id_seccion" = $1
-        ORDER BY e."apellido", e."nombre"
+          e.id_estudiante as id,
+          p.nombre as first_name,
+          p.apellido as last_name,
+          p.cedula as dni,
+          p.fecha_nacimiento as birth_date,
+          p.genero as gender,
+          CONCAT(p_rep.nombre, ' ', p_rep.apellido) as representative_name,
+          p_rep.numero_telefono as representative_phone,
+          p_rep.email as representative_email
+        FROM inscripcion i
+        JOIN estudiante e ON i.id_estudiante = e.id_estudiante
+        JOIN persona p ON e.id_persona = p.id_persona
+        LEFT JOIN representante r ON e.id_representante = r.id_representante
+        LEFT JOIN persona p_rep ON r.id_persona = p_rep.id_persona
+        WHERE i.id_seccion = $1 AND i.estado_inscripcion = 'activo'
+        ORDER BY p.apellido, p.nombre
       `,
-      values: [sectionId]
+      values: [sectionId],
     };
     const { rows } = await db.query(query.text, query.values);
     return rows;
@@ -413,27 +417,22 @@ const getStudentsBySection = async (sectionId) => {
 
 const getEvaluationStructure = async (sectionId) => {
   try {
-    // Obtenemos la estructura de evaluación definida para esta sección
-    // Si no existe, podríamos devolver una por defecto o vacía
     const query = {
       text: `
-                SELECT 
-                    ee."Id_estructura_evaluacion" as id,
-      ee."numero_evaluacion" as numero,
-      ee."porcentaje_peso" as peso,
-      te."nombre_evaluacion" as tipo
-                FROM "Estructura_Evaluacion" ee
-                LEFT JOIN "Tipo_Evaluacion" te ON ee."Id_tipo_evaluacion" = te."Id_tipo_evaluacion"
-                WHERE ee."Id_seccion" = $1
-                ORDER BY ee."numero_evaluacion"
-            `,
-      values: [sectionId]
+        SELECT 
+          ee.id_estructura_evaluacion as id,
+          ee.numero_evaluacion as numero,
+          ee.porcentaje as peso,
+          te.nombre_evaluacion as tipo
+        FROM estructura_evaluacion ee
+        LEFT JOIN tipo_evaluacion te ON ee.id_tipo_evaluacion = te.id_tipo_evaluacion
+        WHERE ee.id_seccion = $1
+        ORDER BY ee.numero_evaluacion
+      `,
+      values: [sectionId],
     };
     const { rows } = await db.query(query.text, query.values);
-
-    // Si no hay estructura en BD, retornamos null para que el frontend use el default o muestre aviso
     if (rows.length === 0) return null;
-
     return rows;
   } catch (error) {
     console.error("Error en getEvaluationStructure:", error);
@@ -452,5 +451,5 @@ export const SectionModel = {
   removeSchedule,
   checkClassroomAvailability,
   getStudentsBySection,
-  getEvaluationStructure
+  getEvaluationStructure,
 };

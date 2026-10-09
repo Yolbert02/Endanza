@@ -178,14 +178,18 @@ const findAll = async (activeOnly = true) => {
     const query = {
       text: `
         SELECT 
-          "Id_especialidad" as id,
-          "nombre_especialidad" as name,
-          "descripcion" as description,
-          "area",
-          "activo" as active
-        FROM "Especialidad"
-        ${activeOnly ? 'WHERE "activo" = true' : ''}
-        ORDER BY "Id_especialidad" ASC
+          id_especialidad as id,
+          id_especialidad as "Id_especialidad",
+          nombre_especialidad as name,
+          nombre_especialidad,
+          descripcion as description,
+          descripcion,
+          'Danza' as area,
+          activo as active,
+          activo
+        FROM especialidad
+        ${activeOnly ? 'WHERE activo = true' : ''}
+        ORDER BY id_especialidad ASC
       `
     };
     const { rows } = await db.query(query.text);
@@ -204,13 +208,17 @@ const findById = async (id) => {
     const query = {
       text: `
         SELECT 
-          "Id_especialidad" as id,
-          "nombre_especialidad" as name,
-          "descripcion" as description,
-          "area",
-          "activo" as active
-        FROM "Especialidad"
-        WHERE "Id_especialidad" = $1
+          id_especialidad as id,
+          id_especialidad as "Id_especialidad",
+          nombre_especialidad as name,
+          nombre_especialidad,
+          descripcion as description,
+          descripcion,
+          'Danza' as area,
+          activo as active,
+          activo
+        FROM especialidad
+        WHERE id_especialidad = $1
       `,
       values: [id]
     };
@@ -244,17 +252,21 @@ const findByName = async (name) => {
     const query = {
       text: `
         SELECT 
-          "Id_especialidad" as id,
-          "Id_especialidad" as especialidad_id,
-          "nombre_especialidad" as name,
-          "nombre_especialidad" as especialidad,
-          "descripcion" as description,
-          "area",
-          "activo" as active
-        FROM "Especialidad"
-        WHERE LOWER("nombre_especialidad") = LOWER($1)
-           OR LOWER("nombre_especialidad") LIKE LOWER($2)
-           OR ($3::TEXT IS NOT NULL AND "nombre_especialidad" ILIKE $3)
+          id_especialidad as id,
+          id_especialidad as "Id_especialidad",
+          id_especialidad as especialidad_id,
+          nombre_especialidad as name,
+          nombre_especialidad as especialidad,
+          nombre_especialidad,
+          descripcion as description,
+          descripcion,
+          'Danza' as area,
+          activo as active,
+          activo
+        FROM especialidad
+        WHERE LOWER(nombre_especialidad) = LOWER($1)
+           OR LOWER(nombre_especialidad) LIKE LOWER($2)
+           OR ($3::TEXT IS NOT NULL AND nombre_especialidad ILIKE $3)
         LIMIT 1
       `,
       values: [cleanName, `%${cleanName}%`, keywordPattern]
@@ -289,19 +301,23 @@ const isSpecialtyRequired = (gradeName) => {
  */
 const create = async (data) => {
   try {
-    const { nombre_especialidad, descripcion, area = 'Danza' } = data;
+    const { nombre_especialidad, descripcion } = data;
     const query = {
       text: `
-        INSERT INTO "Especialidad" ("nombre_especialidad", "descripcion", "area", "activo")
-        VALUES ($1, $2, $3, true)
+        INSERT INTO especialidad (nombre_especialidad, descripcion, activo)
+        VALUES ($1, $2, true)
         RETURNING 
-          "Id_especialidad" as id,
-          "nombre_especialidad" as name,
-          "descripcion" as description,
-          "area",
-          "activo" as active
+          id_especialidad as id,
+          id_especialidad as "Id_especialidad",
+          nombre_especialidad as name,
+          nombre_especialidad,
+          descripcion as description,
+          descripcion,
+          'Danza' as area,
+          activo as active,
+          activo
       `,
-      values: [nombre_especialidad, descripcion, area]
+      values: [nombre_especialidad, descripcion]
     };
     const { rows } = await db.query(query.text, query.values);
     return rows[0];
@@ -316,24 +332,27 @@ const create = async (data) => {
  */
 const update = async (id, data) => {
   try {
-    const { nombre_especialidad, descripcion, area, activo } = data;
+    const { nombre_especialidad, descripcion, activo } = data;
     const query = {
       text: `
-        UPDATE "Especialidad"
+        UPDATE especialidad
         SET 
-          "nombre_especialidad" = COALESCE($1, "nombre_especialidad"),
-          "descripcion" = COALESCE($2, "descripcion"),
-          "area" = COALESCE($3, "area"),
-          "activo" = COALESCE($4, "activo")
-        WHERE "Id_especialidad" = $5
+          nombre_especialidad = COALESCE($1, nombre_especialidad),
+          descripcion = COALESCE($2, descripcion),
+          activo = COALESCE($3, activo)
+        WHERE id_especialidad = $4
         RETURNING 
-          "Id_especialidad" as id,
-          "nombre_especialidad" as name,
-          "descripcion" as description,
-          "area",
-          "activo" as active
+          id_especialidad as id,
+          id_especialidad as "Id_especialidad",
+          nombre_especialidad as name,
+          nombre_especialidad,
+          descripcion as description,
+          descripcion,
+          'Danza' as area,
+          activo as active,
+          activo
       `,
-      values: [nombre_especialidad, descripcion, area, activo, id]
+      values: [nombre_especialidad, descripcion, activo, id]
     };
     const { rows } = await db.query(query.text, query.values);
     return rows[0] || null;

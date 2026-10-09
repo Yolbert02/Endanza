@@ -44,6 +44,37 @@ const splitPhoneParts = (phone) => {
   return { prefix: "0414", number: digits };
 };
 
+// Cálculo robusto de edad sin desfase por huso horario
+const calculateAge = (birthDate) => {
+  if (!birthDate) return "";
+  try {
+    const clean = String(birthDate).split("T")[0];
+    const parts = clean.split("-");
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const today = new Date();
+      let age = today.getFullYear() - year;
+      const monthDiff = today.getMonth() - month;
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < day)) {
+        age--;
+      }
+      return age >= 0 ? age : "";
+    }
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age >= 0 ? age : "";
+  } catch (e) {
+    return "";
+  }
+};
+
 const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }) => {
   const [step, setStep] = useState(1);
   const [inscripcionEnviada, setInscripcionEnviada] = useState(false);
@@ -54,15 +85,17 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
   const [yaInscrito, setYaInscrito] = useState(false);
   const [mensajeYaInscrito, setMensajeYaInscrito] = useState("");
 
+  const initialBirthDate = (student?.birth_date || student?.birthDate || "").split("T")[0];
+
   // Estado inicial LIMPIO
   const [formData, setFormData] = useState({
     // Datos del estudiante
     id_estudiante: student?.id || null,
     nombres: student?.first_name || student?.name || "",
     apellidos: student?.last_name || student?.lastName || "",
-    fecha_nac: student?.birth_date || "",
+    fecha_nac: initialBirthDate,
     direccion_Habitacion: "",
-    grado: student?.grade_level || student?.gradeLevel || "",
+    grado: student?.dance_level_name || student?.dance_level || student?.danceLevel || (student?.grade_level !== student?.grade_level_name ? student?.grade_level : "") || "",
     especialidad: "",
     convivencia: "",
     escuela: "",
@@ -122,7 +155,7 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
     // Datos de salud
     peso: "",
     talla: "",
-    edad: "",
+    edad: calculateAge(initialBirthDate),
     intolerancia: "",
     textIntolerancia: "",
     sintomasFrecuentes: "",
@@ -173,16 +206,17 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
           setMensajeYaInscrito("");
         }
 
-        // Formatear fecha de nacimiento
         let formattedDate = "";
         const rawDate = est.fecha_nacimiento || student.birth_date || student.birthDate;
         if (rawDate) {
           formattedDate = String(rawDate).split('T')[0];
         }
+        const edadCalculada = calculateAge(formattedDate);
 
-        // Grado del estudiante mapeado
+        // Grado de Danza del estudiante mapeado (de la Escuela de Danza)
+        // IMPORTANTE: NO usar grade_level_name / grade_level / gradeLevel, esos son el grado de la escuela regular (primaria/bachillerato)
         let mappedGrade = "";
-        const rawGrade = est.grado_escuela || est.dance_level_name || est.grade_level_name || student.grade_level || student.gradeLevel || "";
+        const rawGrade = est.dance_level_name || est.dance_level || student.dance_level_name || student.dance_level || "";
         if (rawGrade) {
           mappedGrade = rawGrade.toLowerCase().replace(" ", "_");
         }
@@ -232,6 +266,7 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
           nombres: est.nombres || student.first_name || prev.nombres,
           apellidos: est.apellidos || student.last_name || prev.apellidos,
           fecha_nac: formattedDate || prev.fecha_nac,
+          edad: edadCalculada || calculateAge(prev.fecha_nac) || prev.edad,
           direccion_Habitacion: est.direccion || prev.direccion_Habitacion,
           grado: mappedGrade || prev.grado,
           escuela: est.escuela || prev.escuela,
@@ -316,17 +351,16 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
     }
   }, [activeYear]);
 
-  const calculateAge = (birthDate) => {
-    if (!birthDate) return "";
-    const today = new Date();
-    const birth = new Date(birthDate);
-    let age = today.getFullYear() - birth.getFullYear();
-    const monthDiff = today.getMonth() - birth.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-      age--;
+  // Sincronizar automáticamente la edad cuando exista o cambie la fecha de nacimiento
+  useEffect(() => {
+    if (formData.fecha_nac) {
+      const calculated = calculateAge(formData.fecha_nac);
+      setFormData(prev => {
+        if (String(prev.edad) === String(calculated)) return prev;
+        return { ...prev, edad: calculated };
+      });
     }
-    return age > 0 ? age : "";
-  };
+  }, [formData.fecha_nac]);
 
   // Mapa para limpiar errores de campos combinados
   const combinedFieldMap = {

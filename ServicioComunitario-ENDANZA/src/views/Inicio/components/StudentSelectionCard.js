@@ -21,9 +21,22 @@ const StudentSelectionCard = ({ child, colorClass, buttonText, onClick }) => {
 
     const fullName = child.fullName || child.full_name || `${firstName} ${lastName}`.trim();
     const code = child.code || child.dni || child.id || '';
-    const status = child.status || (child.is_active === false ? 'Inactivo' : 'Activo');
-    const gradeLevel = child.gradeLevel || child.grade_level || 'N/A';
-    const academicYear = child.academicYear || '2024-2025';
+    const rawGrade = child.dance_level || child.dance_level_name || child.danceLevel || child.grade_level || child.gradeLevel || '';
+    let baseGrade = rawGrade.replace(/Año/gi, 'Grado');
+    const isAdvancedGrade = /6|7|8|sexto|séptimo|septimo|octavo/i.test(baseGrade);
+    const hasProgram = child.has_program ?? (isAdvancedGrade && (child.specialty_name || child.specialtyName || baseGrade.includes(' - ')));
+
+    let gradeLevel = 'N/A';
+    if (baseGrade) {
+        if (!isAdvancedGrade && baseGrade.includes(' - ')) {
+            gradeLevel = baseGrade.split(' - ')[0].trim();
+        } else {
+            gradeLevel = baseGrade;
+        }
+    }
+
+    const gradeLabel = hasProgram ? 'Grado y Programa' : 'Grado';
+    const academicYear = child.academicYear || child.academic_year || '2025-2026';
 
     return (
         <CCard className={`premium-card student-card h-100 border-0 border-start border-4 border-${colorClass}`} style={{ borderRadius: '16px' }}>
@@ -55,7 +68,7 @@ const StudentSelectionCard = ({ child, colorClass, buttonText, onClick }) => {
 
                 <div className="p-3 child-info-box rounded-3 mb-4">
                     <div className="d-flex justify-content-between align-items-center mb-2">
-                        <span className="child-info-label small fw-bold text-uppercase">Grado y Programa</span>
+                        <span className="child-info-label small fw-bold text-uppercase">{gradeLabel}</span>
                         <span className={`fw-bold text-${colorClass} text-end`}>{gradeLevel}</span>
                     </div>
                     <div className="d-flex justify-content-between align-items-center">

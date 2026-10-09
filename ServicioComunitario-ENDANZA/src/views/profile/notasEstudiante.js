@@ -148,7 +148,7 @@ const NotasView = () => {
                 estudianteInfo = {
                     nombre: `${found.first_name} ${found.last_name}`,
                     codigo: found.dni,
-                    grado: found.gradeLevel || "N/A", // Si viene del back
+                    grado: found.dance_level || found.dance_level_name || found.gradeLevel || found.grade_level || "N/A",
                     seccion: "A" // TODO: Esto debería venir del endpoint de estudiantes de repre
                 }
             }

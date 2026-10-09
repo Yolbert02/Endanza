@@ -13,8 +13,14 @@ const DatosEstudiante = ({ formData, onChange, errores = {}, mode = "completo" }
   useEffect(() => {
     if (formData.Grado_Escuela) {
       const gradoStr = String(formData.Grado_Escuela).toLowerCase();
-      if (gradoStr.includes('año') || gradoStr.includes('1er año') || gradoStr.includes('5to año')) {
+      if (gradoStr.includes('preescolar') || gradoStr.includes('maternal') || gradoStr.includes('nivel')) {
+        setTipoEstudioExterno('preescolar');
+      } else if (gradoStr.includes('año') || gradoStr.includes('bachillerato')) {
         setTipoEstudioExterno('bachillerato');
+      } else if (gradoStr.includes('universidad') || gradoStr.includes('universitario') || gradoStr.includes('semestre')) {
+        setTipoEstudioExterno('universidad');
+      } else {
+        setTipoEstudioExterno('escuela');
       }
     }
   }, [formData.Grado_Escuela]);
@@ -23,8 +29,19 @@ const DatosEstudiante = ({ formData, onChange, errores = {}, mode = "completo" }
   const handleTipoEstudioChange = (e) => {
     const nuevoTipo = e.target.value;
     setTipoEstudioExterno(nuevoTipo);
-    onChange({ target: { name: 'Grado_Escuela', value: '' } });
+    if (nuevoTipo === 'universidad') {
+      onChange({ target: { name: 'Grado_Escuela', value: 'Universitario' } });
+    } else {
+      onChange({ target: { name: 'Grado_Escuela', value: '' } });
+    }
   };
+
+  // Asegurar que si el tipo es universidad, el valor sea 'Universitario'
+  useEffect(() => {
+    if (tipoEstudioExterno === 'universidad' && formData.Grado_Escuela !== 'Universitario') {
+      onChange({ target: { name: 'Grado_Escuela', value: 'Universitario' } });
+    }
+  }, [tipoEstudioExterno]);
 
   // Función para determinar si el grado es avanzado (6to a 8vo)
   const esGradoAvanzado = () => {
@@ -88,26 +105,47 @@ const DatosEstudiante = ({ formData, onChange, errores = {}, mode = "completo" }
     return formData.especialidad;
   };
 
-  // Opciones para grados escolares externos (Escuela)
-  const gradosEscuela = [
-    { value: "1er_grado", label: "1er Grado" },
-    { value: "2do_grado", label: "2do Grado" },
-    { value: "3er_grado", label: "3er Grado" },
-    { value: "4to_grado", label: "4to Grado" },
-    { value: "5to_grado", label: "5to Grado" },
-    { value: "6to_grado", label: "6to Grado" },
-    { value: "7mo_grado", label: "7mo Grado" },
-    { value: "8vo_grado", label: "8vo Grado" }
+  // Opciones para Preescolar
+  const gradosPreescolar = [
+    { value: "Preescolar", label: "Preescolar" },
+    { value: "Maternal", label: "Maternal" },
+    { value: "1er Nivel", label: "1er Nivel" },
+    { value: "2do Nivel", label: "2do Nivel" },
+    { value: "3er Nivel", label: "3er Nivel" }
   ];
 
-  // Opciones para años de bachillerato
-  const añosBachillerato = [
-    { value: "1er_año", label: "1er Año" },
-    { value: "2do_año", label: "2do Año" },
-    { value: "3er_año", label: "3er Año" },
-    { value: "4to_año", label: "4to Año" },
-    { value: "5to_año", label: "5to Año" }
+  // Opciones para grados escolares de Primaria (1° a 6° Grado)
+  const gradosPrimaria = [
+    { value: "1er Grado", label: "1er Grado" },
+    { value: "2do Grado", label: "2do Grado" },
+    { value: "3er Grado", label: "3er Grado" },
+    { value: "4to Grado", label: "4to Grado" },
+    { value: "5to Grado", label: "5to Grado" },
+    { value: "6to Grado", label: "6to Grado" }
   ];
+
+  // Opciones para años de Bachillerato (1° a 5° Año)
+  const añosBachillerato = [
+    { value: "1er Año", label: "1er Año" },
+    { value: "2do Año", label: "2do Año" },
+    { value: "3er Año", label: "3er Año" },
+    { value: "4to Año", label: "4to Año" },
+    { value: "5to Año", label: "5to Año" }
+  ];
+
+
+
+  // Normalizar valor de Grado_Escuela para coincidir con el select
+  const normalizedGradoEscuela = (options) => {
+    if (!formData.Grado_Escuela) return "";
+    const g = String(formData.Grado_Escuela).trim().toLowerCase();
+    const match = options.find(
+      opt => opt.value.toLowerCase() === g || 
+             opt.label.toLowerCase() === g ||
+             opt.value.toLowerCase().replace(/_/g, ' ') === g.replace(/_/g, ' ')
+    );
+    return match ? match.value : formData.Grado_Escuela;
+  };
 
   return (
     <div className="animate__animated animate__fadeIn">
@@ -352,13 +390,15 @@ const DatosEstudiante = ({ formData, onChange, errores = {}, mode = "completo" }
                   onChange={handleTipoEstudioChange}
                   className="input-premium py-2"
                 >
-                  <option value="escuela">Escuela (1° a 8° grado)</option>
+                  <option value="preescolar">Preescolar</option>
+                  <option value="escuela">Escuela (1° a 6° grado)</option>
                   <option value="bachillerato">Bachillerato (1° a 5° año)</option>
+                  <option value="universidad">Universidad</option>
                 </CFormSelect>
               </CCol>
               
               <CCol md={3}>
-                {tipoEstudioExterno === 'escuela' ? (
+                {tipoEstudioExterno === 'preescolar' && (
                   <CFormSelect
                     label={
                       <span className="fw-bold step-label text-uppercase ls-1 small mb-1">
@@ -366,36 +406,73 @@ const DatosEstudiante = ({ formData, onChange, errores = {}, mode = "completo" }
                       </span>
                     }
                     name="Grado_Escuela"
-                    value={formData.Grado_Escuela}
+                    value={normalizedGradoEscuela(gradosPreescolar)}
                     onChange={onChange}
                     className="input-premium py-2"
                   >
                     <option value="">Seleccione grado...</option>
-                    {gradosEscuela.map(grado => (
+                    {gradosPreescolar.map(g => (
+                      <option key={g.value} value={g.value}>
+                        {g.label}
+                      </option>
+                    ))}
+                  </CFormSelect>
+                )}
+
+                {tipoEstudioExterno === 'escuela' && (
+                  <CFormSelect
+                    label={
+                      <span className="fw-bold step-label text-uppercase ls-1 small mb-1">
+                        Grado Escolar
+                      </span>
+                    }
+                    name="Grado_Escuela"
+                    value={normalizedGradoEscuela(gradosPrimaria)}
+                    onChange={onChange}
+                    className="input-premium py-2"
+                  >
+                    <option value="">Seleccione grado...</option>
+                    {gradosPrimaria.map(grado => (
                       <option key={grado.value} value={grado.value}>
                         {grado.label}
                       </option>
                     ))}
                   </CFormSelect>
-                ) : (
+                )}
+
+                {tipoEstudioExterno === 'bachillerato' && (
                   <CFormSelect
                     label={
                       <span className="fw-bold step-label text-uppercase ls-1 small mb-1">
-                        Año de Bachillerato
+                        Grado Escolar
                       </span>
                     }
                     name="Grado_Escuela"
-                    value={formData.Grado_Escuela}
+                    value={normalizedGradoEscuela(añosBachillerato)}
                     onChange={onChange}
                     className="input-premium py-2"
                   >
-                    <option value="">Seleccione año...</option>
+                    <option value="">Seleccione grado...</option>
                     {añosBachillerato.map(año => (
                       <option key={año.value} value={año.value}>
                         {año.label}
                       </option>
                     ))}
                   </CFormSelect>
+                )}
+
+                {tipoEstudioExterno === 'universidad' && (
+                  <CFormInput
+                    label={
+                      <span className="fw-bold step-label text-uppercase ls-1 small mb-1">
+                        Grado Escolar
+                      </span>
+                    }
+                    name="Grado_Escuela"
+                    value="Universitario"
+                    readOnly
+                    className="input-premium py-2 bg-light fw-semibold"
+                  />
                 )}
               </CCol>
             </CRow>

@@ -154,10 +154,15 @@ const SeccionesLapsos = () => {
   // Filtered sections
   const filteredSections = useMemo(() => {
     return sections.filter((s) => {
-      const matchesGrade = filterGrade ? s.grade_name === filterGrade || s.nivel_academico === filterGrade : true
+      const gName = (s.nivel_academico || s.grade_name || '').replace(/Año/gi, 'Grado')
+      const matchesGrade = filterGrade
+        ? gName.toLowerCase() === filterGrade.toLowerCase() ||
+          (s.grade_name && s.grade_name.toLowerCase() === filterGrade.toLowerCase()) ||
+          (s.nivel_academico && s.nivel_academico.toLowerCase() === filterGrade.toLowerCase())
+        : true
       const matchesSearch = searchTerm
         ? (s.section_name && s.section_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (s.grade_name && s.grade_name.toLowerCase().includes(searchTerm.toLowerCase()))
+          (gName && gName.toLowerCase().includes(searchTerm.toLowerCase()))
         : true
       return matchesGrade && matchesSearch
     })
@@ -525,7 +530,7 @@ const SeccionesLapsos = () => {
                             </CTableDataCell>
                             <CTableDataCell>
                               <div className="fw-bold" style={{ color: '#2B2827' }}>
-                                {sec.nivel_academico || sec.grade_name || 'Sin asignar'}
+                                {(sec.nivel_academico || sec.grade_name || 'Sin asignar').replace(/Año/gi, 'Grado')}
                               </div>
                               <span className="small text-muted">Aplica a los 3 lapsos</span>
                             </CTableDataCell>

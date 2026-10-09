@@ -38,9 +38,9 @@ import PersonalInfoTab from "../profile/components/profile/PersonalInfoTab"
 import RepresentativeTab from "../profile/components/profile/RepresentativeTab"
 import HealthTab from "../profile/components/profile/HealthTab"
 import EditStudentModal from "../profile/components/profile/editModal"
+import ModalPlanillasInscripcion from "../../components/planillas/ModalPlanillasInscripcion"
 
-// 👇 Importar el servicio para representantes (como fallback)
-import { getStudentProfile, updateStudent as updateStudentService } from '../../services/studentsService'
+import { getStudentProfile, getStudent, updateStudent as updateStudentService } from '../../services/studentsService'
 import useUserRole from '../../Hooks/useUserRole'
 
 // 👇 LOG 1: Verificar que el archivo se carga
@@ -54,7 +54,7 @@ const PerfilRepresentanteEstudiante = () => {
   const navigate = useNavigate()
   const location = useLocation()
   // 👇 IMPORTANTE: Obtener también isLoading
-  const { isRepresentante, isLoading } = useUserRole()
+  const { isRepresentante, isAdmin, isLoading } = useUserRole()
 
   // 👇 LOG 3: Verificar parámetros
   console.log("📍 useParams:", { id });
@@ -68,7 +68,39 @@ const PerfilRepresentanteEstudiante = () => {
   const [activeKey, setActiveKey] = useState(1)
   const [toasts, setToasts] = useState([])
   const [editModalVisible, setEditModalVisible] = useState(false)
+  const [modalPlanillasVisible, setModalPlanillasVisible] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  const fetchStudentData = async (showSpinner = true) => {
+    console.log("📤 fetchStudentData - Iniciando petición al backend");
+    if (showSpinner) setLoading(true);
+    try {
+      console.log(`📥 Cargando perfil completo del estudiante ID: ${id}`);
+      let data = await getStudentProfile(id);
+      if (!data) {
+        console.log(`🔄 Intentando fallback con getStudent(${id})`);
+        data = await getStudent(id);
+      }
+      console.log("✅ Perfil cargado desde backend:", data);
+      if (data) {
+        setStudent(data);
+      }
+    } catch (error) {
+      console.error("❌ Error fetching student:", error);
+      try {
+        const fallbackData = await getStudent(id);
+        if (fallbackData) {
+          setStudent(fallbackData);
+          return;
+        }
+      } catch (e) {
+        console.error("❌ Fallback getStudent error:", e);
+      }
+      showToast("danger", "Error", error.message || "No se pudo cargar el perfil del estudiante");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   // 👇 SOLUCIÓN: Esperar a que isLoading sea false antes de ejecutar la lógica
   useEffect(() => {
@@ -80,61 +112,38 @@ const PerfilRepresentanteEstudiante = () => {
 
     console.log("🔄 useEffect ejecutándose - id:", id, "isRepresentante:", isRepresentante);
 
-    // Redirigir si no es representante (ahora con datos reales)
-    if (!isRepresentante) {
-      console.log("🚫 No es representante, redirigiendo a /inicio");
-      navigate('/inicio')
-      return
+    // Redirigir si no es representante ni admin
+    if (!isRepresentante && !isAdmin) {
+      console.log("🚫 No es representante ni admin, redirigiendo a /inicio");
+      navigate('/inicio');
+      return;
     }
 
-    // Intentar obtener el estudiante de la lista cacheada
-    const studentsList = location.state?.studentsList
+    // Intentar obtener el estudiante de la lista cacheada para vista previa rápida
+    const studentsList = location.state?.studentsList;
     console.log("📋 studentsList desde state:", studentsList);
 
+    let hasCached = false;
     if (studentsList && studentsList.length > 0) {
-      console.log("📦 Usando estudiantes de la lista cacheada:", studentsList)
-      // Buscar el estudiante por ID (convertir a número por si acaso)
-      const foundStudent = studentsList.find(s => s.id === parseInt(id) || s.id === id)
-
+      console.log("📦 Usando estudiante de lista cacheada como vista previa inicial");
+      const foundStudent = studentsList.find(s => s.id === parseInt(id) || s.id === id);
       if (foundStudent) {
-        console.log("✅ Estudiante encontrado en cache:", foundStudent)
-        setStudent(foundStudent)
-        setLoading(false)
-        return
-      } else {
-        console.warn("⚠️ Estudiante no encontrado en cache, haciendo petición...")
+        setStudent(foundStudent);
+        setLoading(false);
+        hasCached = true;
       }
-    } else {
-      console.log("📡 No hay cache disponible, haciendo petición al backend")
     }
 
-    // Fallback: hacer petición al backend
-    fetchStudentData()
-  }, [id, isRepresentante, isLoading, location.state]) // 👈 AÑADIR isLoading a las dependencias
-
-  const fetchStudentData = async () => {
-    console.log("📤 fetchStudentData - Iniciando petición al backend");
-    setLoading(true)
-    try {
-      console.log(`📥 Representante cargando perfil del estudiante ID: ${id} (fallback)`)
-      const data = await getStudentProfile(id)
-      console.log("✅ Perfil cargado desde backend:", data)
-      setStudent(data)
-    } catch (error) {
-      console.error("❌ Error fetching student:", error)
-      showToast("danger", "Error", error.message || "No se pudo cargar el perfil del estudiante")
-    } finally {
-      setLoading(false)
-    }
-  }
+    // Cargar SIEMPRE el perfil completo desde el backend para garantizar todos los datos (representante, salud, secciones)
+    fetchStudentData(!hasCached);
+  }, [id, isRepresentante, isAdmin, isLoading])
 
   const showToast = (type, title, message) => {
     setToasts((prev) => [...prev, { id: Date.now(), type, title, message, delay: 3000 }])
   }
 
   const handlePrint = () => {
-    window.print()
-    showToast("success", "Imprimir", "Preparando para imprimir...")
+    setModalPlanillasVisible(true)
   }
 
   const handleEdit = () => {
@@ -233,7 +242,7 @@ const PerfilRepresentanteEstudiante = () => {
                 <ol className="breadcrumb mb-0 small">
                   <li className="breadcrumb-item">Inicio</li>
                   <li className="breadcrumb-item active" aria-current="page">
-                    {student.first_name} {student.last_name}
+                    {student.full_name || student.fullName || `${student.first_name || ''} ${student.last_name || ''}`.trim()}
                   </li>
                 </ol>
               </nav>
@@ -383,11 +392,20 @@ const PerfilRepresentanteEstudiante = () => {
 
       <EditStudentModal
         visible={editModalVisible}
-        setVisible={setEditModalVisible}
+        onClose={() => setEditModalVisible(false)}
         studentData={student}
         onSave={handleSaveStudent}
-        saving={saving}
+        loading={saving}
       />
+
+      {modalPlanillasVisible && (
+        <ModalPlanillasInscripcion
+          visible={modalPlanillasVisible}
+          onClose={() => setModalPlanillasVisible(false)}
+          data={student}
+          codigoInscripcion={student?.student_code || student?.codigo || student?.id}
+        />
+      )}
 
       <style>{`
         @media print {

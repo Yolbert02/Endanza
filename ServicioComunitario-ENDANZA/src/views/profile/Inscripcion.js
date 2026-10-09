@@ -169,7 +169,7 @@ const checkEnrollmentPeriod = async () => {
       <InscripcionCompletaForm
         onVolver={() => {
           setSelectedStudent(null);
-          loadRepresentativeChildren();
+          fetchChildren();
         }}
         student={selectedStudent}
         studentsList={children}

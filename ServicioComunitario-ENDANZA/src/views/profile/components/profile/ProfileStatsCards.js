@@ -8,10 +8,11 @@ const ProfileStatsCards = ({ student, progreso }) => {
     // Calcular promedio ponderado (ejemplo)
     const promedio = student.average_grade || '0.0'
     
-    // Determinar año académico actual
-    const añoActual = student.sections && student.sections.length > 0
-        ? student.sections[0].academic_year
-        : '2024 - 2025'
+    // Determinar año académico actual (cargado dinámicamente desde BD o secciones)
+    const añoActual = (student.sections && student.sections.length > 0 && student.sections[0].academic_year)
+        || student.current_academic_year
+        || student.academic_year
+        || '2025-2026'
 
     return (
         <CRow className="g-4 mb-4 animate__animated animate__fadeIn">

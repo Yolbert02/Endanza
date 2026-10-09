@@ -1,0 +1,434 @@
+/* ==========================================================================
+   ESTILOS OFICIALES DE LAS 4 PLANILLAS ENDANZA
+   (Ficha de Inscripción, Acta Representante, Acta Estudiante, Historia Clínica)
+   ========================================================================== */
+
+@page {
+  size: letter portrait;
+  margin: 6mm 8mm;
+}
+
+/* Contenedor en pantalla para vista previa */
+.planillas-preview-container {
+  background-color: #525659;
+  padding: 20px 10px;
+  max-height: 80vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+/* Hoja individual tipo papel Carta / A4 */
+.planilla-sheet {
+  width: 216mm;
+  min-height: 275mm;
+  background-color: #ffffff;
+  color: #111111;
+  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  font-size: 8pt;
+  line-height: 1.3;
+  padding: 7mm 10mm 6mm 10mm;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* ENCABEZADOS COMUNES */
+.planilla-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  position: relative;
+}
+
+.planilla-header-logo-left {
+  width: 32mm;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.planilla-header-logo-left img {
+  max-width: 100%;
+  max-height: 20mm;
+  object-fit: contain;
+}
+
+.planilla-header-logo-right {
+  width: 32mm;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.planilla-header-logo-right img {
+  max-width: 100%;
+  max-height: 20mm;
+  object-fit: contain;
+}
+
+.planilla-header-center {
+  flex: 1;
+  text-align: center;
+  padding: 0 5px;
+}
+
+.planilla-republica {
+  font-size: 8pt;
+  font-weight: normal;
+  margin: 0;
+  line-height: 1.15;
+}
+
+.planilla-ministerio {
+  font-size: 7.5pt;
+  margin: 0;
+  line-height: 1.15;
+}
+
+.planilla-escuela {
+  font-size: 8pt;
+  font-weight: bold;
+  margin: 0;
+  line-height: 1.15;
+}
+
+.planilla-ciudad {
+  font-size: 7.5pt;
+  margin: 0;
+  line-height: 1.15;
+}
+
+.planilla-doc-title {
+  font-size: 9.5pt;
+  font-weight: bold;
+  text-transform: uppercase;
+  margin-top: 3px;
+  margin-bottom: 1px;
+  letter-spacing: 0.5px;
+}
+
+.planilla-doc-subtitle {
+  font-size: 9pt;
+  font-weight: bold;
+  margin: 0;
+}
+
+/* RECUADRO FOTO (FICHA DE INSCRIPCIÓN) */
+.planilla-photo-box {
+  width: 25mm;
+  height: 32mm;
+  border: 1px solid #777777;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 6.5pt;
+  color: #555555;
+  background-color: #fafafa;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.planilla-photo-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* BARRAS DE SECCIÓN GRIS */
+.planilla-section-bar {
+  background-color: #d1d5db;
+  color: #111111;
+  font-size: 8pt;
+  font-weight: bold;
+  padding: 2.5px 6px;
+  border: 1px solid #9ca3af;
+  margin-top: 5px;
+  margin-bottom: 3px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-transform: uppercase;
+}
+
+.planilla-section-code {
+  font-size: 7pt;
+  font-weight: bold;
+}
+
+.planilla-badge-rep {
+  background-color: #1f2937;
+  color: #ffffff;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 6.5pt;
+  margin-left: 6px;
+  text-transform: uppercase;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+/* GRILLAS Y CAMPOS DE INFORMACIÓN */
+.planilla-grid {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 2px;
+  column-gap: 8px;
+  margin-bottom: 2px;
+}
+
+.planilla-field {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  font-size: 7.5pt;
+  line-height: 1.25;
+}
+
+.planilla-label {
+  font-weight: bold;
+  color: #111111;
+  white-space: nowrap;
+}
+
+.planilla-val {
+  color: #111111;
+  text-transform: uppercase;
+  word-break: break-word;
+}
+
+.planilla-val-empty {
+  color: #666666;
+}
+
+/* FIRMAS */
+.planilla-signatures {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 14px;
+  margin-bottom: 6px;
+  width: 100%;
+}
+
+.planilla-sig-block {
+  text-align: center;
+  width: 55mm;
+}
+
+.planilla-sig-line {
+  border-top: 1px solid #111111;
+  height: 1px;
+  margin-bottom: 3px;
+  margin-top: 28px;
+}
+
+.planilla-sig-label {
+  font-size: 7.5pt;
+  font-weight: bold;
+  color: #111111;
+}
+
+/* PIE DE PÁGINA INSTITUCIONAL */
+.planilla-footer {
+  border-top: 1px solid #d1d5db;
+  padding-top: 3px;
+  text-align: center;
+  font-size: 7pt;
+  color: #4b5563;
+  margin-top: auto;
+}
+
+.planilla-lema {
+  font-style: italic;
+  font-size: 7.5pt;
+  color: #374151;
+  margin-bottom: 2px;
+}
+
+/* ESTILOS ESPECÍFICOS PARA ACTAS DE COMPROMISO */
+.acta-sheet {
+  padding: 18mm 22mm 14mm 22mm;
+}
+
+.acta-title {
+  text-align: center;
+  font-size: 13pt;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 35px;
+  margin-bottom: 45px;
+}
+
+.acta-body {
+  font-size: 10pt;
+  line-height: 2;
+  text-align: justify;
+  text-justify: inter-word;
+  color: #111111;
+}
+
+.acta-date-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 45px;
+  margin-bottom: 50px;
+  font-size: 9.5pt;
+}
+
+.acta-signatures {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  margin-bottom: 40px;
+}
+
+.acta-sig-block {
+  text-align: center;
+  width: 70mm;
+}
+
+.acta-sig-line {
+  border-top: 1px solid #111111;
+  height: 1px;
+  margin-bottom: 4px;
+}
+
+/* ESTILOS HISTORIA CLÍNICA NUTRICIONAL */
+.historia-sheet {
+  padding: 10mm 14mm 8mm 14mm;
+}
+
+.historia-title {
+  text-align: center;
+  font-size: 11pt;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 6px;
+  margin-bottom: 12px;
+}
+
+.historia-datos-basicos {
+  margin-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 8px;
+}
+
+.historia-question-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 7.8pt;
+  line-height: 1.35;
+}
+
+.historia-question-table td {
+  padding: 4px 6px;
+  vertical-align: top;
+}
+
+.historia-q-left {
+  width: 52%;
+}
+
+.historia-q-right {
+  width: 48%;
+}
+
+.historia-antecedentes-box {
+  margin-top: 8px;
+  padding: 6px 8px;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  font-size: 7.8pt;
+  line-height: 1.35;
+}
+
+/* BOTONES DE CONTROL DE VISTA PREVIA */
+.planillas-toolbar {
+  background: #ffffff;
+  padding: 12px 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  position: sticky;
+  top: 10px;
+  z-index: 100;
+  width: 100%;
+  max-width: 216mm;
+}
+
+/* AJUSTES PARA IMPRESIÓN OFICIAL (WINDOW.PRINT) */
+@media print {
+  body {
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .no-print,
+  .planillas-toolbar,
+  .modal-header,
+  .modal-footer,
+  .nav-tabs {
+    display: none !important;
+  }
+
+  .planillas-preview-container {
+    background: transparent !important;
+    padding: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    gap: 0 !important;
+    display: block !important;
+  }
+
+  .modal,
+  .modal-dialog,
+  .modal-content,
+  .modal-body {
+    position: static !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+
+  .planilla-sheet {
+    width: 100% !important;
+    min-height: 260mm !important;
+    max-height: none !important;
+    margin: 0 0 0 0 !important;
+    padding: 5mm 6mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .planilla-sheet:last-child {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  .acta-sheet {
+    padding: 12mm 18mm 10mm 18mm !important;
+  }
+}
