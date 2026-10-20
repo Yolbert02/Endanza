@@ -156,15 +156,20 @@ export const InscripcionRepresentanteController = {
           }
         }
 
-        // 5. Crear historial médico (tabla: historial_medico en NewEndanza)
+        let tipoSangre = (datos.tipo_sangre || datos.TipoSangre || datos.blood_type || '').trim();
+        if (!tipoSangre || tipoSangre.toLowerCase() === 'desconocido') {
+          tipoSangre = 'No sabe';
+        }
+
         const historialQuery = {
           text: `
             INSERT INTO historial_medico (
               peso_kg, altura_m, intolerancia_alimentos, descripcion_intolerancia,
               dolores_frecuentes, constipacion_frecuente, tiene_cirugia, descripcion_cirugia,
               control_hormonal, descripcion_control_hormonal, tiene_alergias,
-              descripcion_alergias, historial_familiar_desc, termino_nacimiento
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+              descripcion_alergias, historial_familiar_desc, termino_nacimiento,
+              tipo_sangre
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             RETURNING id_historia
           `,
           values: [
@@ -181,7 +186,8 @@ export const InscripcionRepresentanteController = {
             datos.alergias === "Si",
             datos.textAlergia || null,
             datos.antecedentesFamiliares || null,
-            terminoNac
+            terminoNac,
+            tipoSangre
           ]
         };
 
@@ -282,8 +288,9 @@ export const InscripcionRepresentanteController = {
             id_nivel = $4,
             id_nivel_danza = $5,
             id_especialidad = $6,
-            seguro_escolar = $7
-           WHERE id_estudiante = $8`,
+            seguro_escolar = $7,
+            convivencia = COALESCE($8, convivencia)
+           WHERE id_estudiante = $9`,
           [
             id_historial,
             id_escuela,
@@ -292,10 +299,25 @@ export const InscripcionRepresentanteController = {
             id_nivel_danza,
             idEspecialidad,
             seguroEscolar,
+            datos.convivencia || null,
             id_estudiante
           ]
         );
-        console.log("✅ Estudiante actualizado");
+
+        // Actualizar cédula y teléfono del estudiante si fueron proporcionados
+        const cedulaEstudiante = datos.cedula || datos.dni;
+        const telEstudiante = datos.telefono_fijo || datos.telefonofijo_Rep || datos.telefono || null;
+        if (cedulaEstudiante || telEstudiante) {
+          await client.query(
+            `UPDATE persona SET 
+               cedula = COALESCE($1, cedula),
+               numero_telefono = COALESCE($2, numero_telefono)
+             WHERE id_persona = (SELECT id_persona FROM estudiante WHERE id_estudiante = $3)`,
+            [cedulaEstudiante || null, telEstudiante || null, id_estudiante]
+          );
+        }
+
+        console.log("✅ Estudiante actualizado con convivencia, cédula y teléfono");
 
         // 12. Guardar datos de los padres (madre y padre) usando estudiante_familiar + persona
         await guardarFamiliares(id_estudiante, datos, client);
@@ -484,19 +506,140 @@ export const InscripcionRepresentanteController = {
         }
       }
 
-      // 4. Obtener familiares asociados desde estudiante_familiar + persona
+      // Helper para extraer y separar nombres y apellidos fiablemente
+      const extractNames = (n1, n2, a1, a2) => {
+        let first = (n1 || '').trim();
+        let second = (n2 || '').trim();
+        if (first.includes(' ') && !second) {
+          const parts = first.split(/\s+/);
+          first = parts[0];
+          second = parts.slice(1).join(' ');
+        }
+
+        let last = (a1 || '').trim();
+        let secondLast = (a2 || '').trim();
+        if (last.includes(' ') && !secondLast) {
+          const parts = last.split(/\s+/);
+          last = parts[0];
+          secondLast = parts.slice(1).join(' ');
+        }
+
+        return {
+          primer_nombre: first,
+          segundo_nombre: second,
+          primer_apellido: last,
+          segundo_apellido: secondLast,
+          nombres: [first, second].filter(Boolean).join(' ').trim(),
+          apellidos: [last, secondLast].filter(Boolean).join(' ').trim()
+        };
+      };
+
+      // 4. Obtener familiares asociados desde estudiante_familiar + persona (+ representante si aplica)
       const familiaresRes = await db.query(`
         SELECT ef.parentesco, ef.es_representante_legal, ef.vive_con_estudiante,
-               p.nombre, p.apellido, p.cedula, p.numero_telefono, p.email, p.genero
+               COALESCE(NULLIF(TRIM(ef.ocupacion), ''), NULLIF(TRIM(r_fam.profesion), ''), NULLIF(TRIM(p.ocupacion), '')) as ocupacion,
+               COALESCE(NULLIF(TRIM(ef.lugar_trabajo), ''), NULLIF(TRIM(r_fam.lugar_trabajo), '')) as lugar_trabajo,
+               COALESCE(NULLIF(TRIM(ef.direccion_trabajo), ''), NULLIF(TRIM(r_fam.direccion_trabajo), '')) as direccion_trabajo,
+               COALESCE(NULLIF(TRIM(ef.telefono_trabajo), ''), NULLIF(TRIM(r_fam.telefono_trabajo), '')) as telefono_trabajo,
+               p.nombre, p.segundo_nombre, p.apellido, p.segundo_apellido,
+               p.cedula, p.numero_telefono, p.email, p.genero
         FROM estudiante_familiar ef
         JOIN persona p ON ef.id_persona = p.id_persona
+        LEFT JOIN representante r_fam ON p.id_persona = r_fam.id_persona
         WHERE ef.id_estudiante = $1
         ORDER BY ef.id_estudiante_familiar ASC
       `, [studentId]);
 
+      // Nombres completos del estudiante
+      const estNames = extractNames(
+        student.first_name,
+        student.middle_name || student.segundo_nombre,
+        student.last_name,
+        student.second_last_name || student.segundo_apellido
+      );
+
+      // Nombres y datos del representante
+      const repP1 = student.representative_first_name || representante?.nombre || representante?.first_name || "";
+      const repP2 = student.representative_second_name || student.representative_segundo_nombre || representante?.segundo_nombre || "";
+      const repA1 = student.representative_last_name || representante?.apellido || representante?.last_name || "";
+      const repA2 = student.representative_second_last_name || student.representative_segundo_apellido || representante?.segundo_apellido || "";
+
+      const repNames = extractNames(repP1, repP2, repA1, repA2);
+      const repOcupacion = student.representative_occupation || representante?.profesion || representante?.profesion_rep || "";
+      const repLugarTrabajo = student.representative_workplace || representante?.lugar_trabajo || "";
+      const repDirTrabajo = student.representative_work_address || representante?.direccion_trabajo || representante?.direccion || "";
+      const repTelTrabajo = student.representative_work_phone || representante?.telefono_trabajo || "";
+
+      const quienEsRep = (() => {
+        const relFromModel = student.representative_relationship;
+        if (relFromModel && /madre|mam[aá]/i.test(relFromModel)) return 'Madre';
+        if (relFromModel && /padre|pap[aá]/i.test(relFromModel)) return 'Padre';
+        if (relFromModel && relFromModel !== 'Madre') return relFromModel;
+        const genero = (student.representative_gender || '').toLowerCase();
+        if (genero === 'masculino' || genero === 'male') {
+          return 'Padre';
+        }
+        return 'Madre';
+      })();
+
       // Identificar madre y padre por parentesco
-      const madre = familiaresRes.rows.find(r => r.parentesco === 'Madre') || null;
-      const padre = familiaresRes.rows.find(r => r.parentesco === 'Padre') || null;
+      let madreRow = familiaresRes.rows.find(r => r.parentesco && /madre|mam[aá]/i.test(r.parentesco.trim())) || null;
+      let padreRow = familiaresRes.rows.find(r => r.parentesco && /padre|pap[aá]/i.test(r.parentesco.trim())) || null;
+
+      // Si el representante es la Madre y faltan datos, autocompletar desde el representante
+      if (quienEsRep === 'Madre') {
+        if (!madreRow) {
+          madreRow = {
+            nombre: repNames.primer_nombre,
+            segundo_nombre: repNames.segundo_nombre,
+            apellido: repNames.primer_apellido,
+            segundo_apellido: repNames.segundo_apellido,
+            cedula: student.representative_dni || representante?.cedula,
+            numero_telefono: student.representative_phone || representante?.numero_telefono,
+            email: student.representative_email || representante?.email,
+            ocupacion: repOcupacion,
+            lugar_trabajo: repLugarTrabajo,
+            direccion_trabajo: repDirTrabajo,
+            telefono_trabajo: repTelTrabajo
+          };
+        } else {
+          madreRow.segundo_nombre = madreRow.segundo_nombre || repNames.segundo_nombre;
+          madreRow.segundo_apellido = madreRow.segundo_apellido || repNames.segundo_apellido;
+          madreRow.ocupacion = madreRow.ocupacion || repOcupacion;
+          madreRow.lugar_trabajo = madreRow.lugar_trabajo || repLugarTrabajo;
+          madreRow.direccion_trabajo = madreRow.direccion_trabajo || repDirTrabajo;
+          madreRow.telefono_trabajo = madreRow.telefono_trabajo || repTelTrabajo;
+        }
+      }
+
+      // Si el representante es el Padre y faltan datos, autocompletar desde el representante
+      if (quienEsRep === 'Padre') {
+        if (!padreRow) {
+          padreRow = {
+            nombre: repNames.primer_nombre,
+            segundo_nombre: repNames.segundo_nombre,
+            apellido: repNames.primer_apellido,
+            segundo_apellido: repNames.segundo_apellido,
+            cedula: student.representative_dni || representante?.cedula,
+            numero_telefono: student.representative_phone || representante?.numero_telefono,
+            email: student.representative_email || representante?.email,
+            ocupacion: repOcupacion,
+            lugar_trabajo: repLugarTrabajo,
+            direccion_trabajo: repDirTrabajo,
+            telefono_trabajo: repTelTrabajo
+          };
+        } else {
+          padreRow.segundo_nombre = padreRow.segundo_nombre || repNames.segundo_nombre;
+          padreRow.segundo_apellido = padreRow.segundo_apellido || repNames.segundo_apellido;
+          padreRow.ocupacion = padreRow.ocupacion || repOcupacion;
+          padreRow.lugar_trabajo = padreRow.lugar_trabajo || repLugarTrabajo;
+          padreRow.direccion_trabajo = padreRow.direccion_trabajo || repDirTrabajo;
+          padreRow.telefono_trabajo = padreRow.telefono_trabajo || repTelTrabajo;
+        }
+      }
+
+      const madreNames = madreRow ? extractNames(madreRow.nombre, madreRow.segundo_nombre, madreRow.apellido, madreRow.segundo_apellido) : null;
+      const padreNames = padreRow ? extractNames(padreRow.nombre, padreRow.segundo_nombre, padreRow.apellido, padreRow.segundo_apellido) : null;
 
       // 5. Verificar si ya se encuentra inscrito en el año especificado (tabla: inscripcion)
       let yaInscrito = false;
@@ -528,13 +671,19 @@ export const InscripcionRepresentanteController = {
         data: {
           estudiante: {
             id: student.id,
-            nombres: student.first_name,
-            apellidos: student.last_name,
-            cedula: student.dni,
+            primer_nombre: estNames.primer_nombre,
+            segundo_nombre: estNames.segundo_nombre,
+            primer_apellido: estNames.primer_apellido,
+            segundo_apellido: estNames.segundo_apellido,
+            nombres: estNames.nombres,
+            apellidos: estNames.apellidos,
+            cedula: student.cedula || student.dni || "",
             fecha_nacimiento: student.birth_date,
             genero: student.gender,
             direccion: direccionHab,
-            telefono: "",
+            convivencia: student.convivencia || "",
+            telefono: student.phone || student.telefono || "",
+            telefono_fijo: student.phone || student.telefono || "",
             grado_escuela: student.grade_level_name || "",
             escuela: student.school_name || "",
             seguro_escolar: student.school_insurance || false,
@@ -547,17 +696,30 @@ export const InscripcionRepresentanteController = {
           },
           representante: representante ? {
             id: representante.id_representante || representante.id,
-            nombres: student.representative_first_name || representante.nombre || representante.first_name,
-            apellidos: student.representative_last_name || representante.apellido || representante.last_name,
-            cedula: student.representative_dni || representante.cedula || representante.dni,
-            telefono: student.representative_phone || "",
-            correo: student.representative_email || representante.email,
+            primer_nombre: repNames.primer_nombre,
+            segundo_nombre: repNames.segundo_nombre,
+            primer_apellido: repNames.primer_apellido,
+            segundo_apellido: repNames.segundo_apellido,
+            nombres: repNames.nombres,
+            apellidos: repNames.apellidos,
+            cedula: student.representative_dni || representante.cedula || representante.dni || "",
+            telefono: student.representative_phone || representante.numero_telefono || "",
+            correo: student.representative_email || representante.email || "",
             parentesco: student.representative_relationship || "Madre",
-            profesion: student.representative_occupation || representante.profesion_rep || "",
-            direccion_trabajo: representante.direccion || "",
-            genero: student.representative_gender || ""
+            profesion: repOcupacion,
+            ocupacion: repOcupacion,
+            lugar_trabajo: repLugarTrabajo,
+            trabajo: repLugarTrabajo,
+            direccion_trabajo: repDirTrabajo,
+            telefono_trabajo: repTelTrabajo,
+            genero: student.representative_gender || representante.genero || "",
+            foto: representante.foto_representante || ""
           } : {
             id: null,
+            primer_nombre: "",
+            segundo_nombre: "",
+            primer_apellido: "",
+            segundo_apellido: "",
             nombres: student.representative_first_name || "",
             apellidos: student.representative_last_name || "",
             cedula: student.representative_dni || "",
@@ -565,36 +727,52 @@ export const InscripcionRepresentanteController = {
             correo: student.representative_email || "",
             parentesco: student.representative_relationship || "Madre",
             profesion: "",
+            ocupacion: "",
+            lugar_trabajo: "",
+            trabajo: "",
             direccion_trabajo: "",
-            genero: student.representative_gender || ""
+            telefono_trabajo: "",
+            genero: student.representative_gender || "",
+            foto: ""
           },
-          quien_es_representante: (() => {
-            const relFromModel = student.representative_relationship;
-            if (relFromModel && relFromModel !== 'Madre') return relFromModel;
-            const genero = (student.representative_gender || '').toLowerCase();
-            if (genero.startsWith('m') && genero !== 'masculino') {
-              // 'm' could be masculino too, check more carefully
-            }
-            if (genero === 'masculino' || genero === 'male') {
-              return 'Padre';
-            }
-            return relFromModel || 'Madre';
-          })(),
-          madre: madre ? {
-            nombre: madre.nombre,
-            apellido: madre.apellido,
-            cedula: madre.cedula,
-            profesion: "",
-            direccion_trabajo: "",
-            telefono: madre.numero_telefono || ""
+          quien_es_representante: quienEsRep,
+          madre: madreRow ? {
+            primer_nombre: madreNames.primer_nombre,
+            segundo_nombre: madreNames.segundo_nombre,
+            primer_apellido: madreNames.primer_apellido,
+            segundo_apellido: madreNames.segundo_apellido,
+            nombre: madreNames.nombres,
+            apellido: madreNames.apellidos,
+            nombres: madreNames.nombres,
+            apellidos: madreNames.apellidos,
+            cedula: madreRow.cedula || "",
+            profesion: madreRow.ocupacion || "",
+            ocupacion: madreRow.ocupacion || "",
+            lugar_trabajo: madreRow.lugar_trabajo || "",
+            trabajo: madreRow.lugar_trabajo || "",
+            direccion_trabajo: madreRow.direccion_trabajo || "",
+            telefono: madreRow.numero_telefono || "",
+            email: madreRow.email || "",
+            telefono_trabajo: madreRow.telefono_trabajo || ""
           } : null,
-          padre: padre ? {
-            nombre: padre.nombre,
-            apellido: padre.apellido,
-            cedula: padre.cedula,
-            profesion: "",
-            direccion_trabajo: "",
-            telefono: padre.numero_telefono || ""
+          padre: padreRow ? {
+            primer_nombre: padreNames.primer_nombre,
+            segundo_nombre: padreNames.segundo_nombre,
+            primer_apellido: padreNames.primer_apellido,
+            segundo_apellido: padreNames.segundo_apellido,
+            nombre: padreNames.nombres,
+            apellido: padreNames.apellidos,
+            nombres: padreNames.nombres,
+            apellidos: padreNames.apellidos,
+            cedula: padreRow.cedula || "",
+            profesion: padreRow.ocupacion || "",
+            ocupacion: padreRow.ocupacion || "",
+            lugar_trabajo: padreRow.lugar_trabajo || "",
+            trabajo: padreRow.lugar_trabajo || "",
+            direccion_trabajo: padreRow.direccion_trabajo || "",
+            telefono: padreRow.numero_telefono || "",
+            email: padreRow.email || "",
+            telefono_trabajo: padreRow.telefono_trabajo || ""
           } : null,
           historial_medico: {
             peso: historial.peso_kg ? parseFloat(historial.peso_kg).toString() : "",
@@ -643,16 +821,35 @@ async function guardarFamiliares(id_estudiante, datos, client = db) {
     console.log("👪 Guardando familiares para estudiante:", id_estudiante);
 
     // Guardar MADRE
-    if (datos.nombre_Madre && datos.apellido_Madre) {
-      const nombreMadre = capitalizeWords(datos.nombre_Madre);
-      const apellidoMadre = capitalizeWords(datos.apellido_Madre);
-      const cedulaMadre = datos.cedula_Madre || null;
-      const ocupacionMadre = datos.ocupacion_Madre || null;
-      const trabajoMadre = datos.trabajo_Madre || datos.lugar_trabajo_Madre || null;
-      const dirTrabajoMadre = datos.direccion_Trabajo_Madre || datos.direccion_trabajo_Madre || null;
-      const telTrabajoMadre = datos.telefono_trabajo_Madre || null;
+    let p1Madre = (datos.primer_nombre_Madre || '').trim();
+    let p2Madre = (datos.segundo_nombre_Madre || '').trim();
+    let a1Madre = (datos.primer_apellido_Madre || '').trim();
+    let a2Madre = (datos.segundo_apellido_Madre || '').trim();
 
-      console.log("📝 Procesando madre:", nombreMadre, apellidoMadre);
+    if (!p1Madre && datos.nombre_Madre) {
+      const parts = datos.nombre_Madre.trim().split(/\s+/);
+      p1Madre = parts[0] || '';
+      p2Madre = parts.slice(1).join(' ') || '';
+    }
+    if (!a1Madre && datos.apellido_Madre) {
+      const parts = datos.apellido_Madre.trim().split(/\s+/);
+      a1Madre = parts[0] || '';
+      a2Madre = parts.slice(1).join(' ') || '';
+    }
+
+    if (p1Madre && a1Madre) {
+      const nombreMadre = capitalizeWords(p1Madre);
+      const segundoNombreMadre = p2Madre ? capitalizeWords(p2Madre) : null;
+      const apellidoMadre = capitalizeWords(a1Madre);
+      const segundoApellidoMadre = a2Madre ? capitalizeWords(a2Madre) : null;
+      const cedulaMadre = datos.cedula_Madre || null;
+      const ocupacionMadre = (datos.ocupacion_Madre || datos.MadreOcupacion || datos.profesion_Madre || '').trim() || null;
+      const trabajoMadre = (datos.trabajo_Madre || datos.MadreLugarTrabajo || datos.lugar_trabajo_Madre || '').trim() || null;
+      const dirTrabajoMadre = (datos.direccion_Trabajo_Madre || datos.MadreDireccionTrabajo || datos.direccion_trabajo_Madre || '').trim() || null;
+      const telTrabajoMadre = (datos.telefono_trabajo_Madre || datos.MadreTelefonoTrabajo || '').trim() || null;
+      const emailMadre = (datos.email_Madre || datos.MadreEmail || '').trim() || null;
+
+      console.log("📝 Procesando madre:", nombreMadre, segundoNombreMadre, apellidoMadre, segundoApellidoMadre, "ocupacion:", ocupacionMadre, "trabajo:", trabajoMadre);
 
       let personaIdMadre;
 
@@ -666,11 +863,17 @@ async function guardarFamiliares(id_estudiante, datos, client = db) {
           personaIdMadre = existRes.rows[0].id_persona;
           // Actualizar datos
           await client.query(
-            `UPDATE persona SET nombre = $1, apellido = $2, genero = 'femenino',
-             numero_telefono = COALESCE($3, numero_telefono),
-             ocupacion = COALESCE($4, ocupacion)
-             WHERE id_persona = $5`,
-            [nombreMadre, apellidoMadre, datos.telefono_Madre || null, ocupacionMadre, personaIdMadre]
+            `UPDATE persona SET 
+               nombre = $1, 
+               segundo_nombre = COALESCE($2, segundo_nombre), 
+               apellido = $3, 
+               segundo_apellido = COALESCE($4, segundo_apellido), 
+               genero = 'femenino',
+               numero_telefono = COALESCE($5, numero_telefono),
+               ocupacion = COALESCE($6, ocupacion),
+               email = COALESCE($7, email)
+             WHERE id_persona = $8`,
+            [nombreMadre, segundoNombreMadre, apellidoMadre, segundoApellidoMadre, datos.telefono_Madre || null, ocupacionMadre, emailMadre, personaIdMadre]
           );
         }
       }
@@ -678,10 +881,10 @@ async function guardarFamiliares(id_estudiante, datos, client = db) {
       if (!personaIdMadre) {
         // Crear nueva persona
         const insertRes = await client.query(
-          `INSERT INTO persona (nombre, apellido, cedula, numero_telefono, genero, ocupacion)
-           VALUES ($1, $2, $3, $4, 'femenino', $5)
+          `INSERT INTO persona (nombre, segundo_nombre, apellido, segundo_apellido, cedula, numero_telefono, email, genero, ocupacion)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'femenino', $8)
            RETURNING id_persona`,
-          [nombreMadre, apellidoMadre, cedulaMadre, datos.telefono_Madre || null, ocupacionMadre]
+          [nombreMadre, segundoNombreMadre, apellidoMadre, segundoApellidoMadre, cedulaMadre, datos.telefono_Madre || null, emailMadre, ocupacionMadre]
         );
         personaIdMadre = insertRes.rows[0].id_persona;
       }
@@ -715,16 +918,35 @@ async function guardarFamiliares(id_estudiante, datos, client = db) {
     }
 
     // Guardar PADRE
-    if (datos.nombre_Padre && datos.apellido_Padre) {
-      const nombrePadre = capitalizeWords(datos.nombre_Padre);
-      const apellidoPadre = capitalizeWords(datos.apellido_Padre);
-      const cedulaPadre = datos.cedula_Padre || null;
-      const ocupacionPadre = datos.ocupacion_Padre || null;
-      const trabajoPadre = datos.trabajo_Padre || datos.lugar_trabajo_Padre || null;
-      const dirTrabajoPadre = datos.direccion_Trabajo_Padre || datos.direccion_trabajo_Padre || null;
-      const telTrabajoPadre = datos.telefono_trabajo_Padre || null;
+    let p1Padre = (datos.primer_nombre_Padre || '').trim();
+    let p2Padre = (datos.segundo_nombre_Padre || '').trim();
+    let a1Padre = (datos.primer_apellido_Padre || '').trim();
+    let a2Padre = (datos.segundo_apellido_Padre || '').trim();
 
-      console.log("📝 Procesando padre:", nombrePadre, apellidoPadre);
+    if (!p1Padre && datos.nombre_Padre) {
+      const parts = datos.nombre_Padre.trim().split(/\s+/);
+      p1Padre = parts[0] || '';
+      p2Padre = parts.slice(1).join(' ') || '';
+    }
+    if (!a1Padre && datos.apellido_Padre) {
+      const parts = datos.apellido_Padre.trim().split(/\s+/);
+      a1Padre = parts[0] || '';
+      a2Padre = parts.slice(1).join(' ') || '';
+    }
+
+    if (p1Padre && a1Padre) {
+      const nombrePadre = capitalizeWords(p1Padre);
+      const segundoNombrePadre = p2Padre ? capitalizeWords(p2Padre) : null;
+      const apellidoPadre = capitalizeWords(a1Padre);
+      const segundoApellidoPadre = a2Padre ? capitalizeWords(a2Padre) : null;
+      const cedulaPadre = datos.cedula_Padre || null;
+      const ocupacionPadre = (datos.ocupacion_Padre || datos.PadreOcupacion || datos.profesion_Padre || '').trim() || null;
+      const trabajoPadre = (datos.trabajo_Padre || datos.PadreLugarTrabajo || datos.lugar_trabajo_Padre || '').trim() || null;
+      const dirTrabajoPadre = (datos.direccion_Trabajo_Padre || datos.PadreDireccionTrabajo || datos.direccion_trabajo_Padre || '').trim() || null;
+      const telTrabajoPadre = (datos.telefono_trabajo_Padre || datos.PadreTelefonoTrabajo || '').trim() || null;
+      const emailPadre = (datos.email_Padre || datos.PadreEmail || '').trim() || null;
+
+      console.log("📝 Procesando padre:", nombrePadre, segundoNombrePadre, apellidoPadre, segundoApellidoPadre, "ocupacion:", ocupacionPadre, "trabajo:", trabajoPadre);
 
       let personaIdPadre;
 
@@ -738,11 +960,17 @@ async function guardarFamiliares(id_estudiante, datos, client = db) {
           personaIdPadre = existRes.rows[0].id_persona;
           // Actualizar datos
           await client.query(
-            `UPDATE persona SET nombre = $1, apellido = $2, genero = 'masculino',
-             numero_telefono = COALESCE($3, numero_telefono),
-             ocupacion = COALESCE($4, ocupacion)
-             WHERE id_persona = $5`,
-            [nombrePadre, apellidoPadre, datos.telefono_Padre || null, ocupacionPadre, personaIdPadre]
+            `UPDATE persona SET 
+               nombre = $1, 
+               segundo_nombre = COALESCE($2, segundo_nombre), 
+               apellido = $3, 
+               segundo_apellido = COALESCE($4, segundo_apellido), 
+               genero = 'masculino',
+               numero_telefono = COALESCE($5, numero_telefono),
+               ocupacion = COALESCE($6, ocupacion),
+               email = COALESCE($7, email)
+             WHERE id_persona = $8`,
+            [nombrePadre, segundoNombrePadre, apellidoPadre, segundoApellidoPadre, datos.telefono_Padre || null, ocupacionPadre, emailPadre, personaIdPadre]
           );
         }
       }
@@ -750,10 +978,10 @@ async function guardarFamiliares(id_estudiante, datos, client = db) {
       if (!personaIdPadre) {
         // Crear nueva persona
         const insertRes = await client.query(
-          `INSERT INTO persona (nombre, apellido, cedula, numero_telefono, genero, ocupacion)
-           VALUES ($1, $2, $3, $4, 'masculino', $5)
+          `INSERT INTO persona (nombre, segundo_nombre, apellido, segundo_apellido, cedula, numero_telefono, email, genero, ocupacion)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'masculino', $8)
            RETURNING id_persona`,
-          [nombrePadre, apellidoPadre, cedulaPadre, datos.telefono_Padre || null, ocupacionPadre]
+          [nombrePadre, segundoNombrePadre, apellidoPadre, segundoApellidoPadre, cedulaPadre, datos.telefono_Padre || null, emailPadre, ocupacionPadre]
         );
         personaIdPadre = insertRes.rows[0].id_persona;
       }
@@ -828,15 +1056,24 @@ async function actualizarDatosRepresentante(representante, datos, client = db) {
       telefonoTrabajo = datos.telefono_trabajo_Rep || null;
     }
 
+    const fotoRep = datos.foto_representante || datos.foto_rep || null;
+
     // Actualizar campos del representante (tabla: representante en NewEndanza)
     await client.query(`
       UPDATE representante SET
         profesion = COALESCE($1, profesion),
         lugar_trabajo = COALESCE($2, lugar_trabajo),
         direccion_trabajo = COALESCE($3, direccion_trabajo),
-        telefono_trabajo = COALESCE($4, telefono_trabajo)
-      WHERE id_representante = $5
-    `, [profesion, lugarTrabajo, direccionTrabajo, telefonoTrabajo, repId]);
+        telefono_trabajo = COALESCE($4, telefono_trabajo),
+        foto_representante = COALESCE($5, foto_representante)
+      WHERE id_representante = $6
+    `, [profesion, lugarTrabajo, direccionTrabajo, telefonoTrabajo, fotoRep, repId]);
+
+    if (fotoRep && representante.id_usuario) {
+      await client.query(`
+        UPDATE usuario SET foto_usuario = COALESCE($1, foto_usuario) WHERE id_usuario = $2
+      `, [fotoRep, representante.id_usuario]);
+    }
 
     // Actualizar el parentesco en estudiante_familiar si existe el vínculo
     const repPersonaId = representante.id_persona;

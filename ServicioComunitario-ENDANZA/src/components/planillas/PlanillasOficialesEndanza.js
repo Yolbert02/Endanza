@@ -271,6 +271,13 @@ export const normalizarDatosPlanillas = (data = {}, extra = {}) => {
 
   let gradoFormateado = String(gradoDanza).replace(/_/g, ' ').toUpperCase();
 
+  // La especialidad es SOLO para 6to, 7mo y 8vo grado
+  const esGradoAvanzado = (() => {
+    const g = String(gradoDanza || '').toLowerCase();
+    return g.includes('6') || g.includes('7') || g.includes('8') ||
+           g.includes('sexto') || g.includes('septimo') || g.includes('séptimo') || g.includes('octavo');
+  })();
+
   return {
     estudiante: {
       nombres: nombresEst || '—',
@@ -280,15 +287,16 @@ export const normalizarDatosPlanillas = (data = {}, extra = {}) => {
       direccion_Habitacion: data.direccion_Habitacion || data.address || data.direccion || '—',
       telefono_fijo: data.telefono_fijo || data.telefonofijo_Rep || data.telefono_fijo_estudiante || '—',
       telefono_movil: data.telefono_movil || (telMadre !== '—' ? telMadre : (telPadre !== '—' ? telPadre : repTelefono)),
-      email: data.email || data.email_estudiante || data.email_Madre || data.email_Padre || data.email_Representante || '—',
+      email: data.email || data.email_estudiante || data.email_Madre || data.MadreEmail || data.email_Padre || data.PadreEmail || data.email_Representante || '—',
       grado: gradoFormateado,
-      especialidad: (data.especialidad || data.specialty || 'DANZA CLÁSICA').toUpperCase(),
+      es_avanzado: esGradoAvanzado,
+      especialidad: esGradoAvanzado ? (data.especialidad || data.specialty || 'DANZA CLÁSICA').toUpperCase() : '',
       asignaturas_pendientes: data.asignaturas_pendientes || data.materias_pendientes || 'NINGUNA',
       alergico_medicamento: data.alergias === 'Si' || data.alergia_medicamento ? 'SÍ' : 'NO',
       alergico_explicacion: data.textAlergia || data.alergias_detalle || '',
       enfermedad: data.sintomasFrecuentes || data.enfermedad ? 'SÍ' : 'NO',
       enfermedad_explicacion: data.sintomasFrecuentes || data.enfermedad_detalle || '',
-      convivencia: (data.convivencia || '—').toUpperCase(),
+      convivencia: (data.convivencia || data.Convivencia || '—').toUpperCase(),
       escuela: (data.escuela || data.regular_school || data.nombre_escuela || '—').toUpperCase(),
       grado_escuela: (gradoEscuelaRegular || '—').toUpperCase(),
       seguro_escolar: data.Seguro_Escolar === 'Si' || data.tiene_seguro ? 'SÍ' : 'NO',
@@ -303,7 +311,7 @@ export const normalizarDatosPlanillas = (data = {}, extra = {}) => {
       direccion: data.direccion_Padre || data.direccion_Habitacion || data.address || data.direccion || '—',
       telefono_fijo: data.telefono_fijo || '—',
       telefono_movil: telPadre,
-      email: data.email_Padre || '—',
+      email: data.email_Padre || data.PadreEmail || (esPadreRep ? (data.email_Representante || data.representative_email || data.email) : '') || '—',
       profesion: profesionPadre,
       lugar_trabajo: trabajoPadre,
       direccion_trabajo: dirTrabajoPadre,
@@ -317,7 +325,7 @@ export const normalizarDatosPlanillas = (data = {}, extra = {}) => {
       direccion: data.direccion_Madre || data.direccion_Habitacion || data.address || data.direccion || '—',
       telefono_fijo: data.telefono_fijo || '—',
       telefono_movil: telMadre,
-      email: data.email_Madre || '—',
+      email: data.email_Madre || data.MadreEmail || (esMadreRep ? (data.email_Representante || data.representative_email || data.email) : '') || '—',
       profesion: profesionMadre,
       lugar_trabajo: trabajoMadre,
       direccion_trabajo: dirTrabajoMadre,
@@ -334,7 +342,7 @@ export const normalizarDatosPlanillas = (data = {}, extra = {}) => {
       parentesco: repParentesco,
       telefono: repTelefono,
       telefono_fijo: data.telefonofijo_Rep || '—',
-      email: data.email_Representante || data.representative_email || '—',
+      email: data.email_Representante || data.representative_email || (esMadreRep ? (data.email_Madre || data.MadreEmail) : (esPadreRep ? (data.email_Padre || data.PadreEmail) : '')) || data.email || '—',
       profesion: repProfesion,
       lugar_trabajo: repTrabajo,
       direccion_trabajo: repDirTrabajo,
@@ -440,15 +448,17 @@ export const FichaInscripcionSheet = ({ info }) => {
             <span className="planilla-val" style={{ textTransform: 'lowercase' }}>{estudiante.email}</span>
           </div>
 
-          <div className="planilla-field" style={{ width: '30%' }}>
+          <div className="planilla-field" style={{ width: estudiante.es_avanzado ? '30%' : '48%' }}>
             <span className="planilla-label">Grado a Cursar:</span>
             <span className="planilla-val">{estudiante.grado}</span>
           </div>
-          <div className="planilla-field" style={{ width: '34%' }}>
-            <span className="planilla-label">Especialidad:</span>
-            <span className="planilla-val">{estudiante.especialidad}</span>
-          </div>
-          <div className="planilla-field" style={{ width: '34%' }}>
+          {estudiante.es_avanzado && (
+            <div className="planilla-field" style={{ width: '34%' }}>
+              <span className="planilla-label">Especialidad:</span>
+              <span className="planilla-val">{estudiante.especialidad}</span>
+            </div>
+          )}
+          <div className="planilla-field" style={{ width: estudiante.es_avanzado ? '34%' : '50%' }}>
             <span className="planilla-label">Asignatura(s) Pendiente(s):</span>
             <span className="planilla-val">{estudiante.asignaturas_pendientes}</span>
           </div>
@@ -482,7 +492,7 @@ export const FichaInscripcionSheet = ({ info }) => {
           </div>
           <div className="planilla-field" style={{ width: '30%' }}>
             <span className="planilla-label">Año o Grado que cursa:</span>
-            <span className="planilla-val">{estudiante.grado}</span>
+            <span className="planilla-val">{estudiante.grado_escuela}</span>
           </div>
 
           <div className="planilla-field" style={{ width: '45%' }}>
@@ -1038,15 +1048,16 @@ export const generarHTMLCompleto = (info, modo = 'todas') => {
             <span class="planilla-val" style="text-transform: lowercase;">${estudiante.email}</span>
           </div>
 
-          <div class="planilla-field" style="width: 30%;">
+          <div class="planilla-field" style="width: ${estudiante.es_avanzado ? '30%' : '48%'};">
             <span class="planilla-label">Grado a Cursar:</span>
             <span class="planilla-val">${estudiante.grado}</span>
           </div>
+          ${estudiante.es_avanzado ? `
           <div class="planilla-field" style="width: 34%;">
             <span class="planilla-label">Especialidad:</span>
             <span class="planilla-val">${estudiante.especialidad}</span>
-          </div>
-          <div class="planilla-field" style="width: 34%;">
+          </div>` : ''}
+          <div class="planilla-field" style="width: ${estudiante.es_avanzado ? '34%' : '50%'};">
             <span class="planilla-label">Asignatura(s) Pendiente(s):</span>
             <span class="planilla-val">${estudiante.asignaturas_pendientes}</span>
           </div>
@@ -1080,7 +1091,7 @@ export const generarHTMLCompleto = (info, modo = 'todas') => {
           </div>
           <div class="planilla-field" style="width: 30%;">
             <span class="planilla-label">Año o Grado que cursa:</span>
-            <span class="planilla-val">${estudiante.grado}</span>
+            <span class="planilla-val">${estudiante.grado_escuela}</span>
           </div>
 
           <div class="planilla-field" style="width: 45%;">

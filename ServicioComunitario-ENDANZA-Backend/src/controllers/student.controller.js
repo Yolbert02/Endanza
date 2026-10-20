@@ -23,28 +23,41 @@ const listStudents = async (req, res) => {
     console.log(`✅ listStudents result - found ${students.length} raw students`);
 
     // Transformar al formato esperado por el frontend
-    const transformed = students.map(s => ({
-      id: s.id,
-      first_name: s.first_name,
-      last_name: s.last_name,
-      full_name: `${s.first_name} ${s.last_name}`.trim(),
-      dni: s.dni,
-      birth_date: s.birth_date,
-      gender: s.gender,
-      grade_level: s.grade_level_name,
-      dance_level: s.dance_level_name,
-      school: s.school_name,
-      insurance: s.insurance_name,
-      representative: s.representative_first_name ?
-        `${s.representative_first_name} ${s.representative_last_name}`.trim() : null,
-      representative_id: s.representative_id,
-      representative_dni: s.representative_dni,
-      representative_user_id: s.representative_user_id,
-      representative_phone: s.representative_phone,
-      representative_email: s.representative_email,
-      status: 'active', // Por defecto todos activos si están en la base de datos
-      sections: s.sections || []
-    }));
+    const transformed = students.map(s => {
+      const sectionDance = (s.sections && s.sections.length > 0 && s.sections[0].dance_level_name) || null;
+      const danceLevelVal = s.dance_level_name || sectionDance || 'Sin Asignar';
+
+      return {
+        id: s.id,
+        first_name: s.first_name,
+        last_name: s.last_name,
+        full_name: `${s.first_name} ${s.last_name}`.trim(),
+        dni: s.dni,
+        birth_date: s.birth_date,
+        gender: s.gender,
+        grade_level_id: s.grade_level_id,
+        grade_level_name: s.grade_level_name,
+        school_grade: s.grade_level_name,
+        grade_level: danceLevelVal,
+        dance_level_id: s.dance_level_id,
+        dance_level_name: s.dance_level_name || sectionDance,
+        dance_level: danceLevelVal,
+        Grado: danceLevelVal,
+        specialty_id: s.specialty_id,
+        specialty_name: s.specialty_name,
+        school: s.school_name,
+        insurance: s.insurance_name,
+        representative: s.representative_first_name ?
+          `${s.representative_first_name} ${s.representative_last_name}`.trim() : null,
+        representative_id: s.representative_id,
+        representative_dni: s.representative_dni,
+        representative_user_id: s.representative_user_id,
+        representative_phone: s.representative_phone,
+        representative_email: s.representative_email,
+        status: 'active', // Por defecto todos activos si están en la base de datos
+        sections: s.sections || []
+      };
+    });
 
     return res.json({
       ok: true,
@@ -178,12 +191,15 @@ const formatStudentPayload = (student, sections = [], currentYear = null) => {
     MadreNombreCompleto: student.representative_relationship === 'Madre' ? repFullName : null,
     MadreCedula: student.representative_relationship === 'Madre' ? student.representative_dni : null,
     MadreTelefono: student.representative_relationship === 'Madre' ? student.representative_phone : null,
+    MadreEmail: student.representative_relationship === 'Madre' ? student.representative_email : null,
+    email_Madre: student.representative_relationship === 'Madre' ? student.representative_email : null,
     MadreOcupacion: student.MadreOcupacion || (student.representative_relationship === 'Madre' ? (student.representative_occupation || student.profesion) : null),
     MadreLugarTrabajo: student.representative_relationship === 'Madre' ? (student.representative_workplace || student.lugar_trabajo) : null,
     MadreDireccionTrabajo: student.representative_relationship === 'Madre' ? (student.representative_work_address || student.direccion_trabajo) : null,
     MadreTelefonoTrabajo: student.representative_relationship === 'Madre' ? (student.representative_work_phone || student.telefono_trabajo) : null,
     ocupacion_Madre: student.MadreOcupacion || (student.representative_relationship === 'Madre' ? (student.representative_occupation || student.profesion) : null),
     trabajo_Madre: student.representative_relationship === 'Madre' ? (student.representative_workplace || student.lugar_trabajo) : null,
+    lugar_trabajo_Madre: student.representative_relationship === 'Madre' ? (student.representative_workplace || student.lugar_trabajo) : null,
     direccion_Trabajo_Madre: student.representative_relationship === 'Madre' ? (student.representative_work_address || student.direccion_trabajo) : null,
     telefono_trabajo_Madre: student.representative_relationship === 'Madre' ? (student.representative_work_phone || student.telefono_trabajo) : null,
     // Si el representante es Padre, proveer campos precargados
@@ -197,14 +213,18 @@ const formatStudentPayload = (student, sections = [], currentYear = null) => {
     PadreCedula: student.representative_relationship === 'Padre' ? student.representative_dni : null,
     PadreTelefono: student.representative_relationship === 'Padre' ? student.representative_phone : null,
     PadreEmail: student.representative_relationship === 'Padre' ? student.representative_email : null,
+    email_Padre: student.representative_relationship === 'Padre' ? student.representative_email : null,
     PadreOcupacion: student.PadreOcupacion || (student.representative_relationship === 'Padre' ? (student.representative_occupation || student.profesion) : null),
     PadreLugarTrabajo: student.representative_relationship === 'Padre' ? (student.representative_workplace || student.lugar_trabajo) : null,
     PadreDireccionTrabajo: student.representative_relationship === 'Padre' ? (student.representative_work_address || student.direccion_trabajo) : null,
     PadreTelefonoTrabajo: student.representative_relationship === 'Padre' ? (student.representative_work_phone || student.telefono_trabajo) : null,
     ocupacion_Padre: student.PadreOcupacion || (student.representative_relationship === 'Padre' ? (student.representative_occupation || student.profesion) : null),
     trabajo_Padre: student.representative_relationship === 'Padre' ? (student.representative_workplace || student.lugar_trabajo) : null,
+    lugar_trabajo_Padre: student.representative_relationship === 'Padre' ? (student.representative_workplace || student.lugar_trabajo) : null,
     direccion_Trabajo_Padre: student.representative_relationship === 'Padre' ? (student.representative_work_address || student.direccion_trabajo) : null,
     telefono_trabajo_Padre: student.representative_relationship === 'Padre' ? (student.representative_work_phone || student.telefono_trabajo) : null,
+    cedula: student.cedula || student.dni || '—',
+    convivencia: student.convivencia || '—',
     address: student.address,
     city: student.city,
     state: student.state,
@@ -267,10 +287,12 @@ const enrichStudentWithFamiliares = async (transformed, studentId) => {
       transformed.MadreCedula = madreRow.cedula || transformed.MadreCedula;
       transformed.MadreTelefono = madreRow.numero_telefono || transformed.MadreTelefono;
       transformed.MadreEmail = madreRow.email || transformed.MadreEmail;
+      transformed.email_Madre = transformed.MadreEmail;
       transformed.MadreOcupacion = madreRow.ocupacion || transformed.MadreOcupacion || '';
       transformed.ocupacion_Madre = transformed.MadreOcupacion;
       transformed.MadreLugarTrabajo = madreRow.lugar_trabajo || transformed.MadreLugarTrabajo || '';
       transformed.trabajo_Madre = transformed.MadreLugarTrabajo;
+      transformed.lugar_trabajo_Madre = transformed.MadreLugarTrabajo;
       transformed.MadreDireccionTrabajo = madreRow.direccion_trabajo || transformed.MadreDireccionTrabajo || '';
       transformed.direccion_Trabajo_Madre = transformed.MadreDireccionTrabajo;
       transformed.MadreTelefonoTrabajo = madreRow.telefono_trabajo || transformed.MadreTelefonoTrabajo || '';
@@ -294,10 +316,12 @@ const enrichStudentWithFamiliares = async (transformed, studentId) => {
       transformed.PadreCedula = padreRow.cedula || transformed.PadreCedula;
       transformed.PadreTelefono = padreRow.numero_telefono || transformed.PadreTelefono;
       transformed.PadreEmail = padreRow.email || transformed.PadreEmail;
+      transformed.email_Padre = transformed.PadreEmail;
       transformed.PadreOcupacion = padreRow.ocupacion || transformed.PadreOcupacion || '';
       transformed.ocupacion_Padre = transformed.PadreOcupacion;
       transformed.PadreLugarTrabajo = padreRow.lugar_trabajo || transformed.PadreLugarTrabajo || '';
       transformed.trabajo_Padre = transformed.PadreLugarTrabajo;
+      transformed.lugar_trabajo_Padre = transformed.PadreLugarTrabajo;
       transformed.PadreDireccionTrabajo = padreRow.direccion_trabajo || transformed.PadreDireccionTrabajo || '';
       transformed.direccion_Trabajo_Padre = transformed.PadreDireccionTrabajo;
       transformed.PadreTelefonoTrabajo = padreRow.telefono_trabajo || transformed.PadreTelefonoTrabajo || '';
@@ -1171,7 +1195,12 @@ const getScheduleByGrade = async (req, res) => {
                 m."nombre_materia" as subject_name,
                 m."tipo_materia" as subject_type,
                 s."Id_seccion" as section_id,
-                s."nombre_seccion" as section_name
+                s."nombre_seccion" as section_name,
+                h."id_docente_auxiliar" as auxiliary_teacher_id,
+                CASE WHEN ua."nombre" IS NOT NULL 
+                     THEN CONCAT(ua."nombre", ' ', ua."apellido") 
+                     ELSE NULL 
+                END as auxiliary_teacher_name
             FROM "Horario" h
             JOIN "Seccion" s ON h."Id_seccion" = s."Id_seccion"
             JOIN "Materia" m ON COALESCE(h."Id_materia", s."Id_materia") = m."Id_materia"
@@ -1181,6 +1210,8 @@ const getScheduleByGrade = async (req, res) => {
             LEFT JOIN "Aula" au ON h."Id_aula" = au."Id_aula"
             LEFT JOIN "Profesor" p ON h."Id_profesor" = p."Id_profesor"
             LEFT JOIN "Usuario" u ON p."Id_usuario" = u."Id_usuario"
+            LEFT JOIN "Profesor" pa ON h."id_docente_auxiliar" = pa."Id_profesor"
+            LEFT JOIN "Usuario" ua ON pa."Id_usuario" = ua."Id_usuario"
             WHERE g."Id_grado" = $1
               AND s."Id_ano" = $2
             ORDER BY d."Id_dia", b."inicio_bloque"

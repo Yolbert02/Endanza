@@ -2,8 +2,9 @@
 import React from 'react'
 import { CCol, CCard, CCardBody, CCardTitle, CBadge, CButton } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilGroup, cilCalendar, cilClock, cilInfo, cilPencil, cilTrash, cilSchool, cilBook } from '@coreui/icons'
+import { cilGroup, cilCalendar, cilClock, cilInfo, cilPencil, cilTrash, cilSchool, cilBook, cilCloudDownload } from '@coreui/icons'
 import PropTypes from 'prop-types'
+import { descargarHorarioSeccionPDF } from '../utils/sectionSchedulePdf'
 
 const ScheduleCard = ({ section, onShowInfo, onEdit, onDelete }) => {
     // ============================================
@@ -13,10 +14,16 @@ const ScheduleCard = ({ section, onShowInfo, onEdit, onDelete }) => {
         id: section.id || 'N/A',
         sectionName: section.sectionName || section.section_name || 'Sin nombre',
         gradeLevel: section.gradeLevel || section.subject_name || 'Sin nivel',
+        specialtyName: section.specialtyName || section.specialty_name || '',
         academicYear: section.academicYear || section.academic_year_name || 'Año no especificado',
         totalHoursPerWeek: section.totalHoursPerWeek || section.total_hours || 0,
         schedules: Array.isArray(section.schedules) ? section.schedules : []
     };
+
+    // Combinar grado + especialidad para mostrar
+    const gradeLevelDisplay = safeSection.specialtyName
+        ? `${safeSection.gradeLevel} • ${safeSection.specialtyName}`
+        : safeSection.gradeLevel;
 
     const teachers = [...new Set(safeSection.schedules?.map(s => s.teacherName) || [])]
     const subjects = [...new Set(safeSection.schedules?.map(s => s.subject) || [])]
@@ -70,8 +77,27 @@ const ScheduleCard = ({ section, onShowInfo, onEdit, onDelete }) => {
 
     const durationInfo = getDurationInfo(safeSection.totalHoursPerWeek, safeSection.schedules);
 
-    // Obtener la primera letra para el avatar (usando el nombre principal)
-    const firstLetter = (safeSection.sectionName?.charAt(0) || safeSection.gradeLevel?.charAt(0) || '?').toUpperCase();
+    // Limpiar grado y extraer letra de sección
+    const cleanGrade = (safeSection.gradeLevel || '').split(' - ')[0].trim();
+    const sectionLetter = (
+        section.section_letter ||
+        section.sectionLetter ||
+        section.section ||
+        (safeSection.sectionName && safeSection.sectionName.length <= 2 ? safeSection.sectionName : '') ||
+        (safeSection.sectionName?.match(/\b([A-Za-z])\b$/)?.[1]) ||
+        ''
+    ).toUpperCase();
+
+    // Componer el título principal con Nivel Académico + Letra de sección
+    let displayTitle = safeSection.sectionName;
+    if (!displayTitle || displayTitle === 'Sin nombre' || displayTitle.length <= 2 || displayTitle === sectionLetter) {
+        displayTitle = sectionLetter && sectionLetter !== 'ÚNICA'
+            ? `${cleanGrade || safeSection.gradeLevel} ${sectionLetter}`.trim()
+            : (cleanGrade || safeSection.gradeLevel);
+    }
+
+    // Avatar: mostrar la letra de la sección (A, B, C...) o la primera letra del nivel
+    const avatarLetter = (sectionLetter || cleanGrade?.charAt(0) || displayTitle?.charAt(0) || '?').toUpperCase();
 
     return (
         <CCol lg={4} md={6}>
@@ -92,7 +118,7 @@ const ScheduleCard = ({ section, onShowInfo, onEdit, onDelete }) => {
                                         border: '2px solid rgba(242, 140, 15, 0.3)'
                                     }}
                                 >
-                                    <span className="fw-bold text-primary" style={{ fontSize: '1.5rem' }}>{firstLetter}</span>
+                                    <span className="fw-bold text-primary" style={{ fontSize: '1.5rem' }}>{avatarLetter}</span>
                                 </div>
                                 <div
                                     className="position-absolute bottom-0 end-0 bg-primary rounded-circle d-flex align-items-center justify-content-center shadow-lg"
@@ -102,13 +128,13 @@ const ScheduleCard = ({ section, onShowInfo, onEdit, onDelete }) => {
                                 </div>
                             </div>
                             <div className="ms-3">
-                                {/* Grado como título principal */}
+                                {/* Grado + Letra como título principal */}
                                 <CCardTitle className="mb-1 fw-bold header-title-custom" style={{ fontSize: '1.25rem' }}>
-                                    {safeSection.sectionName}
+                                    {displayTitle}
                                 </CCardTitle>
                                 <div className="d-flex align-items-center gap-2">
                                     <span className="badge bg-light-custom text-muted-custom border border-light-custom fw-normal" style={{ fontSize: '0.7rem' }}>
-                                        {safeSection.gradeLevel} • ID #{safeSection.id}
+                                        {safeSection.specialtyName ? `${safeSection.specialtyName} • ` : ''}ID #{safeSection.id}
                                     </span>
                                 </div>
                             </div>
@@ -175,6 +201,14 @@ const ScheduleCard = ({ section, onShowInfo, onEdit, onDelete }) => {
                         </CButton>
                         <CButton
                             size="sm"
+                            className="bg-light-custom text-primary border-light-custom px-3 hover-lift shadow-sm"
+                            onClick={() => descargarHorarioSeccionPDF({ ...safeSection, sectionName: displayTitle })}
+                            title="Descargar Horario en PDF (Bloques y Días)"
+                        >
+                            <CIcon icon={cilCloudDownload} />
+                        </CButton>
+                        <CButton
+                            size="sm"
                             className="bg-light-custom text-muted-custom border-light-custom px-3 hover-lift shadow-sm"
                             onClick={() => onEdit(section)}
                             title="Editar"
@@ -184,7 +218,7 @@ const ScheduleCard = ({ section, onShowInfo, onEdit, onDelete }) => {
                         <CButton
                             size="sm"
                             className="bg-light-custom text-danger border-light-custom px-3 hover-lift shadow-sm"
-                            onClick={() => onDelete(safeSection.id, safeSection.sectionName)}
+                            onClick={() => onDelete(safeSection.id, displayTitle)}
                             title="Eliminar"
                         >
                             <CIcon icon={cilTrash} />

@@ -125,7 +125,11 @@ const ProfileSummary = ({ student }) => {
                     <SummaryItem 
                         icon={cilDrop} 
                         label="Factor Sanguíneo" 
-                        value={student.blood_type || 'N/A'} 
+                        value={
+                          !student.blood_type || student.blood_type === 'Desconocido' || student.blood_type === 'No sabe' || student.blood_type === 'null' || student.blood_type === 'N/A'
+                            ? 'No sabe' 
+                            : student.blood_type
+                        } 
                     />
                 </div>
             </CCardBody>

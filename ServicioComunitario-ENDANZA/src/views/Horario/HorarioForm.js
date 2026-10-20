@@ -59,7 +59,16 @@ const SUBJECTS = [
     { id: 41, value: 'Kinesiología', label: 'Kinesiología' },
     { id: 25, value: 'Francés', label: 'Francés' },
     { id: 40, value: 'Composición Coreográfica', label: 'Composición Coreográfica' },
-    { id: 49, value: 'Danza de Carácter', label: 'Danza de Carácter' }
+    { id: 49, value: 'Danza de Carácter', label: 'Danza de Carácter' },
+    { id: 15, value: 'Repertorio Danza Clásica', label: 'Repertorio Danza Clásica' },
+    { id: 16, value: 'Repertorio Contemporáneo', label: 'Repertorio Contemporáneo' },
+    { id: 17, value: 'Pas de Deux', label: 'Pas de Deux' },
+    { id: 13, value: 'Danza Latinoamericana', label: 'Danza Latinoamericana' },
+    { id: 14, value: 'Iniciación a la Danza', label: 'Iniciación a la Danza' },
+    { id: 18, value: 'Indumentaria', label: 'Indumentaria' },
+    { id: 19, value: 'Historia de la Danza Tradicional', label: 'Historia de la Danza Tradicional' },
+    { id: 20, value: 'Proyecto Comunitario', label: 'Proyecto Comunitario' },
+    { id: 21, value: 'Historia de los Precursores', label: 'Historia de los Precursores' }
 ]
 
 const GRADE_LEVELS = [
@@ -143,10 +152,22 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
     useEffect(() => {
         if (visible) {
             if (initial) {
-                setSectionName(initial.sectionName || '')
-                setGradeLevel(initial.gradeLevel || '1er Grado')
+                const rawGrade = initial.gradeLevel || initial.grade_level || initial.subject_name || '1er Grado'
+                const cleanGrade = rawGrade.split(' - ')[0].trim()
+                setGradeLevel(cleanGrade || rawGrade)
                 setSpecialty(initial.specialty || initial.specialty_name || initial.nombre_especialidad || initial.especialidad || '')
-                setSection(initial.section || '')
+                
+                let rawLetter = initial.section || initial.section_letter || initial.letra || ''
+                if (!rawLetter && initial.sectionName) {
+                    if (initial.sectionName.length <= 2) {
+                        rawLetter = initial.sectionName
+                    } else {
+                        const match = initial.sectionName.match(/\b([A-Za-z])\b$/)
+                        if (match) rawLetter = match[1]
+                    }
+                }
+                setSection(rawLetter ? rawLetter.toUpperCase() : '')
+                setSectionName(initial.sectionName || '')
                 
                 // Normalizar horarios existentes marcándolos como ya persistidos en la base de datos
                 const initialSchedules = (initial.schedules || []).map(s => {
@@ -457,12 +478,8 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
     // ============================================
 
     const validateForm = () => {
-        if (!sectionName.trim()) {
-            setErrorModal({ visible: true, message: 'El nombre de la sección es obligatorio' })
-            return false
-        }
         if (!gradeLevel) {
-            setErrorModal({ visible: true, message: 'El grado es obligatorio' })
+            setErrorModal({ visible: true, message: 'El nivel académico es obligatorio' })
             return false
         }
         if (isSpecialtyRequired(gradeLevel) && !specialty) {
@@ -497,11 +514,19 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
 
             const selectedSpecialtyObj = specialtiesList.find(s => s.value === specialty || s.name === specialty || s.label === specialty);
 
+            const cleanLetter = (section || '').trim().toUpperCase()
+            const computedSectionName = cleanLetter && cleanLetter !== 'ÚNICA'
+                ? `${gradeLevel} ${cleanLetter}`
+                : gradeLevel
+
             // Datos de la sección a procesar
             const sectionData = {
-                sectionName: sectionName.trim(),
+                sectionName: computedSectionName,
+                section_name: computedSectionName,
                 gradeLevel: gradeLevel,  // Nivel académico
-                section: section,         // Letra de la sección
+                grade_level: gradeLevel,
+                section: cleanLetter,     // Letra de la sección
+                section_letter: cleanLetter,
                 capacity: 30,
                 specialty: isSpecialtyRequired(gradeLevel) ? specialty : null,
                 specialtyId: isSpecialtyRequired(gradeLevel) ? (selectedSpecialtyObj?.id || null) : null,
@@ -626,18 +651,8 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
                                 <h6 className="mb-4 text-primary fw-bold text-uppercase small ls-1 border-bottom border-light-custom border-opacity-10 pb-3">
                                     Datos Generales
                                 </h6>
-                                <CRow className="g-4">
-                                    <CCol md={isSpecialtyRequired(gradeLevel) ? 4 : 5}>
-                                        <CFormInput
-                                            label={<span className="text-muted-custom small fw-bold text-uppercase ls-1">Nombre de la Sección</span>}
-                                            placeholder="Ej: 6to Grado A"
-                                            value={sectionName}
-                                            onChange={(e) => setSectionName(e.target.value)}
-                                            required
-                                            className="bg-light-custom border-light-custom header-title-custom fw-bold shadow-sm py-2"
-                                        />
-                                    </CCol>
-                                    <CCol md={isSpecialtyRequired(gradeLevel) ? 3 : 4}>
+                                <CRow className="g-4 align-items-center">
+                                    <CCol md={isSpecialtyRequired(gradeLevel) ? 5 : 7}>
                                         <CFormSelect
                                             label={<span className="text-muted-custom small fw-bold text-uppercase ls-1">Nivel Académico</span>}
                                             value={gradeLevel}
@@ -650,8 +665,20 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
                                             ))}
                                         </CFormSelect>
                                     </CCol>
+
+                                    <CCol md={isSpecialtyRequired(gradeLevel) ? 3 : 5}>
+                                        <CFormInput
+                                            label={<span className="text-muted-custom small fw-bold text-uppercase ls-1">Letra de Sección</span>}
+                                            placeholder="Ej: A, B (o vacío)"
+                                            value={section}
+                                            maxLength={5}
+                                            onChange={(e) => setSection(e.target.value.toUpperCase())}
+                                            className="bg-light-custom border-light-custom header-title-custom text-center fw-bold shadow-sm py-2"
+                                        />
+                                    </CCol>
+
                                     {isSpecialtyRequired(gradeLevel) && (
-                                        <CCol md={3} className="animate__animated animate__fadeIn">
+                                        <CCol md={4} className="animate__animated animate__fadeIn">
                                             <CFormSelect
                                                 label={
                                                     <span className="text-muted-custom small fw-bold text-uppercase ls-1 text-primary">
@@ -675,16 +702,14 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
                                             </small>
                                         </CCol>
                                     )}
-                                    <CCol md={isSpecialtyRequired(gradeLevel) ? 2 : 3}>
-                                        <CFormInput
-                                            label={<span className="text-muted-custom small fw-bold text-uppercase ls-1">Letra (Opcional)</span>}
-                                            placeholder="A"
-                                            value={section}
-                                            onChange={(e) => setSection(e.target.value)}
-                                            className="bg-light-custom border-light-custom header-title-custom text-center fw-bold shadow-sm py-2"
-                                        />
-                                    </CCol>
                                 </CRow>
+
+                                <div className="mt-3 pt-3 border-top border-light-custom border-opacity-10 d-flex align-items-center gap-2">
+                                    <span className="text-muted-custom small fw-semibold">Nombre de la sección generado:</span>
+                                    <CBadge color="primary" className="px-3 py-2 fw-bold" style={{ fontSize: '0.9rem' }}>
+                                        {section && section.trim() ? `${gradeLevel} ${section.trim().toUpperCase()}` : gradeLevel}
+                                    </CBadge>
+                                </div>
                             </CCardBody>
                         </CCard>
 
@@ -764,11 +789,14 @@ const HorarioForm = ({ visible, onClose, onSave, initial = null, academicYear })
                                                 disabled={loadingCatalogs}
                                             >
                                                 <option value="">Seleccionar bloque...</option>
-                                                {blocks.map(block => (
-                                                    <option key={block.id} value={block.id}>
-                                                        {block.name} ({block.start_time?.substring(0, 5)} - {block.end_time?.substring(0, 5)})
-                                                    </option>
-                                                ))}
+                                                {blocks
+                                                    .filter(block => !newSchedule.dayId || !block.day_id || parseInt(block.day_id) === parseInt(newSchedule.dayId))
+                                                    .map(block => (
+                                                        <option key={block.id} value={block.id}>
+                                                            {block.name}
+                                                        </option>
+                                                    ))
+                                                }
                                             </CFormSelect>
                                         </CCol>
 

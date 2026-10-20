@@ -174,7 +174,7 @@ const DatosRepresentante = ({ formData, onChange, errores = {}, setErrores }) =>
         </CCol>
         <CCol md={6}>
           <CFormInput
-            label={<NameLabel text="Lugar de Trabajo" />}
+            label={<NameLabel text="Nombre de Empresa" />}
             name="trabajo_Madre"
             value={formData.trabajo_Madre || ""}
             onChange={onChange}
@@ -189,6 +189,28 @@ const DatosRepresentante = ({ formData, onChange, errores = {}, setErrores }) =>
             value={formData.direccion_Trabajo_Madre || ""}
             onChange={onChange}
             placeholder="Dirección laboral detallada"
+            className="input-premium py-2"
+          />
+        </CCol>
+        <CCol md={6}>
+          <CFormInput
+            label={<NameLabel text="Correo Electrónico" />}
+            name="email_Madre"
+            type="email"
+            value={formData.email_Madre || ""}
+            onChange={onChange}
+            placeholder="Ej: correo@ejemplo.com"
+            className="input-premium py-2"
+          />
+        </CCol>
+        <CCol md={6}>
+          <CFormInput
+            label={<NameLabel text="Teléfono del Trabajo" />}
+            name="telefono_trabajo_Madre"
+            value={formData.telefono_trabajo_Madre || ""}
+            onChange={onChange}
+            placeholder="Ej: 02763421234"
+            maxLength={11}
             className="input-premium py-2"
           />
         </CCol>
@@ -293,7 +315,7 @@ const DatosRepresentante = ({ formData, onChange, errores = {}, setErrores }) =>
         </CCol>
         <CCol md={6}>
           <CFormInput
-            label={<NameLabel text="Lugar de Trabajo" />}
+            label={<NameLabel text="Nombre de Empresa" />}
             name="trabajo_Padre"
             value={formData.trabajo_Padre || ""}
             onChange={onChange}
@@ -308,6 +330,28 @@ const DatosRepresentante = ({ formData, onChange, errores = {}, setErrores }) =>
             value={formData.direccion_Trabajo_Padre || ""}
             onChange={onChange}
             placeholder="Dirección laboral detallada"
+            className="input-premium py-2"
+          />
+        </CCol>
+        <CCol md={6}>
+          <CFormInput
+            label={<NameLabel text="Correo Electrónico" />}
+            name="email_Padre"
+            type="email"
+            value={formData.email_Padre || ""}
+            onChange={onChange}
+            placeholder="Ej: correo@ejemplo.com"
+            className="input-premium py-2"
+          />
+        </CCol>
+        <CCol md={6}>
+          <CFormInput
+            label={<NameLabel text="Teléfono del Trabajo" />}
+            name="telefono_trabajo_Padre"
+            value={formData.telefono_trabajo_Padre || ""}
+            onChange={onChange}
+            placeholder="Ej: 02763421234"
+            maxLength={11}
             className="input-premium py-2"
           />
         </CCol>
@@ -404,7 +448,7 @@ const DatosRepresentante = ({ formData, onChange, errores = {}, setErrores }) =>
                 <div className="flex-grow-1" style={{ height: '1px', background: 'linear-gradient(to right, rgba(242,140,15,0.3), transparent)' }} />
               </div>
             </CCol>
-            <CCol md={6}>
+            <CCol md={4}>
               <CFormInput
                 label={<NameLabel text="Parentesco / Relación" required />}
                 name="parentesco_Otro"
@@ -416,7 +460,7 @@ const DatosRepresentante = ({ formData, onChange, errores = {}, setErrores }) =>
                 invalid={!!errores.parentesco_Otro}
               />
             </CCol>
-            <CCol md={6}>
+            <CCol md={4}>
               <label className="fw-bold step-label text-uppercase ls-1 small mb-1 d-block">
                 Teléfono Móvil <span className="text-danger">*</span>
               </label>
@@ -430,9 +474,23 @@ const DatosRepresentante = ({ formData, onChange, errores = {}, setErrores }) =>
                 feedback={errores.telefono_Rep}
               />
             </CCol>
+            <CCol md={4}>
+              <CFormInput
+                label={<NameLabel text="Teléfono Fijo" />}
+                name="telefonofijo_Rep"
+                value={formData.telefonofijo_Rep || formData.telefono_fijo || ""}
+                onChange={(e) => {
+                  onChange(e);
+                  onChange({ target: { name: 'telefono_fijo', value: e.target.value } });
+                }}
+                placeholder="Ej: 02761234567"
+                maxLength={11}
+                className="input-premium py-2"
+              />
+            </CCol>
             <CCol md={6}>
               <CFormInput
-                label={<NameLabel text="Lugar de Trabajo" />}
+                label={<NameLabel text="Nombre de Empresa" />}
                 name="trabajo_Rep"
                 value={formData.trabajo_Rep || ""}
                 onChange={onChange}

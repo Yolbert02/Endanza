@@ -117,7 +117,7 @@ const Students = () => {
 
     const matchSearch = searchText === '' || fullText.includes(searchLower)
 
-    const matchGrade = filterGrade ? s.grade_level === filterGrade : true
+    const matchGrade = filterGrade ? (s.grade_level === filterGrade || s.dance_level === filterGrade) : true
     const matchSection = filterSection ?
       s.sections?.some(sec => sec.section_name === filterSection) : true
 
@@ -189,7 +189,7 @@ const Students = () => {
   }
 
   // Datos para filtros
-  const gradosUnicos = [...new Set(students.map(s => s.grade_level).filter(Boolean))]
+  const gradosUnicos = [...new Set(students.map(s => s.dance_level || s.grade_level).filter(Boolean))]
   const seccionesUnicas = [...new Set(
     students.flatMap(s => s.sections?.map(sec => sec.section_name) || [])
   )].filter(Boolean)
