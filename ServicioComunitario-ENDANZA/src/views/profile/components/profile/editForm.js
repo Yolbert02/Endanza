@@ -102,7 +102,9 @@ const editForm = ({ formData, onInputChange, activeTab, errors = {} }) => {
     { value: "B+", label: "B+" },
     { value: "B-", label: "B-" },
     { value: "AB+", label: "AB+" },
-    { value: "AB-", label: "AB-" }
+    { value: "AB-", label: "AB-" },
+    { value: "No sabe", label: "No sabe / No recuerda" },
+    { value: "Desconocido", label: "No sabe / Desconocido" }
   ]
 
   const estatusOptions = [
@@ -446,7 +448,7 @@ const editForm = ({ formData, onInputChange, activeTab, errors = {} }) => {
           </CRow>
           <CRow className="mb-3">
             <CCol md={4}>
-              <CFormLabel className="fw-bold">Lugar de Trabajo</CFormLabel>
+              <CFormLabel className="fw-bold">Nombre de Empresa</CFormLabel>
               <CFormInput
                 type="text"
                 name="PadreLugarTrabajo"
@@ -587,7 +589,7 @@ const editForm = ({ formData, onInputChange, activeTab, errors = {} }) => {
           </CRow>
           <CRow className="mb-3">
             <CCol md={4}>
-              <CFormLabel className="fw-bold">Lugar de Trabajo</CFormLabel>
+              <CFormLabel className="fw-bold">Nombre de Empresa</CFormLabel>
               <CFormInput
                 type="text"
                 name="MadreLugarTrabajo"
@@ -865,7 +867,7 @@ const editForm = ({ formData, onInputChange, activeTab, errors = {} }) => {
 
           <CRow className="mb-3">
             <CCol md={4}>
-              <CFormLabel className="fw-bold">Lugar de Trabajo</CFormLabel>
+              <CFormLabel className="fw-bold">Nombre de Empresa</CFormLabel>
               <CFormInput
                 type="text"
                 name="RepresentanteLugarTrabajo"

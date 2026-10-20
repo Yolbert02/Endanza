@@ -78,7 +78,8 @@ const DatosSalud = ({ formData, onChange, errores = {} }) => {
               <option value="AB-">AB-</option>
               <option value="O+">O+</option>
               <option value="O-">O-</option>
-              <option value="Desconocido">No sabe / No recuerda</option>
+              <option value="No sabe">No sabe / No recuerda</option>
+              <option value="Desconocido" className="d-none">No sabe / No recuerda</option>
             </CFormSelect>
           </CCol>
         </CRow>

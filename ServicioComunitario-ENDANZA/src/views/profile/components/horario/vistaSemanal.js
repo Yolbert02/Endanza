@@ -105,6 +105,12 @@ const VistaSemanal = ({ diasSemana, horarioCompleto, onDescargarPDF, onImprimir 
                                   <CIcon icon={cilUser} size="sm" className="me-1 text-primary" />
                                   {claseEnEstaHora.profesor.split(' ').pop()}
                                 </div>
+                                {claseEnEstaHora.auxiliar && (
+                                  <div className="small d-flex align-items-center" style={{ color: '#c35604', fontSize: '0.75rem' }}>
+                                    <CIcon icon={cilUser} size="sm" className="me-1" style={{ opacity: 0.7 }} />
+                                    Aux: {claseEnEstaHora.auxiliar.split(' ').pop()}
+                                  </div>
+                                )}
                                 <div className="small text-muted-custom d-flex align-items-center">
                                   <CIcon icon={cilLocationPin} size="sm" className="me-1 text-primary" />
                                   {claseEnEstaHora.aula}

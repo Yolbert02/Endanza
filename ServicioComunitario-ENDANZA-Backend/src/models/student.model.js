@@ -31,7 +31,17 @@ const findAll = async (filters = {}) => {
           e.id_nivel as grade_level_id,
           nl.nivel as grade_level_name,
           e.id_nivel_danza as dance_level_id,
-          nd.nivel_danza as dance_level_name,
+          COALESCE(
+            nd.nivel_danza,
+            (
+              SELECT sec_nd2.nivel_danza
+              FROM inscripcion i2
+              JOIN seccion sec2 ON i2.id_seccion = sec2.id_seccion
+              LEFT JOIN nivel_danza sec_nd2 ON sec2.id_nivel_danza = sec_nd2.id_nivel_danza
+              WHERE i2.id_estudiante = e.id_estudiante
+              LIMIT 1
+            )
+          ) as dance_level_name,
           e.id_especialidad as specialty_id,
           e.id_especialidad as especialidad_id,
           e.id_especialidad as id_especialidad,
@@ -69,11 +79,13 @@ const findAll = async (filters = {}) => {
                   'id', i.id_inscripcion,
                   'section_id', sec.id_seccion,
                   'section_name', sec.nombre_seccion,
-                  'academic_year', a.nombre_ano
+                  'academic_year', a.nombre_ano,
+                  'dance_level_name', sec_nd.nivel_danza
                 )
               )
               FROM inscripcion i
               JOIN seccion sec ON i.id_seccion = sec.id_seccion
+              LEFT JOIN nivel_danza sec_nd ON sec.id_nivel_danza = sec_nd.id_nivel_danza
               JOIN ano_academico a ON i.id_ano = a.id_ano
               WHERE i.id_estudiante = e.id_estudiante
             ),
@@ -146,13 +158,16 @@ const findById = async (id) => {
           p.segundo_nombre as second_name,
           p.apellido as last_name,
           p.segundo_apellido as second_last_name,
-          p.segundo_apellido as segundo_apellido,
           p.cedula as dni,
+          p.cedula as cedula,
+          e.convivencia as convivencia,
           TO_CHAR(p.fecha_nacimiento, 'YYYY-MM-DD') as birth_date,
           p.genero as gender,
-          COALESCE(hm.tipo_sangre, 'O+') as blood_type,
-          COALESCE(hm.tipo_sangre, 'O+') as tipo_sangre,
-          COALESCE(hm.tipo_sangre, 'O+') as "TipoSangre",
+          p.numero_telefono as phone,
+          p.numero_telefono as telefono,
+          COALESCE(NULLIF(TRIM(hm.tipo_sangre), ''), 'No sabe') as blood_type,
+          COALESCE(NULLIF(TRIM(hm.tipo_sangre), ''), 'No sabe') as tipo_sangre,
+          COALESCE(NULLIF(TRIM(hm.tipo_sangre), ''), 'No sabe') as "TipoSangre",
           e.id_nivel as grade_level_id,
           nl.nivel as grade_level_name,
           e.id_nivel_danza as dance_level_id,
@@ -473,6 +488,7 @@ const update = async (id, studentData) => {
     }
 
     const seguroEscolar = studentData.seguro_escolar ?? studentData.school_insurance;
+    const convivenciaVal = studentData.convivencia ?? studentData.Convivencia;
 
     // Actualizar tabla estudiante
     await client.query(`
@@ -480,12 +496,15 @@ const update = async (id, studentData) => {
       SET
         id_nivel_danza = COALESCE($1, id_nivel_danza),
         id_especialidad = COALESCE($2, id_especialidad),
-        seguro_escolar = COALESCE($3, seguro_escolar)
-      WHERE id_estudiante = $4
+        seguro_escolar = COALESCE($3, seguro_escolar),
+        convivencia = CASE WHEN $4 THEN $5 ELSE convivencia END
+      WHERE id_estudiante = $6
     `, [
       danceLevelId || null,
       espId || null,
       seguroEscolar !== undefined ? seguroEscolar : null,
+      convivenciaVal !== undefined,
+      convivenciaVal || null,
       id
     ]);
 

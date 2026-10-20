@@ -35,6 +35,7 @@ import { getStoredUser } from 'src/utils/authStorage'
 
 // Componentes estéticos
 import VistaSemanalDocente from './components/horario/VistaSemanalDocente'
+import { descargarHorarioDocentePDF } from './utils/teacherSchedulePdf'
 
 const HorarioDocente = () => {
     const { user, isDocente, isSuperadministrador, userData, userId } = useUserRole()
@@ -46,8 +47,6 @@ const HorarioDocente = () => {
     const [activeDay, setActiveDay] = useState('LUNES')
     const [toasts, setToasts] = useState([])
 
-    const diasSemana = ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES']
-
     const showToast = (type, message) => {
         const id = Date.now()
         const newToast = { id, type, message }
@@ -58,10 +57,27 @@ const HorarioDocente = () => {
     }
 
     const handleGenerarPDF = () => {
-        showToast('info', 'Generando horario institucional...')
-        setTimeout(() => {
-            showToast('success', '✅ Horario preparado para descarga')
-        }, 1500)
+        if (!selectedTeacher) {
+            showToast('warning', 'Seleccione un docente para descargar su horario.')
+            return
+        }
+
+        const allSchedules = Object.values(teacherSchedules).flat()
+        if (allSchedules.length === 0) {
+            showToast('warning', 'El docente seleccionado no tiene clases asignadas.')
+            return
+        }
+
+        showToast('info', 'Generando horario en PDF...')
+        const success = descargarHorarioDocentePDF({
+            teacherName: selectedTeacher,
+            academicYear: selectedYear,
+            schedules: allSchedules
+        })
+
+        if (success) {
+            showToast('success', '✅ Horario descargado correctamente')
+        }
     }
 
     useEffect(() => {
@@ -160,6 +176,7 @@ const HorarioDocente = () => {
         sectionsData.forEach(section => {
             section.schedules.forEach(sched => {
                 if (sched.teacherName) teachers.add(sched.teacherName)
+                if (sched.auxiliaryTeacherName) teachers.add(sched.auxiliaryTeacherName)
             })
         })
         return Array.from(teachers).sort()
@@ -181,7 +198,7 @@ const HorarioDocente = () => {
         const targetTeacherNormalized = normalizeStr(selectedTeacher || (activeUser ? `${activeUser.nombre || ''} ${activeUser.apellido || ''}` : ''))
 
         const scheduleMap = {
-            'LUNES': [], 'MARTES': [], 'MIÉRCOLES': [], 'JUEVES': [], 'VIERNES': []
+            'LUNES': [], 'MARTES': [], 'MIÉRCOLES': [], 'JUEVES': [], 'VIERNES': [], 'SÁBADO': []
         }
 
         const dayAliasMap = {
@@ -190,33 +207,53 @@ const HorarioDocente = () => {
             'MIERCOLES': 'MIÉRCOLES',
             'MIÉRCOLES': 'MIÉRCOLES',
             'JUEVES': 'JUEVES',
-            'VIERNES': 'VIERNES'
+            'VIERNES': 'VIERNES',
+            'SABADO': 'SÁBADO',
+            'SÁBADO': 'SÁBADO'
         }
 
         sections.forEach(section => {
             (section.schedules || []).forEach(sched => {
                 const schedTeacherName = sched.teacherName || sched.teacher_name || ''
+                const schedAuxName = sched.auxiliaryTeacherName || sched.auxiliary_teacher_name || ''
                 const schedUserId = Number(sched.teacherUserId || sched.teacher_user_id || sched.user_id)
                 const schedProfId = Number(sched.teacherId || sched.teacher_id || sched.Id_profesor)
+                const schedAuxUserId = Number(sched.auxiliaryTeacherUserId || sched.auxiliary_teacher_user_id)
+                const schedAuxProfId = Number(sched.auxiliaryTeacherId || sched.auxiliary_teacher_id)
 
-                const isMatchByUser = isDocente && currentUserId && schedUserId && currentUserId === schedUserId
-                const isMatchByProf = isDocente && currentProfId && schedProfId && currentProfId === schedProfId
-                const isMatchByName = targetTeacherNormalized && (
-                    normalizeStr(schedTeacherName) === targetTeacherNormalized ||
-                    normalizeStr(schedTeacherName).includes(targetTeacherNormalized) ||
-                    targetTeacherNormalized.includes(normalizeStr(schedTeacherName))
-                )
+                const isMatchTitular = (isDocente && currentUserId && schedUserId && currentUserId === schedUserId) ||
+                    (isDocente && currentProfId && schedProfId && currentProfId === schedProfId) ||
+                    (targetTeacherNormalized && (
+                        normalizeStr(schedTeacherName) === targetTeacherNormalized ||
+                        normalizeStr(schedTeacherName).includes(targetTeacherNormalized) ||
+                        targetTeacherNormalized.includes(normalizeStr(schedTeacherName))
+                    ))
 
-                if (isMatchByUser || isMatchByProf || isMatchByName) {
+                const isMatchAuxiliar = (isDocente && currentUserId && schedAuxUserId && currentUserId === schedAuxUserId) ||
+                    (isDocente && currentProfId && schedAuxProfId && currentProfId === schedAuxProfId) ||
+                    (targetTeacherNormalized && schedAuxName && (
+                        normalizeStr(schedAuxName) === targetTeacherNormalized ||
+                        normalizeStr(schedAuxName).includes(targetTeacherNormalized) ||
+                        targetTeacherNormalized.includes(normalizeStr(schedAuxName))
+                    ))
+
+                if (isMatchTitular || isMatchAuxiliar) {
                     const rawDia = normalizeStr(sched.dayName || sched.day_name || '').toUpperCase()
                     const dia = dayAliasMap[rawDia] || rawDia
-                    scheduleMap[dia]?.push({
+                    if (!scheduleMap[dia]) scheduleMap[dia] = []
+                    scheduleMap[dia].push({
                         ...sched,
                         sectionName: section.sectionName || section.section_name,
                         subjectName: section.subjectName || section.subject_name,
                         gradeLevel: section.gradeLevel || section.grade_level,
                         classroom: sched.classroomName || sched.classroom_name || sched.classroom || 'Sin aula',
-                        subject: sched.subject || sched.subject_name || section.subjectName || 'Sin materia'
+                        subject: sched.subject || sched.subject_name || section.subjectName || 'Sin materia',
+                        startTime: sched.startTime || sched.start_time,
+                        endTime: sched.endTime || sched.end_time,
+                        dayName: dia,
+                        isAuxiliary: !isMatchTitular && isMatchAuxiliar,
+                        titularTeacherName: schedTeacherName,
+                        auxiliaryTeacherName: schedAuxName
                     })
                 }
             })
@@ -229,6 +266,13 @@ const HorarioDocente = () => {
 
         return scheduleMap
     }, [sections, selectedTeacher, isDocente, userData, userId, user])
+
+    const diasSemana = useMemo(() => {
+        const hasSat = (teacherSchedules['SÁBADO'] || []).length > 0
+        return hasSat
+            ? ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO']
+            : ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES']
+    }, [teacherSchedules])
 
     const totalClases = useMemo(() => {
         return Object.values(teacherSchedules).reduce((acc, dayClases) => acc + dayClases.length, 0)

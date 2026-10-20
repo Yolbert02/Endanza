@@ -27,8 +27,10 @@ import {
     cilLocationPin,
     cilBook,
     cilGroup,
-    cilSchool
+    cilSchool,
+    cilCloudDownload
 } from '@coreui/icons'
+import { descargarHorarioSeccionPDF } from './utils/sectionSchedulePdf'
 
 const InfoHorario = ({ visible, onClose, section }) => {
     useEffect(() => {
@@ -53,6 +55,7 @@ const InfoHorario = ({ visible, onClose, section }) => {
         id: section.id || 'N/A',
         sectionName: section.sectionName || section.section_name || 'Sin nombre',
         gradeLevel: section.gradeLevel || section.subject_name || 'Sin nivel',
+        specialtyName: section.specialtyName || section.specialty_name || '',
         academicYear: section.academicYear || section.academic_year_name || 'Año no especificado',
         totalHoursPerWeek: section.totalHoursPerWeek || section.total_hours || 0,
         schedules: Array.isArray(section.schedules) ? section.schedules : [],
@@ -136,11 +139,20 @@ const InfoHorario = ({ visible, onClose, section }) => {
 
     return (
         <CModal size="xl" visible={visible} onClose={onClose} backdrop="static" className="premium-modal">
-            <CModalHeader className="bg-primary text-white border-0 py-3">
+            <CModalHeader className="bg-primary text-white border-0 py-3 d-flex justify-content-between align-items-center">
                 <CModalTitle className="fw-bold d-flex align-items-center ls-1 small">
                     <CIcon icon={cilCalendar} className="me-2" />
                     DETALLE DE HORARIO
                 </CModalTitle>
+                <CButton
+                    size="sm"
+                    className="btn btn-light text-primary fw-bold px-3 py-1 me-2 shadow-sm d-flex align-items-center gap-2"
+                    onClick={() => descargarHorarioSeccionPDF(safeSection)}
+                    title="Descargar Horario en formato PDF (Bloques y Días)"
+                >
+                    <CIcon icon={cilCloudDownload} size="sm" />
+                    DESCARGAR PDF
+                </CButton>
             </CModalHeader>
             
             <CModalBody className="p-4 bg-light-custom bg-opacity-10" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
@@ -161,6 +173,9 @@ const InfoHorario = ({ visible, onClose, section }) => {
                                         <div className="d-flex flex-column p-3 bg-light-custom bg-opacity-10 rounded-4 border border-light-custom shadow-sm">
                                             <span className="text-muted-custom small text-uppercase fw-bold ls-1">Nivel</span>
                                             <strong className="fs-5 header-title-custom">{safeSection.gradeLevel}</strong>
+                                            {safeSection.specialtyName && (
+                                                <span className="text-muted-custom small mt-1">{safeSection.specialtyName}</span>
+                                            )}
                                         </div>
                                     </CCol>
                                     
@@ -295,9 +310,16 @@ const InfoHorario = ({ visible, onClose, section }) => {
                                                                     <span className="fw-bold header-title-custom">{schedule.subject}</span>
                                                                 </CTableDataCell>
                                                                 <CTableDataCell className="border-0" style={{ width: '25%' }}>
-                                                                    <div className="d-flex align-items-center text-muted-custom small fw-medium">
-                                                                        <CIcon icon={cilUser} size="sm" className="me-1 text-primary opacity-75" />
-                                                                        {schedule.teacherName}
+                                                                    <div className="d-flex flex-column text-muted-custom small fw-medium">
+                                                                        <div className="d-flex align-items-center">
+                                                                            <CIcon icon={cilUser} size="sm" className="me-1 text-primary opacity-75" />
+                                                                            {schedule.teacherName}
+                                                                        </div>
+                                                                        {schedule.auxiliaryTeacherName && (
+                                                                            <small className="text-primary mt-1 fw-bold" style={{ fontSize: '0.72rem' }}>
+                                                                                Aux: {schedule.auxiliaryTeacherName}
+                                                                            </small>
+                                                                        )}
                                                                     </div>
                                                                 </CTableDataCell>
                                                                 <CTableDataCell className="border-0" style={{ width: '20%' }}>
@@ -323,7 +345,15 @@ const InfoHorario = ({ visible, onClose, section }) => {
                 </CRow>
             </CModalBody>
 
-            <CModalFooter className="bg-light-custom bg-opacity-10 border-top border-light-custom border-opacity-10">
+            <CModalFooter className="bg-light-custom bg-opacity-10 border-top border-light-custom border-opacity-10 d-flex justify-content-between align-items-center">
+                <CButton
+                    onClick={() => descargarHorarioSeccionPDF(safeSection)}
+                    className="fw-bold px-4 py-2 text-white shadow-sm d-flex align-items-center gap-2"
+                    style={{ background: '#28a745', border: 'none' }}
+                >
+                    <CIcon icon={cilCloudDownload} size="sm" />
+                    DESCARGAR HORARIO EN PDF
+                </CButton>
                 <CButton onClick={onClose} className="fw-bold px-4 py-2 btn-premium shadow-sm">
                     CERRAR VENTANA
                 </CButton>

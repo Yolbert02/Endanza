@@ -91,10 +91,12 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
   const [formData, setFormData] = useState({
     // Datos del estudiante
     id_estudiante: student?.id || null,
-    nombres: student?.first_name || student?.name || "",
-    apellidos: student?.last_name || student?.lastName || "",
+    nombres: [student?.first_name || student?.nombre, student?.middle_name || student?.segundo_nombre || student?.second_name].filter(Boolean).join(" ") || student?.first_name || student?.name || "",
+    apellidos: [student?.last_name || student?.apellido, student?.second_last_name || student?.segundo_apellido].filter(Boolean).join(" ") || student?.last_name || student?.lastName || "",
     fecha_nac: initialBirthDate,
+    cedula: student?.cedula || student?.dni || "",
     direccion_Habitacion: "",
+    telefono_fijo: "",
     grado: student?.dance_level_name || student?.dance_level || student?.danceLevel || (student?.grade_level !== student?.grade_level_name ? student?.grade_level : "") || "",
     especialidad: "",
     convivencia: "",
@@ -112,11 +114,13 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
     apellido_Madre: "",
     cedula_Madre: "",
     ocupacion_Madre: "",
+    email_Madre: "",
     trabajo_Madre: "",
     direccion_Trabajo_Madre: "",
     telefono_Madre_prefix: "0414",
     telefono_Madre_number: "",
     telefono_Madre: "",
+    telefono_trabajo_Madre: "",
 
     // Datos del Padre (campos divididos + combinado para backend)
     primer_nombre_Padre: "",
@@ -127,11 +131,13 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
     apellido_Padre: "",
     cedula_Padre: "",
     ocupacion_Padre: "",
+    email_Padre: "",
     trabajo_Padre: "",
     direccion_Trabajo_Padre: "",
     telefono_Padre_prefix: "0414",
     telefono_Padre_number: "",
     telefono_Padre: "",
+    telefono_trabajo_Padre: "",
 
     // Elección del representante
     quien_es_representante: "Madre",
@@ -151,6 +157,8 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
     profesion_Rep: "",
     trabajo_Rep: "",
     direccion_Trabajo_Rep: "",
+    telefono_trabajo_Rep: "",
+    foto_representante: "",
 
     // Datos de salud
     peso: "",
@@ -263,9 +271,10 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
         setFormData(prev => ({
           ...prev,
           id_estudiante: est.id || student.id,
-          nombres: est.nombres || student.first_name || prev.nombres,
-          apellidos: est.apellidos || student.last_name || prev.apellidos,
+          nombres: est.nombres || [student?.first_name || student?.nombre, student?.middle_name || student?.segundo_nombre].filter(Boolean).join(" ") || student?.first_name || prev.nombres,
+          apellidos: est.apellidos || [student?.last_name || student?.apellido, student?.second_last_name || student?.segundo_apellido].filter(Boolean).join(" ") || student?.last_name || prev.apellidos,
           fecha_nac: formattedDate || prev.fecha_nac,
+          cedula: est.cedula || prev.cedula,
           edad: edadCalculada || calculateAge(prev.fecha_nac) || prev.edad,
           direccion_Habitacion: est.direccion || prev.direccion_Habitacion,
           grado: mappedGrade || prev.grado,
@@ -274,49 +283,59 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
           Seguro_Escolar: est.seguro_escolar ? "si" : (prev.Seguro_Escolar || "no"),
           nombre_Seguro: est.nombre_seguro || prev.nombre_Seguro,
           Telefono_Celular: est.telefono || prev.Telefono_Celular,
+          telefono_fijo: est.telefono_fijo || est.telefono || rep.telefono_fijo || prev.telefono_fijo || "",
+          telefonofijo_Rep: rep.telefono_fijo || est.telefono_fijo || est.telefono || prev.telefonofijo_Rep || "",
 
           // Representante
           quien_es_representante: quienRep,
           parentesco_Otro: parentescoOtro,
-          primer_nombre_Rep: repNombres.first || prev.primer_nombre_Rep,
-          segundo_nombre_Rep: repNombres.second || prev.segundo_nombre_Rep,
-          primer_apellido_Rep: repApellidos.first || prev.primer_apellido_Rep,
-          segundo_apellido_Rep: repApellidos.second || prev.segundo_apellido_Rep,
+          primer_nombre_Rep: rep.primer_nombre || repNombres.first || prev.primer_nombre_Rep,
+          segundo_nombre_Rep: (rep.segundo_nombre !== undefined && rep.segundo_nombre !== null && rep.segundo_nombre !== "") ? rep.segundo_nombre : (repNombres.second || prev.segundo_nombre_Rep),
+          primer_apellido_Rep: rep.primer_apellido || repApellidos.first || prev.primer_apellido_Rep,
+          segundo_apellido_Rep: (rep.segundo_apellido !== undefined && rep.segundo_apellido !== null && rep.segundo_apellido !== "") ? rep.segundo_apellido : (repApellidos.second || prev.segundo_apellido_Rep),
           nombres_Representante: rep.nombres || prev.nombres_Representante,
           apellidos_Representante: rep.apellidos || prev.apellidos_Representante,
           telefono_Rep_prefix: repTel.prefix || prev.telefono_Rep_prefix,
           telefono_Rep_number: repTel.number || prev.telefono_Rep_number,
           telefono_Rep: rep.telefono || prev.telefono_Rep,
-          profesion_Rep: rep.profesion || prev.profesion_Rep,
+          profesion_Rep: rep.profesion || rep.ocupacion || prev.profesion_Rep,
+          trabajo_Rep: rep.trabajo || rep.lugar_trabajo || prev.trabajo_Rep,
           direccion_Trabajo_Rep: rep.direccion_trabajo || prev.direccion_Trabajo_Rep,
+          telefono_trabajo_Rep: rep.telefono_trabajo || prev.telefono_trabajo_Rep,
 
           // Madre
-          primer_nombre_Madre: madreNombres.first || prev.primer_nombre_Madre,
-          segundo_nombre_Madre: madreNombres.second || prev.segundo_nombre_Madre,
-          primer_apellido_Madre: madreApellidos.first || prev.primer_apellido_Madre,
-          segundo_apellido_Madre: madreApellidos.second || prev.segundo_apellido_Madre,
+          primer_nombre_Madre: infoMadre?.primer_nombre || madreNombres.first || prev.primer_nombre_Madre,
+          segundo_nombre_Madre: (infoMadre?.segundo_nombre !== undefined && infoMadre?.segundo_nombre !== null && infoMadre?.segundo_nombre !== "") ? infoMadre.segundo_nombre : (madreNombres.second || prev.segundo_nombre_Madre),
+          primer_apellido_Madre: infoMadre?.primer_apellido || madreApellidos.first || prev.primer_apellido_Madre,
+          segundo_apellido_Madre: (infoMadre?.segundo_apellido !== undefined && infoMadre?.segundo_apellido !== null && infoMadre?.segundo_apellido !== "") ? infoMadre.segundo_apellido : (madreApellidos.second || prev.segundo_apellido_Madre),
           nombre_Madre: (infoMadre?.nombre || infoMadre?.nombres) || prev.nombre_Madre,
           apellido_Madre: (infoMadre?.apellido || infoMadre?.apellidos) || prev.apellido_Madre,
           cedula_Madre: infoMadre?.cedula || prev.cedula_Madre,
-          ocupacion_Madre: infoMadre?.profesion || infoMadre?.profesion_padre || prev.ocupacion_Madre,
+          ocupacion_Madre: infoMadre?.ocupacion || infoMadre?.profesion || infoMadre?.profesion_padre || prev.ocupacion_Madre,
+          email_Madre: infoMadre?.email || prev.email_Madre,
+          trabajo_Madre: infoMadre?.trabajo || infoMadre?.lugar_trabajo || infoMadre?.lugar_trabajo_padre || prev.trabajo_Madre,
           direccion_Trabajo_Madre: infoMadre?.direccion_trabajo || infoMadre?.direccion_trabajo_padre || prev.direccion_Trabajo_Madre,
           telefono_Madre_prefix: madreTel.prefix || prev.telefono_Madre_prefix,
           telefono_Madre_number: madreTel.number || prev.telefono_Madre_number,
           telefono_Madre: infoMadre?.telefono || prev.telefono_Madre,
+          telefono_trabajo_Madre: infoMadre?.telefono_trabajo || prev.telefono_trabajo_Madre,
 
           // Padre
-          primer_nombre_Padre: padreNombres.first || prev.primer_nombre_Padre,
-          segundo_nombre_Padre: padreNombres.second || prev.segundo_nombre_Padre,
-          primer_apellido_Padre: padreApellidos.first || prev.primer_apellido_Padre,
-          segundo_apellido_Padre: padreApellidos.second || prev.segundo_apellido_Padre,
+          primer_nombre_Padre: infoPadre?.primer_nombre || padreNombres.first || prev.primer_nombre_Padre,
+          segundo_nombre_Padre: (infoPadre?.segundo_nombre !== undefined && infoPadre?.segundo_nombre !== null && infoPadre?.segundo_nombre !== "") ? infoPadre.segundo_nombre : (padreNombres.second || prev.segundo_nombre_Padre),
+          primer_apellido_Padre: infoPadre?.primer_apellido || padreApellidos.first || prev.primer_apellido_Padre,
+          segundo_apellido_Padre: (infoPadre?.segundo_apellido !== undefined && infoPadre?.segundo_apellido !== null && infoPadre?.segundo_apellido !== "") ? infoPadre.segundo_apellido : (padreApellidos.second || prev.segundo_apellido_Padre),
           nombre_Padre: (infoPadre?.nombre || infoPadre?.nombres) || prev.nombre_Padre,
           apellido_Padre: (infoPadre?.apellido || infoPadre?.apellidos) || prev.apellido_Padre,
           cedula_Padre: infoPadre?.cedula || prev.cedula_Padre,
-          ocupacion_Padre: infoPadre?.profesion || infoPadre?.profesion_padre || prev.ocupacion_Padre,
+          ocupacion_Padre: infoPadre?.ocupacion || infoPadre?.profesion || infoPadre?.profesion_padre || prev.ocupacion_Padre,
+          email_Padre: infoPadre?.email || prev.email_Padre,
+          trabajo_Padre: infoPadre?.trabajo || infoPadre?.lugar_trabajo || infoPadre?.lugar_trabajo_padre || prev.trabajo_Padre,
           direccion_Trabajo_Padre: infoPadre?.direccion_trabajo || infoPadre?.direccion_trabajo_padre || prev.direccion_Trabajo_Padre,
           telefono_Padre_prefix: padreTel.prefix || prev.telefono_Padre_prefix,
           telefono_Padre_number: padreTel.number || prev.telefono_Padre_number,
           telefono_Padre: infoPadre?.telefono || prev.telefono_Padre,
+          telefono_trabajo_Padre: infoPadre?.telefono_trabajo || prev.telefono_trabajo_Padre,
 
           // Salud
           peso: hm.peso || prev.peso,
@@ -383,7 +402,7 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
     const numericFields = [
       "cedula_Madre", "cedula_Padre",
       "telefono_Madre_number", "telefono_Padre_number",
-      "telefono_Rep_number", "telefonofijo_Rep"
+      "telefono_Rep_number", "telefonofijo_Rep", "telefono_fijo"
     ];
     if (numericFields.includes(name)) {
       cleanValue = value.replace(/[^0-9]/g, "");
@@ -442,6 +461,10 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
         const prefix = name === 'telefono_Rep_prefix' ? cleanValue : prev.telefono_Rep_prefix;
         const number = name === 'telefono_Rep_number' ? cleanValue : prev.telefono_Rep_number;
         updated.telefono_Rep = number ? `${prefix}-${number}` : '';
+      }
+      if (['telefono_fijo', 'telefonofijo_Rep'].includes(name)) {
+        updated.telefono_fijo = cleanValue;
+        updated.telefonofijo_Rep = cleanValue;
       }
 
       return updated;
@@ -574,7 +597,8 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
       telefono_Madre: formData.telefono_Madre?.replace(/[^\d]/g, '').slice(0, 11) || null,
       telefono_Padre: formData.telefono_Padre?.replace(/[^\d]/g, '').slice(0, 11) || null,
       telefono_Rep: formData.telefono_Rep?.replace(/[^\d]/g, '').slice(0, 11) || null,
-      telefonofijo_Rep: formData.telefonofijo_Rep?.replace(/[^\d]/g, '').slice(0, 11) || null,
+      telefono_fijo: (formData.telefono_fijo || formData.telefonofijo_Rep)?.replace(/[^\d]/g, '').slice(0, 11) || null,
+      telefonofijo_Rep: (formData.telefonofijo_Rep || formData.telefono_fijo)?.replace(/[^\d]/g, '').slice(0, 11) || null,
     };
 
     setEnviando(true);

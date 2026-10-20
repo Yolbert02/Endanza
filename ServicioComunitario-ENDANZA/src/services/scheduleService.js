@@ -54,9 +54,13 @@ export const listSections = async (filters = {}) => {
         return sections.map(s => ({
             ...s,
             id: s.id,
+            sectionLetter: s.section_letter || s.section || '',
+            section: s.section_letter || s.section || '',
             sectionName: s.section_name || s.sectionName,
             subjectName: s.subject_name || s.subjectName || 'Sin Materia',
             gradeLevel: s.grade_level || s.gradeLevel || s.subject_name,
+            specialtyName: s.specialty_name || s.specialtyName || '',
+            specialtyId: s.specialty_id || s.specialtyId || null,
             academicYear: s.academic_year_name || s.academicYear,
             academicYearId: s.academic_year_id || s.academicYearId,
             schedules: (s.schedules || []).map(sched => ({
@@ -72,6 +76,9 @@ export const listSections = async (filters = {}) => {
                 endTime: sched.end_time || sched.endTime,
                 classroomName: sched.classroom_name || sched.classroomName || sched.classroom,
                 classroom: sched.classroom_name || sched.classroomName || sched.classroom,
+                auxiliaryTeacherId: sched.auxiliary_teacher_id || sched.auxiliaryTeacherId,
+                auxiliaryTeacherName: sched.auxiliary_teacher_name || sched.auxiliaryTeacherName,
+                auxiliaryTeacherUserId: sched.auxiliary_teacher_user_id || sched.auxiliaryTeacherUserId,
             }))
         }));
 
@@ -327,7 +334,10 @@ export const adaptSectionFromDB = (dbSection) => {
             classroom: s.classroom_name || 'Sin aula',
             dayId: s.day_id,
             blockId: s.block_id,
-            classroomId: s.classroom_id
+            classroomId: s.classroom_id,
+            auxiliaryTeacherId: s.auxiliary_teacher_id || null,
+            auxiliaryTeacherName: s.auxiliary_teacher_name || '',
+            auxiliaryTeacherUserId: s.auxiliary_teacher_user_id || null
         };
     });
 
@@ -396,7 +406,16 @@ export const SUBJECTS = [
     { value: 'Kinesiología', label: 'Kinesiología' },
     { value: 'Francés', label: 'Francés' },
     { value: 'Composición Coreográfica', label: 'Composición Coreográfica' },
-    { value: 'Danza de Carácter', label: 'Danza de Carácter' }
+    { value: 'Danza de Carácter', label: 'Danza de Carácter' },
+    { value: 'Repertorio Danza Clásica', label: 'Repertorio Danza Clásica' },
+    { value: 'Repertorio Contemporáneo', label: 'Repertorio Contemporáneo' },
+    { value: 'Pas de Deux', label: 'Pas de Deux' },
+    { value: 'Danza Latinoamericana', label: 'Danza Latinoamericana' },
+    { value: 'Iniciación a la Danza', label: 'Iniciación a la Danza' },
+    { value: 'Indumentaria', label: 'Indumentaria' },
+    { value: 'Historia de la Danza Tradicional', label: 'Historia de la Danza Tradicional' },
+    { value: 'Proyecto Comunitario', label: 'Proyecto Comunitario' },
+    { value: 'Historia de los Precursores', label: 'Historia de los Precursores' }
 ];
 
 export const CLASSROOMS = [

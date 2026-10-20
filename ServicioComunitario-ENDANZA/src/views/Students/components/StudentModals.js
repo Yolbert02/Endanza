@@ -56,8 +56,14 @@ const StudentModals = ({
         return selectedItem.sections[0].section_name
     }
 
+    const getGradoActual = () => {
+        if (!selectedItem) return 'N/A'
+        return selectedItem.dance_level || selectedItem.dance_level_name || (selectedItem.grade_level && selectedItem.grade_level !== selectedItem.grade_level_name && selectedItem.grade_level !== selectedItem.school_grade ? selectedItem.grade_level : '') || selectedItem.grade_level || 'Sin Asignar'
+    }
+
     const representante = getRepresentanteInfo()
     const seccionActual = getSeccionActual()
+    const gradoActual = getGradoActual()
 
     return (
         <CModal
@@ -119,7 +125,7 @@ const StudentModals = ({
                                 <div className="detail-item mb-2">
                                     <span className="text-muted-custom label-micro me-2">GRADO:</span>
                                     <span className="fw-bold header-title-custom">
-                                        {selectedItem.grade_level || 'N/A'}
+                                        {gradoActual}
                                     </span>
                                 </div>
                                 <div className="detail-item mb-2">
@@ -267,7 +273,7 @@ const StudentModals = ({
                                         {selectedItem.first_name} {selectedItem.last_name}
                                     </strong><br />
                                     <small className="text-muted-custom text-uppercase fw-bold ls-1">
-                                        MATRÍCULA: #{selectedItem.id} • {selectedItem.grade_level || 'N/A'}
+                                        MATRÍCULA: #{selectedItem.id} • {gradoActual}
                                     </small>
                                 </div>
                             </div>

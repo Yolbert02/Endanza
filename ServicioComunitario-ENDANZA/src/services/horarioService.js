@@ -176,6 +176,7 @@ const transformarHorarioParaFrontend = (estudiante, seccion, horarios) => {
         const clase = {
             materia: h.subject_name || 'Materia General',
             profesor: h.teacher_name || 'Profesor Asignado',
+            auxiliar: h.auxiliary_teacher_name || '',
             aula: h.classroom_name || 'Aula Pendiente',
             hora: `${horaInicio} - ${horaFin}`,
             tipo: h.subject_type || 'práctica',

@@ -148,6 +148,7 @@ const StudentTable = ({
                                     students.map((student) => {
                                         const representante = getRepresentanteInfo(student)
                                         const seccionActual = getSeccionActual(student)
+                                        const gradoEndanza = student.dance_level || student.dance_level_name || (student.grade_level && student.grade_level !== student.grade_level_name && student.grade_level !== student.school_grade ? student.grade_level : '') || student.grade_level || 'Sin Asignar'
                                         
                                         return (
                                             <CTableRow key={student.id} className="hover-row transition-all border-0">
@@ -181,7 +182,7 @@ const StudentTable = ({
                                                 </CTableDataCell>
                                                 <CTableDataCell className="border-bottom-light d-mobile-none">
                                                     <div className="fw-bold header-title-custom">
-                                                        {student.grade_level || 'N/A'}
+                                                        {gradoEndanza}
                                                     </div>
                                                     <CBadge className="bg-primary bg-opacity-10 text-primary border border-primary border-opacity-10 rounded-pill px-2 small">
                                                         {seccionActual}

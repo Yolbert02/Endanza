@@ -236,12 +236,28 @@ const DatosEstudiante = ({ formData, onChange, errores = {}, mode = "completo" }
               />
             </CCol>
           )}
+
+          <CCol md={esModoBasico ? 6 : 4}>
+            <CFormInput
+              label={
+                <span className="fw-bold step-label text-uppercase ls-1 small mb-1">
+                  Cédula de Identidad (V-/E-)
+                </span>
+              }
+              name="cedula"
+              value={formData.cedula || ""}
+              onChange={onChange}
+              placeholder="Ej: 30123456"
+              maxLength={10}
+              className="input-premium py-2"
+            />
+          </CCol>
         </CRow>
 
         {!esModoBasico && (
           <>
             <CRow className="g-4 mt-1">
-              <CCol md={8}>
+              <CCol md={6}>
                 <CFormInput
                   label={
                     <span className="fw-bold step-label text-uppercase ls-1 small mb-1">
@@ -255,7 +271,22 @@ const DatosEstudiante = ({ formData, onChange, errores = {}, mode = "completo" }
                   className="input-premium py-2"
                 />
               </CCol>
-              <CCol md={4}>
+              <CCol md={3}>
+                <CFormInput
+                  label={
+                    <span className="fw-bold step-label text-uppercase ls-1 small mb-1">
+                      Teléfono Fijo
+                    </span>
+                  }
+                  name="telefono_fijo"
+                  value={formData.telefono_fijo || ""}
+                  onChange={onChange}
+                  placeholder="Ej: 02761234567"
+                  maxLength={11}
+                  className="input-premium py-2"
+                />
+              </CCol>
+              <CCol md={3}>
                 <CFormSelect
                   label={
                     <span className="fw-bold step-label text-uppercase ls-1 small mb-1">

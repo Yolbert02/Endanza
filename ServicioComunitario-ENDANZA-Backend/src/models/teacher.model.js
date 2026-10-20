@@ -14,8 +14,8 @@ const findAll = async (academicYearId = null) => {
                     SELECT 
                         u.id_usuario as id,
                         p.cedula as dni,
-                        p.nombre as first_name,
-                        p.apellido as last_name,
+                        TRIM(CONCAT(p.nombre, ' ', COALESCE(p.segundo_nombre, ''))) as first_name,
+                        TRIM(CONCAT(p.apellido, ' ', COALESCE(p.segundo_apellido, ''))) as last_name,
                         p.email as email,
                         p.numero_telefono as phone,
                         u.estado_usuario as status,
@@ -82,8 +82,8 @@ const findAll = async (academicYearId = null) => {
                     SELECT 
                         u.id_usuario as id,
                         p.cedula as dni,
-                        p.nombre as first_name,
-                        p.apellido as last_name,
+                        TRIM(CONCAT(p.nombre, ' ', COALESCE(p.segundo_nombre, ''))) as first_name,
+                        TRIM(CONCAT(p.apellido, ' ', COALESCE(p.segundo_apellido, ''))) as last_name,
                         p.email as email,
                         p.numero_telefono as phone,
                         u.estado_usuario as status,

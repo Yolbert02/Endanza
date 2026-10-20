@@ -10,10 +10,20 @@ const findAll = async (academicYearId = null) => {
       text: `
         SELECT 
           s.id_seccion as id,
-          s.nombre_seccion as section_name,
+          s.nombre_seccion as section_letter,
+          CASE 
+            WHEN s.nombre_seccion IS NULL OR s.nombre_seccion = '' OR s.nombre_seccion = 'Única' THEN 
+              REGEXP_REPLACE(COALESCE(nd.nivel_danza, 'General'), ' - .*$', '')
+            WHEN LENGTH(s.nombre_seccion) <= 2 THEN 
+              REGEXP_REPLACE(COALESCE(nd.nivel_danza, 'General'), ' - .*$', '') || ' ' || s.nombre_seccion
+            WHEN POSITION(REGEXP_REPLACE(COALESCE(nd.nivel_danza, 'General'), ' - .*$', '') IN s.nombre_seccion) > 0 THEN 
+              s.nombre_seccion
+            ELSE 
+              REGEXP_REPLACE(COALESCE(nd.nivel_danza, 'General'), ' - .*$', '') || ' ' || s.nombre_seccion
+          END as section_name,
           30 as capacity,
-          COALESCE(m.id_materia, NULL) as subject_id,
-          COALESCE(m.nombre_materia, 'General') as subject_name,
+          NULL::integer as subject_id,
+          'General'::text as subject_name,
           s.id_ano as academic_year_id,
           a.nombre_ano as academic_year_name,
           s.id_nivel_danza as grade_id,
@@ -26,8 +36,6 @@ const findAll = async (academicYearId = null) => {
         LEFT JOIN ano_academico a ON s.id_ano = a.id_ano
         LEFT JOIN nivel_danza nd ON s.id_nivel_danza = nd.id_nivel_danza
         LEFT JOIN especialidad esp ON s.id_especialidad = esp.id_especialidad
-        LEFT JOIN horario h ON s.id_seccion = h.id_seccion
-        LEFT JOIN materia m ON h.id_materia = m.id_materia
         LEFT JOIN inscripcion i ON s.id_seccion = i.id_seccion AND i.estado_inscripcion = 'activo'
       `,
     };
@@ -41,8 +49,6 @@ const findAll = async (academicYearId = null) => {
       GROUP BY 
         s.id_seccion, 
         s.nombre_seccion, 
-        m.id_materia, 
-        m.nombre_materia, 
         s.id_ano, 
         a.nombre_ano, 
         s.id_nivel_danza, 
@@ -66,7 +72,17 @@ const findById = async (id) => {
       text: `
         SELECT 
           s.id_seccion as id,
-          s.nombre_seccion as section_name,
+          s.nombre_seccion as section_letter,
+          CASE 
+            WHEN s.nombre_seccion IS NULL OR s.nombre_seccion = '' OR s.nombre_seccion = 'Única' THEN 
+              REGEXP_REPLACE(COALESCE(nd.nivel_danza, 'General'), ' - .*$', '')
+            WHEN LENGTH(s.nombre_seccion) <= 2 THEN 
+              REGEXP_REPLACE(COALESCE(nd.nivel_danza, 'General'), ' - .*$', '') || ' ' || s.nombre_seccion
+            WHEN POSITION(REGEXP_REPLACE(COALESCE(nd.nivel_danza, 'General'), ' - .*$', '') IN s.nombre_seccion) > 0 THEN 
+              s.nombre_seccion
+            ELSE 
+              REGEXP_REPLACE(COALESCE(nd.nivel_danza, 'General'), ' - .*$', '') || ' ' || s.nombre_seccion
+          END as section_name,
           30 as capacity,
           s.id_ano as academic_year_id,
           a.nombre_ano as academic_year_name,
