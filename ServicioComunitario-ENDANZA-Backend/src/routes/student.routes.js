@@ -54,6 +54,7 @@ router.get('/:id/horario-grado',
 // Listar estudiantes: admin y docentes pueden ver (docentes ven los de sus secciones)
 router.get("/list", verifyToken, autoVerifyRole, StudentController.listStudents);
 router.get("/search", verifyToken, autoVerifyRole, StudentController.searchStudents);
+router.put("/:id/change-section", verifyToken, autoVerifyRole, StudentController.changeSection);
 router.get("/:id", verifyToken, autoVerifyRole, StudentController.getStudent);
 router.post("/", verifyToken, autoVerifyRole, StudentController.createStudent);
 router.put("/:id", verifyToken, autoVerifyRole, StudentController.updateStudent);

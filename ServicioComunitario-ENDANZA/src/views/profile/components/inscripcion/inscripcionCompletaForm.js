@@ -23,9 +23,36 @@ import { capitalizeWords } from "../../../../utils/formatters";
 import "./styles/inscripcion.css";
 
 // Funciones auxiliares para separar nombres y teléfonos
+const deduplicateConsecutiveWords = (str) => {
+  if (!str) return '';
+  const words = String(str).trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 1) return words.join(' ');
+
+  // Frase repetida completa: "Ana Leticia Ana Leticia" -> "Ana Leticia"
+  const len = words.length;
+  if (len % 2 === 0) {
+    const half = len / 2;
+    const firstHalf = words.slice(0, half).join(' ').toLowerCase();
+    const secondHalf = words.slice(half).join(' ').toLowerCase();
+    if (firstHalf === secondHalf) {
+      return words.slice(0, half).join(' ');
+    }
+  }
+
+  // Palabras repetidas consecutivas: "Marcela Marcela" -> "Marcela"
+  const deduped = [];
+  for (let i = 0; i < words.length; i++) {
+    if (i === 0 || words[i].toLowerCase() !== words[i - 1].toLowerCase()) {
+      deduped.push(words[i]);
+    }
+  }
+  return deduped.join(' ');
+};
+
 const splitTwoParts = (str) => {
   if (!str) return { first: "", second: "" };
-  const parts = str.trim().split(/\s+/);
+  const clean = deduplicateConsecutiveWords(str);
+  const parts = clean.trim().split(/\s+/);
   return {
     first: parts[0] || "",
     second: parts.slice(1).join(" ") || ""
@@ -289,53 +316,53 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
           // Representante
           quien_es_representante: quienRep,
           parentesco_Otro: parentescoOtro,
-          primer_nombre_Rep: rep.primer_nombre || repNombres.first || prev.primer_nombre_Rep,
-          segundo_nombre_Rep: (rep.segundo_nombre !== undefined && rep.segundo_nombre !== null && rep.segundo_nombre !== "") ? rep.segundo_nombre : (repNombres.second || prev.segundo_nombre_Rep),
-          primer_apellido_Rep: rep.primer_apellido || repApellidos.first || prev.primer_apellido_Rep,
-          segundo_apellido_Rep: (rep.segundo_apellido !== undefined && rep.segundo_apellido !== null && rep.segundo_apellido !== "") ? rep.segundo_apellido : (repApellidos.second || prev.segundo_apellido_Rep),
-          nombres_Representante: rep.nombres || prev.nombres_Representante,
-          apellidos_Representante: rep.apellidos || prev.apellidos_Representante,
-          telefono_Rep_prefix: repTel.prefix || prev.telefono_Rep_prefix,
-          telefono_Rep_number: repTel.number || prev.telefono_Rep_number,
-          telefono_Rep: rep.telefono || prev.telefono_Rep,
-          profesion_Rep: rep.profesion || rep.ocupacion || prev.profesion_Rep,
-          trabajo_Rep: rep.trabajo || rep.lugar_trabajo || prev.trabajo_Rep,
-          direccion_Trabajo_Rep: rep.direccion_trabajo || prev.direccion_Trabajo_Rep,
-          telefono_trabajo_Rep: rep.telefono_trabajo || prev.telefono_trabajo_Rep,
+          primer_nombre_Rep: rep.primer_nombre || repNombres.first || "",
+          segundo_nombre_Rep: (rep.segundo_nombre !== undefined && rep.segundo_nombre !== null) ? rep.segundo_nombre : (repNombres.second || ""),
+          primer_apellido_Rep: rep.primer_apellido || repApellidos.first || "",
+          segundo_apellido_Rep: (rep.segundo_apellido !== undefined && rep.segundo_apellido !== null) ? rep.segundo_apellido : (repApellidos.second || ""),
+          nombres_Representante: rep.nombres || "",
+          apellidos_Representante: rep.apellidos || "",
+          telefono_Rep_prefix: repTel.prefix || "0414",
+          telefono_Rep_number: repTel.number || "",
+          telefono_Rep: rep.telefono || "",
+          profesion_Rep: rep.profesion || rep.ocupacion || "",
+          trabajo_Rep: rep.trabajo || rep.lugar_trabajo || "",
+          direccion_Trabajo_Rep: rep.direccion_trabajo || "",
+          telefono_trabajo_Rep: rep.telefono_trabajo || "",
 
           // Madre
-          primer_nombre_Madre: infoMadre?.primer_nombre || madreNombres.first || prev.primer_nombre_Madre,
-          segundo_nombre_Madre: (infoMadre?.segundo_nombre !== undefined && infoMadre?.segundo_nombre !== null && infoMadre?.segundo_nombre !== "") ? infoMadre.segundo_nombre : (madreNombres.second || prev.segundo_nombre_Madre),
-          primer_apellido_Madre: infoMadre?.primer_apellido || madreApellidos.first || prev.primer_apellido_Madre,
-          segundo_apellido_Madre: (infoMadre?.segundo_apellido !== undefined && infoMadre?.segundo_apellido !== null && infoMadre?.segundo_apellido !== "") ? infoMadre.segundo_apellido : (madreApellidos.second || prev.segundo_apellido_Madre),
-          nombre_Madre: (infoMadre?.nombre || infoMadre?.nombres) || prev.nombre_Madre,
-          apellido_Madre: (infoMadre?.apellido || infoMadre?.apellidos) || prev.apellido_Madre,
-          cedula_Madre: infoMadre?.cedula || prev.cedula_Madre,
-          ocupacion_Madre: infoMadre?.ocupacion || infoMadre?.profesion || infoMadre?.profesion_padre || prev.ocupacion_Madre,
-          email_Madre: infoMadre?.email || prev.email_Madre,
-          trabajo_Madre: infoMadre?.trabajo || infoMadre?.lugar_trabajo || infoMadre?.lugar_trabajo_padre || prev.trabajo_Madre,
-          direccion_Trabajo_Madre: infoMadre?.direccion_trabajo || infoMadre?.direccion_trabajo_padre || prev.direccion_Trabajo_Madre,
-          telefono_Madre_prefix: madreTel.prefix || prev.telefono_Madre_prefix,
-          telefono_Madre_number: madreTel.number || prev.telefono_Madre_number,
-          telefono_Madre: infoMadre?.telefono || prev.telefono_Madre,
-          telefono_trabajo_Madre: infoMadre?.telefono_trabajo || prev.telefono_trabajo_Madre,
+          primer_nombre_Madre: infoMadre?.primer_nombre || madreNombres.first || "",
+          segundo_nombre_Madre: (infoMadre?.segundo_nombre !== undefined && infoMadre?.segundo_nombre !== null) ? infoMadre.segundo_nombre : (madreNombres.second || ""),
+          primer_apellido_Madre: infoMadre?.primer_apellido || madreApellidos.first || "",
+          segundo_apellido_Madre: (infoMadre?.segundo_apellido !== undefined && infoMadre?.segundo_apellido !== null) ? infoMadre.segundo_apellido : (madreApellidos.second || ""),
+          nombre_Madre: (infoMadre?.nombre || infoMadre?.nombres) || "",
+          apellido_Madre: (infoMadre?.apellido || infoMadre?.apellidos) || "",
+          cedula_Madre: infoMadre?.cedula || "",
+          ocupacion_Madre: infoMadre?.ocupacion || infoMadre?.profesion || infoMadre?.profesion_padre || "",
+          email_Madre: infoMadre?.email || "",
+          trabajo_Madre: infoMadre?.trabajo || infoMadre?.lugar_trabajo || infoMadre?.lugar_trabajo_padre || "",
+          direccion_Trabajo_Madre: infoMadre?.direccion_trabajo || infoMadre?.direccion_trabajo_padre || "",
+          telefono_Madre_prefix: madreTel.prefix || "0414",
+          telefono_Madre_number: madreTel.number || "",
+          telefono_Madre: infoMadre?.telefono || "",
+          telefono_trabajo_Madre: infoMadre?.telefono_trabajo || "",
 
           // Padre
-          primer_nombre_Padre: infoPadre?.primer_nombre || padreNombres.first || prev.primer_nombre_Padre,
-          segundo_nombre_Padre: (infoPadre?.segundo_nombre !== undefined && infoPadre?.segundo_nombre !== null && infoPadre?.segundo_nombre !== "") ? infoPadre.segundo_nombre : (padreNombres.second || prev.segundo_nombre_Padre),
-          primer_apellido_Padre: infoPadre?.primer_apellido || padreApellidos.first || prev.primer_apellido_Padre,
-          segundo_apellido_Padre: (infoPadre?.segundo_apellido !== undefined && infoPadre?.segundo_apellido !== null && infoPadre?.segundo_apellido !== "") ? infoPadre.segundo_apellido : (padreApellidos.second || prev.segundo_apellido_Padre),
-          nombre_Padre: (infoPadre?.nombre || infoPadre?.nombres) || prev.nombre_Padre,
-          apellido_Padre: (infoPadre?.apellido || infoPadre?.apellidos) || prev.apellido_Padre,
-          cedula_Padre: infoPadre?.cedula || prev.cedula_Padre,
-          ocupacion_Padre: infoPadre?.ocupacion || infoPadre?.profesion || infoPadre?.profesion_padre || prev.ocupacion_Padre,
-          email_Padre: infoPadre?.email || prev.email_Padre,
-          trabajo_Padre: infoPadre?.trabajo || infoPadre?.lugar_trabajo || infoPadre?.lugar_trabajo_padre || prev.trabajo_Padre,
-          direccion_Trabajo_Padre: infoPadre?.direccion_trabajo || infoPadre?.direccion_trabajo_padre || prev.direccion_Trabajo_Padre,
-          telefono_Padre_prefix: padreTel.prefix || prev.telefono_Padre_prefix,
-          telefono_Padre_number: padreTel.number || prev.telefono_Padre_number,
-          telefono_Padre: infoPadre?.telefono || prev.telefono_Padre,
-          telefono_trabajo_Padre: infoPadre?.telefono_trabajo || prev.telefono_trabajo_Padre,
+          primer_nombre_Padre: infoPadre?.primer_nombre || padreNombres.first || "",
+          segundo_nombre_Padre: (infoPadre?.segundo_nombre !== undefined && infoPadre?.segundo_nombre !== null) ? infoPadre.segundo_nombre : (padreNombres.second || ""),
+          primer_apellido_Padre: infoPadre?.primer_apellido || padreApellidos.first || "",
+          segundo_apellido_Padre: (infoPadre?.segundo_apellido !== undefined && infoPadre?.segundo_apellido !== null) ? infoPadre.segundo_apellido : (padreApellidos.second || ""),
+          nombre_Padre: (infoPadre?.nombre || infoPadre?.nombres) || "",
+          apellido_Padre: (infoPadre?.apellido || infoPadre?.apellidos) || "",
+          cedula_Padre: infoPadre?.cedula || "",
+          ocupacion_Padre: infoPadre?.ocupacion || infoPadre?.profesion || infoPadre?.profesion_padre || "",
+          email_Padre: infoPadre?.email || "",
+          trabajo_Padre: infoPadre?.trabajo || infoPadre?.lugar_trabajo || infoPadre?.lugar_trabajo_padre || "",
+          direccion_Trabajo_Padre: infoPadre?.direccion_trabajo || infoPadre?.direccion_trabajo_padre || "",
+          telefono_Padre_prefix: padreTel.prefix || "0414",
+          telefono_Padre_number: padreTel.number || "",
+          telefono_Padre: infoPadre?.telefono || "",
+          telefono_trabajo_Padre: infoPadre?.telefono_trabajo || "",
 
           // Salud
           peso: hm.peso || prev.peso,

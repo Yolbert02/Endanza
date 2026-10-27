@@ -12,7 +12,7 @@ import {
     cilPlus, cilPencil, cilTrash, cilUser, cilShieldAlt,
     cilPeople, cilInfo, cilSearch, cilCheckCircle, cilWarning,
     cilBan, cilCheck, cilLockLocked, cilCircle, cilReportSlash,
-    cilArrowLeft, cilSpeedometer
+    cilArrowLeft, cilSpeedometer, cilCloudDownload
 } from '@coreui/icons'
 import { useNavigate } from 'react-router-dom'
 
@@ -24,6 +24,7 @@ import SearchInput from 'src/components/SearchInput'
 import Pagination from 'src/components/Pagination'
 import SystemMessageModal from 'src/components/SystemMessageModal'
 import { formatShortName } from '../../utils/formatters'
+import { downloadTeacherSchedule } from '../../utils/downloadTeacherSchedule'
 
 const Users = () => {
     const navigate = useNavigate()
@@ -41,6 +42,7 @@ const Users = () => {
     const [actionUser, setActionUser] = useState(null)
     const [selectedRole, setSelectedRole] = useState('')
     const [selectedStatus, setSelectedStatus] = useState('')
+    const [downloadingUserId, setDownloadingUserId] = useState(null)
 
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage] = useState(8)
@@ -72,15 +74,36 @@ const Users = () => {
         setToasts(prev => [...prev, { id: Date.now(), message, color }])
     }
 
+    const handleDownloadSchedule = async (targetUser) => {
+        setDownloadingUserId(targetUser.id)
+        try {
+            const res = await downloadTeacherSchedule(targetUser)
+            if (res.success) {
+                showToast(res.message, 'success')
+            } else {
+                showToast(res.message, 'warning')
+            }
+        } catch (err) {
+            console.error('Error al descargar horario:', err)
+            showToast('Error inesperado al generar el PDF del horario', 'danger')
+        } finally {
+            setDownloadingUserId(null)
+        }
+    }
+
     const filteredUsers = data.filter(user => {
         if (user.role === 'representante') return false;
         if (!searchTerm) return true
         const searchLower = searchTerm.toLowerCase()
+        const fName = user.first_name || user.nombre || ''
+        const lName = user.last_name || user.apellido || ''
+        const docDni = user.dni || user.cedula || ''
+        const mail = user.email || user.correo || ''
         return (
-            user.first_name?.toLowerCase().includes(searchLower) ||
-            user.last_name?.toLowerCase().includes(searchLower) ||
-            user.dni?.toLowerCase().includes(searchLower) ||
-            user.email?.toLowerCase().includes(searchLower)
+            fName.toLowerCase().includes(searchLower) ||
+            lName.toLowerCase().includes(searchLower) ||
+            docDni.toLowerCase().includes(searchLower) ||
+            mail.toLowerCase().includes(searchLower)
         )
     })
 
@@ -301,7 +324,7 @@ const Users = () => {
                                                     <div className="d-flex align-items-center">
                                                         <div className="me-3 flex-shrink-0">
                                                             <AvatarLetter
-                                                                name={user.first_name + ' ' + user.last_name}
+                                                                name={(user.first_name || user.nombre || '') + ' ' + (user.last_name || user.apellido || '')}
                                                                 size="md"
                                                                 className="shadow-sm border border-light"
                                                                 style={{ background: 'linear-gradient(135deg, #E07A00, #C66900)' }}
@@ -309,23 +332,23 @@ const Users = () => {
                                                         </div>
                                                         <div className="overflow-hidden">
                                                             <div className="fw-bold header-title-custom text-truncate" style={{ maxWidth: '180px' }}>
-                                                                {formatShortName(user.first_name, user.last_name)}
+                                                                {formatShortName(user.first_name || user.nombre, user.last_name || user.apellido)}
                                                             </div>
                                                             <div className="text-muted-custom small d-flex align-items-center">
                                                                 <CIcon icon={cilUser} size="sm" className="me-1 opacity-50" />
-                                                                {user.dni}
+                                                                {user.dni || user.cedula}
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </CTableDataCell>
                                                 <CTableDataCell className="border-bottom-light">
-                                                    <div className="fw-medium text-muted-custom small text-truncate" style={{ maxWidth: '150px' }}>{user.email}</div>
+                                                    <div className="fw-medium text-muted-custom small text-truncate" style={{ maxWidth: '150px' }}>{user.email || user.correo}</div>
                                                 </CTableDataCell>
                                                 <CTableDataCell className="border-bottom-light">
-                                                    {getRoleBadge(user.role)}
+                                                    {getRoleBadge(user.role || user.rol)}
                                                 </CTableDataCell>
                                                 <CTableDataCell className="border-bottom-light">
-                                                    {getStatusBadge(user.status)}
+                                                    {getStatusBadge(user.status || (user.estado_usuario === 'activo' ? 'active' : 'inactive'))}
                                                 </CTableDataCell>
                                                 <CTableDataCell className="text-end pe-4 border-bottom-light">
                                                     <CButtonGroup className="shadow-sm rounded-pill overflow-hidden border border-light-custom border-opacity-10">
@@ -339,6 +362,24 @@ const Users = () => {
                                                         >
                                                             <CIcon icon={cilInfo} style={{ color: '#E07A00' }} />
                                                         </CButton>
+
+                                                        {/* Botón Descargar Horario (si es docente) */}
+                                                        {(user.role === 'docente' || user.rol === 'docente' || user.roles?.includes('docente') || !!user.id_docente) && (
+                                                            <CButton
+                                                                color="light"
+                                                                size="sm"
+                                                                disabled={downloadingUserId === user.id}
+                                                                onClick={() => handleDownloadSchedule(user)}
+                                                                className="px-3 border-0 btn-icon-premium bg-transparent"
+                                                                title="Descargar horario del docente (PDF)"
+                                                            >
+                                                                {downloadingUserId === user.id ? (
+                                                                    <CSpinner size="sm" style={{ color: '#E07A00', width: '13px', height: '13px' }} />
+                                                                ) : (
+                                                                    <CIcon icon={cilCloudDownload} style={{ color: '#E07A00' }} />
+                                                                )}
+                                                            </CButton>
+                                                        )}
 
                                                         {/* Botón Editar */}
                                                         <CButton

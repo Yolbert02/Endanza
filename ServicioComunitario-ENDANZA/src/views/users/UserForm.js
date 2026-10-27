@@ -79,7 +79,7 @@ const UserForm = ({ visible, onClose, onSave, initial = null }) => {
                 setLastName2(lnParts.slice(1).join(' ') || '');
 
                 // Parsear teléfono
-                const tel = initial.phone || initial.telefono || '';
+                const tel = initial.phone || initial.telefono || initial.numero_telefono || '';
                 const matchedPrefix = PHONE_PREFIXES.find(p => tel.startsWith(p + '-') || tel.startsWith(p));
                 if (matchedPrefix) {
                     setPhonePrefix(matchedPrefix);
@@ -95,7 +95,7 @@ const UserForm = ({ visible, onClose, onSave, initial = null }) => {
                 setPassword('');
                 setEmail(initial.email || initial.correo || '');
                 setRole(initial.role || initial.tipo_rol || initial.rol || 'docente');
-                setStatus(initial.status || initial.estatus_usuario || 'active');
+                setStatus(initial.status || (initial.estado_usuario === 'activo' ? 'active' : (initial.estado_usuario === 'inactivo' ? 'inactive' : 'active')) || initial.estatus_usuario || 'active');
             } else {
                 setDni('V-');
                 setFirstName1('');

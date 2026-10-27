@@ -29,6 +29,33 @@ const checkStudentOwnership = (student, representante, userId) => {
   return studentRepId === repId || (userId && studentRepUserId === parseInt(userId));
 };
 
+// Helper para extraer y separar nombres y apellidos fiablemente sin duplicaciones
+const deduplicateConsecutiveWords = (str) => {
+  if (!str) return '';
+  const words = String(str).trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 1) return words.join(' ');
+  
+  // Frase repetida completa: "Ana Leticia Ana Leticia" -> "Ana Leticia"
+  const len = words.length;
+  if (len % 2 === 0) {
+    const half = len / 2;
+    const firstHalf = words.slice(0, half).join(' ').toLowerCase();
+    const secondHalf = words.slice(half).join(' ').toLowerCase();
+    if (firstHalf === secondHalf) {
+      return words.slice(0, half).join(' ');
+    }
+  }
+  
+  // Palabras repetidas consecutivas: "Marcela Marcela" -> "Marcela"
+  const deduped = [];
+  for (let i = 0; i < words.length; i++) {
+    if (i === 0 || words[i].toLowerCase() !== words[i - 1].toLowerCase()) {
+      deduped.push(words[i]);
+    }
+  }
+  return deduped.join(' ');
+};
+
 export const InscripcionRepresentanteController = {
 
   /**
@@ -506,23 +533,62 @@ export const InscripcionRepresentanteController = {
         }
       }
 
-      // Helper para extraer y separar nombres y apellidos fiablemente
       const extractNames = (n1, n2, a1, a2) => {
-        let first = (n1 || '').trim();
-        let second = (n2 || '').trim();
-        if (first.includes(' ') && !second) {
-          const parts = first.split(/\s+/);
-          first = parts[0];
-          second = parts.slice(1).join(' ');
+        let rawN1 = deduplicateConsecutiveWords(n1);
+        let rawN2 = deduplicateConsecutiveWords(n2);
+        let rawA1 = deduplicateConsecutiveWords(a1);
+        let rawA2 = deduplicateConsecutiveWords(a2);
+
+        // Si n1 ya contiene n2 (ej. n1 = "Ginna Marcela", n2 = "Marcela"):
+        if (rawN1 && rawN2) {
+          const lowerN1 = rawN1.toLowerCase();
+          const lowerN2 = rawN2.toLowerCase();
+          if (lowerN1 === lowerN2) {
+            const parts = rawN1.split(/\s+/);
+            if (parts.length > 1) {
+              rawN1 = parts[0];
+              rawN2 = parts.slice(1).join(' ');
+            } else {
+              rawN2 = '';
+            }
+          } else if (lowerN1.endsWith(lowerN2)) {
+            rawN1 = rawN1.slice(0, rawN1.length - rawN2.length).trim();
+          } else if (lowerN2.startsWith(lowerN1)) {
+            rawN2 = rawN2.slice(rawN1.length).trim();
+          }
+        } else if (rawN1 && !rawN2 && rawN1.includes(' ')) {
+          const parts = rawN1.split(/\s+/);
+          rawN1 = parts[0];
+          rawN2 = parts.slice(1).join(' ');
         }
 
-        let last = (a1 || '').trim();
-        let secondLast = (a2 || '').trim();
-        if (last.includes(' ') && !secondLast) {
-          const parts = last.split(/\s+/);
-          last = parts[0];
-          secondLast = parts.slice(1).join(' ');
+        // Mismo tratamiento para apellidos:
+        if (rawA1 && rawA2) {
+          const lowerA1 = rawA1.toLowerCase();
+          const lowerA2 = rawA2.toLowerCase();
+          if (lowerA1 === lowerA2) {
+            const parts = rawA1.split(/\s+/);
+            if (parts.length > 1) {
+              rawA1 = parts[0];
+              rawA2 = parts.slice(1).join(' ');
+            } else {
+              rawA2 = '';
+            }
+          } else if (lowerA1.endsWith(lowerA2)) {
+            rawA1 = rawA1.slice(0, rawA1.length - rawA2.length).trim();
+          } else if (lowerA2.startsWith(lowerA1)) {
+            rawA2 = rawA2.slice(rawA1.length).trim();
+          }
+        } else if (rawA1 && !rawA2 && rawA1.includes(' ')) {
+          const parts = rawA1.split(/\s+/);
+          rawA1 = parts[0];
+          rawA2 = parts.slice(1).join(' ');
         }
+
+        const first = rawN1 || '';
+        const second = rawN2 || '';
+        const last = rawA1 || '';
+        const secondLast = rawA2 || '';
 
         return {
           primer_nombre: first,
@@ -542,7 +608,7 @@ export const InscripcionRepresentanteController = {
                COALESCE(NULLIF(TRIM(ef.direccion_trabajo), ''), NULLIF(TRIM(r_fam.direccion_trabajo), '')) as direccion_trabajo,
                COALESCE(NULLIF(TRIM(ef.telefono_trabajo), ''), NULLIF(TRIM(r_fam.telefono_trabajo), '')) as telefono_trabajo,
                p.nombre, p.segundo_nombre, p.apellido, p.segundo_apellido,
-               p.cedula, p.numero_telefono, p.email, p.genero
+               p.cedula, p.numero_telefono, p.email, p.genero, p.id_persona
         FROM estudiante_familiar ef
         JOIN persona p ON ef.id_persona = p.id_persona
         LEFT JOIN representante r_fam ON p.id_persona = r_fam.id_persona
@@ -586,7 +652,7 @@ export const InscripcionRepresentanteController = {
       let madreRow = familiaresRes.rows.find(r => r.parentesco && /madre|mam[aá]/i.test(r.parentesco.trim())) || null;
       let padreRow = familiaresRes.rows.find(r => r.parentesco && /padre|pap[aá]/i.test(r.parentesco.trim())) || null;
 
-      // Si el representante es la Madre y faltan datos, autocompletar desde el representante
+      // Si el representante es la Madre y no hay registro previo de madre en familiares, usar datos del representante
       if (quienEsRep === 'Madre') {
         if (!madreRow) {
           madreRow = {
@@ -602,9 +668,8 @@ export const InscripcionRepresentanteController = {
             direccion_trabajo: repDirTrabajo,
             telefono_trabajo: repTelTrabajo
           };
-        } else {
-          madreRow.segundo_nombre = madreRow.segundo_nombre || repNames.segundo_nombre;
-          madreRow.segundo_apellido = madreRow.segundo_apellido || repNames.segundo_apellido;
+        } else if (representante && madreRow.id_persona === representante.id_persona) {
+          // Si es la misma persona, solo autocompletar datos de contacto/trabajo faltantes (NUNCA nombres)
           madreRow.ocupacion = madreRow.ocupacion || repOcupacion;
           madreRow.lugar_trabajo = madreRow.lugar_trabajo || repLugarTrabajo;
           madreRow.direccion_trabajo = madreRow.direccion_trabajo || repDirTrabajo;
@@ -612,7 +677,7 @@ export const InscripcionRepresentanteController = {
         }
       }
 
-      // Si el representante es el Padre y faltan datos, autocompletar desde el representante
+      // Si el representante es el Padre y no hay registro previo de padre en familiares, usar datos del representante
       if (quienEsRep === 'Padre') {
         if (!padreRow) {
           padreRow = {
@@ -628,9 +693,8 @@ export const InscripcionRepresentanteController = {
             direccion_trabajo: repDirTrabajo,
             telefono_trabajo: repTelTrabajo
           };
-        } else {
-          padreRow.segundo_nombre = padreRow.segundo_nombre || repNames.segundo_nombre;
-          padreRow.segundo_apellido = padreRow.segundo_apellido || repNames.segundo_apellido;
+        } else if (representante && padreRow.id_persona === representante.id_persona) {
+          // Si es la misma persona, solo autocompletar datos de contacto/trabajo faltantes (NUNCA nombres)
           padreRow.ocupacion = padreRow.ocupacion || repOcupacion;
           padreRow.lugar_trabajo = padreRow.lugar_trabajo || repLugarTrabajo;
           padreRow.direccion_trabajo = padreRow.direccion_trabajo || repDirTrabajo;
@@ -821,20 +885,27 @@ async function guardarFamiliares(id_estudiante, datos, client = db) {
     console.log("👪 Guardando familiares para estudiante:", id_estudiante);
 
     // Guardar MADRE
-    let p1Madre = (datos.primer_nombre_Madre || '').trim();
-    let p2Madre = (datos.segundo_nombre_Madre || '').trim();
-    let a1Madre = (datos.primer_apellido_Madre || '').trim();
-    let a2Madre = (datos.segundo_apellido_Madre || '').trim();
+    let p1Madre = deduplicateConsecutiveWords(datos.primer_nombre_Madre || '').trim();
+    let p2Madre = deduplicateConsecutiveWords(datos.segundo_nombre_Madre || '').trim();
+    let a1Madre = deduplicateConsecutiveWords(datos.primer_apellido_Madre || '').trim();
+    let a2Madre = deduplicateConsecutiveWords(datos.segundo_apellido_Madre || '').trim();
 
     if (!p1Madre && datos.nombre_Madre) {
-      const parts = datos.nombre_Madre.trim().split(/\s+/);
+      const parts = deduplicateConsecutiveWords(datos.nombre_Madre).trim().split(/\s+/);
       p1Madre = parts[0] || '';
       p2Madre = parts.slice(1).join(' ') || '';
     }
     if (!a1Madre && datos.apellido_Madre) {
-      const parts = datos.apellido_Madre.trim().split(/\s+/);
+      const parts = deduplicateConsecutiveWords(datos.apellido_Madre).trim().split(/\s+/);
       a1Madre = parts[0] || '';
       a2Madre = parts.slice(1).join(' ') || '';
+    }
+
+    if (p1Madre && p2Madre && p1Madre.toLowerCase() === p2Madre.toLowerCase()) {
+      p2Madre = '';
+    }
+    if (a1Madre && a2Madre && a1Madre.toLowerCase() === a2Madre.toLowerCase()) {
+      a2Madre = '';
     }
 
     if (p1Madre && a1Madre) {
@@ -865,9 +936,9 @@ async function guardarFamiliares(id_estudiante, datos, client = db) {
           await client.query(
             `UPDATE persona SET 
                nombre = $1, 
-               segundo_nombre = COALESCE($2, segundo_nombre), 
+               segundo_nombre = $2, 
                apellido = $3, 
-               segundo_apellido = COALESCE($4, segundo_apellido), 
+               segundo_apellido = $4, 
                genero = 'femenino',
                numero_telefono = COALESCE($5, numero_telefono),
                ocupacion = COALESCE($6, ocupacion),
@@ -918,20 +989,27 @@ async function guardarFamiliares(id_estudiante, datos, client = db) {
     }
 
     // Guardar PADRE
-    let p1Padre = (datos.primer_nombre_Padre || '').trim();
-    let p2Padre = (datos.segundo_nombre_Padre || '').trim();
-    let a1Padre = (datos.primer_apellido_Padre || '').trim();
-    let a2Padre = (datos.segundo_apellido_Padre || '').trim();
+    let p1Padre = deduplicateConsecutiveWords(datos.primer_nombre_Padre || '').trim();
+    let p2Padre = deduplicateConsecutiveWords(datos.segundo_nombre_Padre || '').trim();
+    let a1Padre = deduplicateConsecutiveWords(datos.primer_apellido_Padre || '').trim();
+    let a2Padre = deduplicateConsecutiveWords(datos.segundo_apellido_Padre || '').trim();
 
     if (!p1Padre && datos.nombre_Padre) {
-      const parts = datos.nombre_Padre.trim().split(/\s+/);
+      const parts = deduplicateConsecutiveWords(datos.nombre_Padre).trim().split(/\s+/);
       p1Padre = parts[0] || '';
       p2Padre = parts.slice(1).join(' ') || '';
     }
     if (!a1Padre && datos.apellido_Padre) {
-      const parts = datos.apellido_Padre.trim().split(/\s+/);
+      const parts = deduplicateConsecutiveWords(datos.apellido_Padre).trim().split(/\s+/);
       a1Padre = parts[0] || '';
       a2Padre = parts.slice(1).join(' ') || '';
+    }
+
+    if (p1Padre && p2Padre && p1Padre.toLowerCase() === p2Padre.toLowerCase()) {
+      p2Padre = '';
+    }
+    if (a1Padre && a2Padre && a1Padre.toLowerCase() === a2Padre.toLowerCase()) {
+      a2Padre = '';
     }
 
     if (p1Padre && a1Padre) {
@@ -962,9 +1040,9 @@ async function guardarFamiliares(id_estudiante, datos, client = db) {
           await client.query(
             `UPDATE persona SET 
                nombre = $1, 
-               segundo_nombre = COALESCE($2, segundo_nombre), 
+               segundo_nombre = $2, 
                apellido = $3, 
-               segundo_apellido = COALESCE($4, segundo_apellido), 
+               segundo_apellido = $4, 
                genero = 'masculino',
                numero_telefono = COALESCE($5, numero_telefono),
                ocupacion = COALESCE($6, ocupacion),

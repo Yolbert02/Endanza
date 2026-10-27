@@ -1,5 +1,5 @@
 // StudentModals.jsx
-import React from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
     CModal,
     CModalHeader,
@@ -13,7 +13,7 @@ import {
     CFormInput
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilUser, cilPencil, cilTrash, cilInfo, cilCheckCircle,cilCircle } from '@coreui/icons'
+import { cilUser, cilPencil, cilTrash, cilInfo, cilCheckCircle, cilCircle, cilArrowRight } from '@coreui/icons'
 import PropTypes from 'prop-types'
 
 const StudentModals = ({
@@ -24,8 +24,20 @@ const StudentModals = ({
     selectedCount,
     onDelete,
     onDeleteMultiple,
-    onView
+    onView,
+    allSections = [],
+    onChangeSection,
+    onSwitchModalType
 }) => {
+    const [selectedTargetSectionId, setSelectedTargetSectionId] = useState('')
+    const [isSubmittingSection, setIsSubmittingSection] = useState(false)
+
+    useEffect(() => {
+        if (!visible) {
+            setSelectedTargetSectionId('')
+            setIsSubmittingSection(false)
+        }
+    }, [visible, selectedItem])
     const StatusBadge = ({ status }) => {
         const isActivo = status === 'active' || status === 'Activo'
         return (
@@ -89,6 +101,14 @@ const StudentModals = ({
                                 <CIcon icon={cilPencil} className="text-white" size="sm" />
                             </div>
                             Editor de Expediente
+                        </div>
+                    )}
+                    {type === "change-section" && (
+                        <div className="d-flex align-items-center">
+                            <div className="p-2 bg-info rounded-circle me-3 shadow-sm">
+                                <CIcon icon={cilArrowRight} className="text-white" size="sm" />
+                            </div>
+                            Cambiar Sección del Estudiante
                         </div>
                     )}
                     {(type === "delete" || type === "delete-multiple") && (
@@ -243,13 +263,132 @@ const StudentModals = ({
                             <CCol xs={12} className="mt-4 pt-2 border-top border-light-custom text-center">
                                 <p className="text-muted-custom small mb-3">
                                     <CIcon icon={cilInfo} className="me-1 text-primary" />
-                                    Para cambios de Grado o Sección, utilice la sección de Transferencias Académicas.
+                                    Para transferir de sección (ej. pasar de A a B):
+                                    {onSwitchModalType && (
+                                        <CButton 
+                                            color="info" 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            className="ms-2 fw-bold text-decoration-underline"
+                                            onClick={() => onSwitchModalType('change-section', selectedItem)}
+                                        >
+                                            Cambiar Sección del Estudiante
+                                        </CButton>
+                                    )}
                                 </p>
                                 <CButton className="btn-premium px-5 py-2 rounded-pill shadow-sm">
                                     GUARDAR CAMBIOS
                                 </CButton>
                             </CCol>
                         </CRow>
+                    </div>
+                )}
+
+                {type === "change-section" && selectedItem && (
+                    <div className="py-2 px-1">
+                        <div className="p-3 rounded-4 mb-4 border bg-light">
+                            <div className="d-flex align-items-center">
+                                <div className="avatar bg-orange-soft text-primary rounded-circle me-3 p-3 fw-bold border border-primary border-opacity-20 shadow-sm fs-5">
+                                    {selectedItem.first_name?.charAt(0) || '?'}
+                                </div>
+                                <div>
+                                    <h5 className="fw-bold header-title-custom mb-1">
+                                        {selectedItem.first_name} {selectedItem.last_name}
+                                    </h5>
+                                    <div className="text-muted-custom small">
+                                        <strong>Matrícula:</strong> #{selectedItem.id} &nbsp;|&nbsp; 
+                                        <strong>Grado / Nivel:</strong> {gradoActual} &nbsp;|&nbsp;
+                                        <strong>Sección Actual:</strong> <CBadge className="bg-primary bg-opacity-10 text-primary border border-primary border-opacity-10 ms-1">{seccionActual}</CBadge>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mb-3">
+                            <label className="form-label fw-bold header-title-custom mb-2">
+                                Selecciona la Sección de Destino:
+                            </label>
+                            <p className="text-muted-custom small mb-3">
+                                Selecciona la sección a la que deseas transferir al estudiante (por ejemplo, pasar de la Sección A a la B).
+                            </p>
+
+                            <div className="d-flex flex-column gap-2" style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                                {allSections.length === 0 ? (
+                                    <div className="alert bg-warning bg-opacity-10 border-warning border-opacity-20 text-warning-custom p-3 rounded-4 text-center">
+                                        No hay secciones registradas o disponibles en el sistema.
+                                    </div>
+                                ) : (
+                                    allSections.map((sec) => {
+                                        const secId = sec.id_seccion || sec.id
+                                        const secName = sec.nombre_seccion || sec.section_name || `Sección ${secId}`
+                                        const cap = parseInt(sec.capacity || sec.capacidad || 30)
+                                        const enrolled = parseInt(sec.student_count || sec.enrolled || sec.estudiantes_inscritos || 0)
+                                        const currentSecId = selectedItem.sections?.[0]?.section_id || selectedItem.section_id || null
+                                        const isCurrent = currentSecId && String(secId) === String(currentSecId)
+                                        const isFull = enrolled >= cap && !isCurrent
+                                        const isSelected = String(selectedTargetSectionId) === String(secId)
+
+                                        return (
+                                            <div
+                                                key={secId}
+                                                onClick={() => {
+                                                    if (!isCurrent && !isFull) {
+                                                        setSelectedTargetSectionId(secId)
+                                                    }
+                                                }}
+                                                className={`p-3 rounded-3 border d-flex justify-content-between align-items-center transition-all ${
+                                                    isSelected
+                                                        ? 'border-primary bg-primary bg-opacity-10 shadow-sm'
+                                                        : 'bg-white'
+                                                } ${isCurrent || isFull ? 'opacity-50' : 'cursor-pointer'}`}
+                                                style={{
+                                                    cursor: isCurrent || isFull ? 'not-allowed' : 'pointer'
+                                                }}
+                                            >
+                                                <div className="d-flex align-items-center">
+                                                    <input
+                                                        type="radio"
+                                                        name="targetSection"
+                                                        className="form-check-input me-3 mt-0"
+                                                        checked={isSelected}
+                                                        disabled={isCurrent || isFull}
+                                                        onChange={() => setSelectedTargetSectionId(secId)}
+                                                    />
+                                                    <div>
+                                                        <div className="fw-bold header-title-custom">
+                                                            {secName}
+                                                            {sec.dance_level_name && (
+                                                                <span className="text-muted-custom fw-normal small ms-2">
+                                                                    • {sec.dance_level_name}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-muted-custom small">
+                                                            {sec.academic_year || sec.nombre_ano || ''}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="text-end">
+                                                    {isCurrent ? (
+                                                        <CBadge className="bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-10 rounded-pill px-3 py-1">
+                                                            Sección Actual
+                                                        </CBadge>
+                                                    ) : isFull ? (
+                                                        <CBadge className="bg-danger bg-opacity-10 text-danger border border-danger border-opacity-10 rounded-pill px-3 py-1">
+                                                            Sin Cupos ({enrolled}/{cap})
+                                                        </CBadge>
+                                                    ) : (
+                                                        <CBadge className="bg-success bg-opacity-10 text-success border border-success border-opacity-10 rounded-pill px-3 py-1">
+                                                            {enrolled} / {cap} cupos
+                                                        </CBadge>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )
+                                    })
+                                )}
+                            </div>
+                        </div>
                     </div>
                 )}
 
@@ -324,6 +463,23 @@ const StudentModals = ({
                         Eliminar Todo ({selectedCount})
                     </CButton>
                 )}
+                {type === "change-section" && (
+                    <CButton 
+                        className="btn-premium rounded-pill px-5 py-2 shadow-sm text-white border-0" 
+                        disabled={!selectedTargetSectionId || isSubmittingSection}
+                        onClick={async () => {
+                            if (!selectedTargetSectionId || !onChangeSection) return
+                            try {
+                                setIsSubmittingSection(true)
+                                await onChangeSection(selectedItem, selectedTargetSectionId)
+                            } finally {
+                                setIsSubmittingSection(false)
+                            }
+                        }}
+                    >
+                        {isSubmittingSection ? 'Cambiando...' : 'Confirmar Cambio de Sección'}
+                    </CButton>
+                )}
             </CModalFooter>
         </CModal>
     )
@@ -338,6 +494,9 @@ StudentModals.propTypes = {
     onDelete: PropTypes.func,
     onDeleteMultiple: PropTypes.func,
     onView: PropTypes.func,
+    allSections: PropTypes.array,
+    onChangeSection: PropTypes.func,
+    onSwitchModalType: PropTypes.func,
 }
 
 export default StudentModals

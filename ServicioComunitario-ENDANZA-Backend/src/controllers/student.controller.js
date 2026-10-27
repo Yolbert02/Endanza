@@ -1240,6 +1240,37 @@ const getScheduleByGrade = async (req, res) => {
   }
 };
 
+/**
+ * Cambiar sección a un estudiante
+ */
+const changeSection = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { newSectionId, currentSectionId } = req.body;
+
+    if (!newSectionId) {
+      return res.status(400).json({
+        ok: false,
+        msg: "Debe especificar la nueva sección a asignar"
+      });
+    }
+
+    const result = await StudentModel.changeSection(id, newSectionId, currentSectionId);
+
+    return res.json({
+      ok: true,
+      msg: result.msg || "Sección actualizada exitosamente",
+      data: result
+    });
+  } catch (error) {
+    console.error("Error en changeSection controller:", error);
+    return res.status(400).json({
+      ok: false,
+      msg: error.message || "Error al cambiar de sección",
+      error: error.message
+    });
+  }
+};
 
 // Exportar todos los métodos
 export const StudentController = {
@@ -1250,6 +1281,7 @@ export const StudentController = {
   deleteStudent,
   enrollStudent,
   removeEnrollment,
+  changeSection,
   searchStudents,
   getMyStudents,
   getStudentForRepresentante, // 👈 NUEVO // 👈 Método corregido

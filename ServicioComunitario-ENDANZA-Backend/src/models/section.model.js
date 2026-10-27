@@ -21,7 +21,8 @@ const findAll = async (academicYearId = null) => {
             ELSE 
               REGEXP_REPLACE(COALESCE(nd.nivel_danza, 'General'), ' - .*$', '') || ' ' || s.nombre_seccion
           END as section_name,
-          30 as capacity,
+          COALESCE(s.capacidad, 30) as capacity,
+          COALESCE(s.capacidad, 30) as capacidad,
           NULL::integer as subject_id,
           'General'::text as subject_name,
           s.id_ano as academic_year_id,
@@ -49,6 +50,7 @@ const findAll = async (academicYearId = null) => {
       GROUP BY 
         s.id_seccion, 
         s.nombre_seccion, 
+        s.capacidad,
         s.id_ano, 
         a.nombre_ano, 
         s.id_nivel_danza, 
@@ -83,7 +85,8 @@ const findById = async (id) => {
             ELSE 
               REGEXP_REPLACE(COALESCE(nd.nivel_danza, 'General'), ' - .*$', '') || ' ' || s.nombre_seccion
           END as section_name,
-          30 as capacity,
+          COALESCE(s.capacidad, 30) as capacity,
+          COALESCE(s.capacidad, 30) as capacidad,
           s.id_ano as academic_year_id,
           a.nombre_ano as academic_year_name,
           s.id_nivel_danza as grade_id,
@@ -142,19 +145,22 @@ const create = async (sectionData) => {
       yearId = activeYearRes.rows[0]?.id_ano || 1;
     }
 
+    const capacity = parseInt(sectionData.capacidad ?? sectionData.capacity) || 30;
+
     const query = {
       text: `
-        INSERT INTO seccion (nombre_seccion, id_ano, id_nivel_danza, id_especialidad)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO seccion (nombre_seccion, id_ano, id_nivel_danza, id_especialidad, capacidad)
+        VALUES ($1, $2, $3, $4, $5)
         RETURNING 
           id_seccion as id,
           nombre_seccion as section_name,
-          30 as capacity,
+          COALESCE(capacidad, 30) as capacity,
+          COALESCE(capacidad, 30) as capacidad,
           id_ano as academic_year_id,
           id_nivel_danza as grade_id,
           id_especialidad as specialty_id
       `,
-      values: [nombre_seccion, yearId, danceLevelId, specialtyId],
+      values: [nombre_seccion, yearId, danceLevelId, specialtyId, capacity],
     };
 
     const { rows } = await db.query(query.text, query.values);
@@ -180,6 +186,9 @@ const update = async (id, sectionData) => {
     const specialtyId = Id_especialidad ?? especialidad_id;
     const danceLevelId = Id_nivel_danza ?? id_nivel_danza ?? grade_id;
     const yearId = Id_ano ?? academic_year_id;
+    const capacity = (sectionData.capacidad !== undefined || sectionData.capacity !== undefined)
+      ? (parseInt(sectionData.capacidad ?? sectionData.capacity) || 30)
+      : null;
 
     const query = {
       text: `
@@ -188,17 +197,19 @@ const update = async (id, sectionData) => {
           nombre_seccion = COALESCE($1, nombre_seccion),
           id_especialidad = COALESCE($2, id_especialidad),
           id_nivel_danza = COALESCE($3, id_nivel_danza),
-          id_ano = COALESCE($4, id_ano)
-        WHERE id_seccion = $5
+          id_ano = COALESCE($4, id_ano),
+          capacidad = COALESCE($5, capacidad)
+        WHERE id_seccion = $6
         RETURNING 
           id_seccion as id,
           nombre_seccion as section_name,
-          30 as capacity,
+          COALESCE(capacidad, 30) as capacity,
+          COALESCE(capacidad, 30) as capacidad,
           id_ano as academic_year_id,
           id_nivel_danza as grade_id,
           id_especialidad as specialty_id
       `,
-      values: [nombre_seccion, specialtyId, danceLevelId, yearId, id],
+      values: [nombre_seccion, specialtyId, danceLevelId, yearId, capacity, id],
     };
 
     const { rows } = await db.query(query.text, query.values);

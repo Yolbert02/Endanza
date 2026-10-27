@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import {
     CModal,
     CModalHeader,
@@ -9,6 +9,8 @@ import {
     CRow,
     CCol,
     CBadge,
+    CSpinner,
+    CAlert,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import {
@@ -18,11 +20,47 @@ import {
     cilPhone,
     cilShieldAlt,
     cilCalendar,
+    cilCloudDownload,
 } from '@coreui/icons'
 import AvatarLetter from 'src/components/AvatarLetter'
+import { downloadTeacherSchedule } from 'src/utils/downloadTeacherSchedule'
 
 const InfoUser = ({ visible, onClose, user }) => {
+    const [downloading, setDownloading] = useState(false)
+    const [alertMsg, setAlertMsg] = useState(null)
+
+    useEffect(() => {
+        if (!visible) {
+            setAlertMsg(null)
+            setDownloading(false)
+        }
+    }, [visible, user])
+
     if (!user) return null
+
+    const isTeacher =
+        user.role?.toLowerCase() === 'docente' ||
+        user.rol?.toLowerCase() === 'docente' ||
+        user.roles?.includes('docente') ||
+        !!user.id_docente
+
+    const handleDownloadSchedule = async () => {
+        setDownloading(true)
+        setAlertMsg(null)
+        try {
+            const res = await downloadTeacherSchedule(user)
+            if (!res.success) {
+                setAlertMsg({ type: 'warning', text: res.message })
+            } else {
+                setAlertMsg({ type: 'success', text: res.message })
+            }
+        } catch (err) {
+            console.error('Error descargando horario docente:', err)
+            setAlertMsg({ type: 'danger', text: 'Error inesperado al generar el PDF del horario.' })
+        } finally {
+            setDownloading(false)
+        }
+    }
 
     const getRoleBadge = (role) => {
         const r = role?.toLowerCase()
@@ -127,10 +165,43 @@ const InfoUser = ({ visible, onClose, user }) => {
                                 La cuenta está actualmente <strong className="header-title-custom">{user.status === 'active' ? 'habilitada' : 'restringida'}</strong> para el acceso a la plataforma.
                             </p>
                         </div>
+
+                        {alertMsg && (
+                            <CAlert
+                                color={alertMsg.type}
+                                dismissible
+                                onClose={() => setAlertMsg(null)}
+                                className="mt-3 mb-0 py-2 px-3 small border-0 shadow-sm rounded-3"
+                            >
+                                {alertMsg.text}
+                            </CAlert>
+                        )}
                     </CCol>
                 </CRow>
             </CModalBody>
-            <CModalFooter className="border-0 bg-light-custom bg-opacity-10">
+            <CModalFooter className="border-0 bg-light-custom bg-opacity-10 d-flex justify-content-between align-items-center">
+                <div>
+                    {isTeacher && (
+                        <CButton
+                            style={{ backgroundColor: '#E07A00', color: 'white', border: 'none' }}
+                            className="d-flex align-items-center fw-bold px-3 py-2 rounded-pill shadow-sm hover-lift"
+                            onClick={handleDownloadSchedule}
+                            disabled={downloading}
+                        >
+                            {downloading ? (
+                                <>
+                                    <CSpinner size="sm" className="me-2" />
+                                    Generando PDF...
+                                </>
+                            ) : (
+                                <>
+                                    <CIcon icon={cilCloudDownload} className="me-2" />
+                                    DESCARGAR HORARIO (PDF)
+                                </>
+                            )}
+                        </CButton>
+                    )}
+                </div>
                 <CButton color="secondary" onClick={onClose} variant="ghost" className="fw-bold text-uppercase text-muted-custom hover-lift">
                     Cerrar Ventana
                 </CButton>

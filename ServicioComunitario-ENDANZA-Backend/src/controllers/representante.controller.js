@@ -174,7 +174,7 @@ export const RepresentanteController = {
           const p1Apellido = capitalizeWords(lnTokens[0] || '');
           const p2Apellido = lnTokens.length > 1 ? capitalizeWords(lnTokens.slice(1).join(' ')) : null;
 
-          // 1. Insertar persona del estudiante
+          // 1. Insertar persona del estudiante o buscar existente
           let studentPersonaId;
           if (cedulaEstudiante) {
             const checkP = await db.query(
@@ -183,6 +183,22 @@ export const RepresentanteController = {
             );
             if (checkP.rows.length > 0) {
               studentPersonaId = checkP.rows[0].id_persona;
+            }
+          }
+
+          if (!studentPersonaId && p1Nombre && p1Apellido && representante.id_representante) {
+            const checkPByName = await db.query(
+              `SELECT p.id_persona 
+               FROM persona p
+               JOIN estudiante e ON e.id_persona = p.id_persona
+               WHERE e.id_representante = $1
+                 AND LOWER(TRIM(p.nombre)) = LOWER(TRIM($2))
+                 AND LOWER(TRIM(p.apellido)) = LOWER(TRIM($3))
+               LIMIT 1`,
+              [representante.id_representante, p1Nombre, p1Apellido]
+            );
+            if (checkPByName.rows.length > 0) {
+              studentPersonaId = checkPByName.rows[0].id_persona;
             }
           }
 
@@ -204,21 +220,36 @@ export const RepresentanteController = {
             studentPersonaId = pRes.rows[0].id_persona;
           }
 
-          // 2. Insertar en tabla estudiante
-          const studentRes = await db.query(
-            `INSERT INTO estudiante (
-               seguro_escolar, id_persona, id_representante, id_nivel_danza, id_especialidad
-             ) VALUES (true, $1, $2, $3, $4)
-             RETURNING id_estudiante as id`,
-            [
-              studentPersonaId,
-              representante.id_representante,
-              id_nivel_danza,
-              defaultEspecialidadId,
-            ]
+          // 2. Verificar si el estudiante ya está creado o insertarlo
+          let newStudentId;
+          const checkEst = await db.query(
+            "SELECT id_estudiante FROM estudiante WHERE id_persona = $1 AND id_representante = $2 LIMIT 1",
+            [studentPersonaId, representante.id_representante]
           );
 
-          const newStudentId = studentRes.rows[0].id;
+          if (checkEst.rows.length > 0) {
+            newStudentId = checkEst.rows[0].id_estudiante;
+            if (id_nivel_danza) {
+              await db.query(
+                "UPDATE estudiante SET id_nivel_danza = $1 WHERE id_estudiante = $2",
+                [id_nivel_danza, newStudentId]
+              );
+            }
+          } else {
+            const studentRes = await db.query(
+              `INSERT INTO estudiante (
+                 seguro_escolar, id_persona, id_representante, id_nivel_danza, id_especialidad
+               ) VALUES (true, $1, $2, $3, $4)
+               RETURNING id_estudiante as id`,
+              [
+                studentPersonaId,
+                representante.id_representante,
+                id_nivel_danza,
+                defaultEspecialidadId,
+              ]
+            );
+            newStudentId = studentRes.rows[0].id;
+          }
 
           // 3. Vincular en tabla estudiante_familiar
           if (representante.id_persona) {
@@ -227,18 +258,30 @@ export const RepresentanteController = {
                 ? parentesco_otro.trim()
                 : (parentesco || "Familiar");
 
-            await db.query(
-              `INSERT INTO estudiante_familiar (
-                 id_estudiante, id_persona, parentesco, es_representante_legal, vive_con_estudiante
-               ) VALUES ($1, $2, $3, true, true)`,
-              [newStudentId, representante.id_persona, relParentesco]
+            const checkFam = await db.query(
+              "SELECT id_estudiante_familiar FROM estudiante_familiar WHERE id_estudiante = $1 AND id_persona = $2 LIMIT 1",
+              [newStudentId, representante.id_persona]
             );
+
+            if (checkFam.rows.length === 0) {
+              await db.query(
+                `INSERT INTO estudiante_familiar (
+                   id_estudiante, id_persona, parentesco, es_representante_legal, vive_con_estudiante
+                 ) VALUES ($1, $2, $3, true, true)`,
+                [newStudentId, representante.id_persona, relParentesco]
+              );
+            }
           }
+
+          const studentFirstName = [p1Nombre, p2Nombre].filter(Boolean).join(" ") || p1Nombre;
+          const studentLastName = [p1Apellido, p2Apellido].filter(Boolean).join(" ") || p1Apellido;
 
           estudiantesCreados.push({
             id: newStudentId,
             first_name: studentFirstName,
             last_name: studentLastName,
+            name: studentFirstName,
+            lastName: studentLastName,
             dni: cedulaEstudiante,
             gradeLevel: estudiante.gradeLevel,
           });

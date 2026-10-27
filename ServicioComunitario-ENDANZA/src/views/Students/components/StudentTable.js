@@ -20,7 +20,7 @@ import {
     CCol
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilSearch, cilUser, cilPencil, cilTrash, cilInfo,cilCircle } from '@coreui/icons'
+import { cilSearch, cilUser, cilPencil, cilTrash, cilInfo, cilCircle, cilArrowRight } from '@coreui/icons'
 import PropTypes from 'prop-types'
 import { formatShortName } from '../../../utils/formatters'
 
@@ -33,6 +33,7 @@ const StudentTable = ({
     handleSort,
     sortConfig,
     onView,
+    onChangeSection,
     onEdit,
     onDelete,
     totalPages,
@@ -215,6 +216,17 @@ const StudentTable = ({
                                                         >
                                                             <CIcon icon={cilCircle} className="text-primary" />
                                                         </CButton>
+                                                        {onChangeSection && (
+                                                            <CButton
+                                                                color="light"
+                                                                size="sm"
+                                                                onClick={() => onChangeSection(student)}
+                                                                className="px-2 px-md-3 border-0 transition-all hover-info action-btn-custom bg-transparent"
+                                                                title="Cambiar sección"
+                                                            >
+                                                                <CIcon icon={cilArrowRight} className="text-info" />
+                                                            </CButton>
+                                                        )}
                                                         <CButton
                                                             color="light"
                                                             size="sm"
@@ -323,6 +335,7 @@ StudentTable.propTypes = {
     handleSort: PropTypes.func,
     sortConfig: PropTypes.object,
     onView: PropTypes.func,
+    onChangeSection: PropTypes.func,
     onEdit: PropTypes.func,
     onDelete: PropTypes.func,
     totalPages: PropTypes.number,

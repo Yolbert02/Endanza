@@ -8,9 +8,10 @@ import { getStoredToken, getStoredUser, clearStoredAuth } from '../utils/authSto
 const routePermissions = {
   // Rutas de administración
   '/dashboard': ['admin', 'superadmin', 'secretaria'],
+  '/users': ['admin', 'superadmin'],
   '/students': ['admin', 'superadmin', 'secretaria'],
   '/students/*': ['admin', 'superadmin', 'secretaria'],
-  '/inscripcion': ['representante'],
+  '/inscripcion': ['representante', 'superadmin'],
   '/aulas': ['admin', 'superadmin', 'secretaria'],
   '/notas': ['admin', 'superadmin', 'docente', 'secretaria'],
   '/boletin': ['admin', 'superadmin', 'secretaria'],
@@ -102,7 +103,7 @@ const ProtectedRoute = ({
   // Verificar permisos: si no tiene permisos o el rol es inválido, redirigir directo sin carteles
   if (allowedRolesForRoute.length > 0 && !allowedRolesForRoute.includes(userRole)) {
     console.warn(`🚨 Acceso no autorizado a ${location.pathname} para rol "${userRole}". Redirigiendo a pantalla adecuada...`)
-    
+
     // Redirigir según el rol que tenga, o a login si no tiene rol válido
     if (userRole === 'admin' || userRole === 'superadmin' || userRole === 'secretaria') {
       return <Navigate to="/dashboard" replace />

@@ -22,7 +22,8 @@ import {
 import { Link, useNavigate } from "react-router-dom"
 
 // Servicios
-import { listStudents, deleteStudent } from 'src/services/studentsService'
+import { listStudents, deleteStudent, changeStudentSection } from 'src/services/studentsService'
+import { listSections } from 'src/services/sectionsService'
 
 // Componentes
 import StudentStats from "./components/StudentStats"
@@ -54,11 +55,22 @@ const Students = () => {
   const [modalVisible, setModalVisible] = useState(false)
   const [modalType, setModalType] = useState(null)
   const [selectedItem, setSelectedItem] = useState(null)
+  const [allSections, setAllSections] = useState([])
 
   // Cargar datos
   useEffect(() => {
     fetchStudents()
+    fetchSections()
   }, [])
+
+  const fetchSections = async () => {
+    try {
+      const data = await listSections()
+      setAllSections(Array.isArray(data) ? data : [])
+    } catch (error) {
+      console.error("Error al cargar secciones:", error)
+    }
+  }
 
   const fetchStudents = async () => {
     setLoading(true)
@@ -139,6 +151,24 @@ const Students = () => {
 
   const viewStudent = (id) => {
     navigate(`/students/${id}`)
+  }
+
+  const handleChangeSection = async (student, targetSectionId) => {
+    try {
+      const currentSectionId = student.sections?.[0]?.section_id || null
+      const res = await changeStudentSection(student.id, targetSectionId, currentSectionId)
+      if (res?.ok || res?._ok || res?.success || res?.status === 200 || !res?.message?.toLowerCase().includes('error')) {
+        showToast("success", "Éxito", res?.message || "Estudiante transferido de sección correctamente")
+        setModalVisible(false)
+        fetchStudents()
+        fetchSections()
+      } else {
+        showToast("danger", "Error", res?.message || "No se pudo cambiar de sección")
+      }
+    } catch (error) {
+      console.error("Error al transferir de sección:", error)
+      showToast("danger", "Error", error?.message || "Error al transferir al estudiante de sección")
+    }
   }
 
   const deleteItem = async () => {
@@ -284,6 +314,7 @@ const Students = () => {
             handleSort={handleSort}
             sortConfig={sortConfig}
             onView={viewStudent}
+            onChangeSection={(student) => openModal('change-section', student)}
             onEdit={(student) => openModal('edit', student)}
             onDelete={(student) => openModal('delete', student)}
             totalPages={totalPages}
@@ -307,6 +338,9 @@ const Students = () => {
         onDelete={deleteItem}
         onDeleteMultiple={handleDeleteSelected}
         onView={viewStudent}
+        allSections={allSections}
+        onChangeSection={handleChangeSection}
+        onSwitchModalType={(type, item) => openModal(type, item)}
       />
 
       {/* Toaster */}

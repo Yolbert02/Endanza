@@ -291,4 +291,20 @@ export const deleteLapso = async (lapsoId) => {
   }
 };
 
+/**
+ * Cambia a un estudiante de sección
+ */
+export const changeStudentSection = async (studentId, newSectionId, currentSectionId = null) => {
+  try {
+    const response = await fetch.put(`/api/students/${studentId}/change-section`, {
+      newSectionId,
+      currentSectionId
+    });
+    return response;
+  } catch (error) {
+    console.error("Error en changeStudentSection:", error);
+    throw error;
+  }
+};
+
 

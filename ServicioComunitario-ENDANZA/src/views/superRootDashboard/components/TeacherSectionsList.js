@@ -1,5 +1,3 @@
-// Archivo: src/dashboard/components/TeacherSectionsList.jsx
-
 import React, { useEffect, useState } from 'react'
 import {
     CCard,
@@ -13,7 +11,11 @@ import {
     CTableDataCell,
     CBadge,
     CButton,
-    CSpinner
+    CSpinner,
+    CToaster,
+    CToast,
+    CToastHeader,
+    CToastBody
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import {
@@ -24,14 +26,46 @@ import {
     cilUser,
     cilArrowRight,
     cilWarning,
-    cilCalendar
+    cilCalendar,
+    cilCloudDownload
 } from '@coreui/icons'
 import { useNavigate } from 'react-router-dom'
 import { formatShortName } from '../../../utils/formatters'
+import { downloadTeacherSchedule } from '../../../utils/downloadTeacherSchedule'
 
 const TeacherSectionsList = ({ sections = [], teachers = [], currentYear, loading }) => {
     const navigate = useNavigate()
     const [teachersByYear, setTeachersByYear] = useState([])
+    const [downloadingTeacherId, setDownloadingTeacherId] = useState(null)
+    const [toasts, setToasts] = useState([])
+
+    const showToast = (message, color = 'success') => {
+        const id = Date.now()
+        setToasts(prev => [...prev, { id, message, color }])
+        setTimeout(() => {
+            setToasts(prev => prev.filter(t => t.id !== id))
+        }, 4000)
+    }
+
+    const handleDownloadSchedule = async (teacher) => {
+        setDownloadingTeacherId(teacher.id)
+        try {
+            const res = await downloadTeacherSchedule(teacher, {
+                academicYearName: currentYear?.name,
+                sectionsList: sections
+            })
+            if (res.success) {
+                showToast(res.message, 'success')
+            } else {
+                showToast(res.message, 'warning')
+            }
+        } catch (err) {
+            console.error('Error al descargar horario:', err)
+            showToast('Error inesperado al generar el PDF del horario', 'danger')
+        } finally {
+            setDownloadingTeacherId(null)
+        }
+    }
 
     // ✅ FILTRAR DOCENTES POR AÑO ACADÉMICO SELECCIONADO
     useEffect(() => {
@@ -136,6 +170,9 @@ const TeacherSectionsList = ({ sections = [], teachers = [], currentYear, loadin
                                     <CTableHeaderCell className="text-center text-muted-custom small text-uppercase fw-black ls-1 border-0 pb-3">
                                         Grados Asignados
                                     </CTableHeaderCell>
+                                    <CTableHeaderCell className="text-end text-muted-custom small text-uppercase fw-black ls-1 border-0 pb-3 pe-4">
+                                        Horario
+                                    </CTableHeaderCell>
                                 </CTableRow>
                             </CTableHead>
                             <CTableBody>
@@ -214,6 +251,32 @@ const TeacherSectionsList = ({ sections = [], teachers = [], currentYear, loadin
                                                     )}
                                                 </div>
                                             </CTableDataCell>
+                                            <CTableDataCell className="py-4 border-0 text-end pe-4">
+                                                <CButton
+                                                    size="sm"
+                                                    disabled={downloadingTeacherId === teacher.id}
+                                                    onClick={() => handleDownloadSchedule(teacher)}
+                                                    className="rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center hover-lift border-0 shadow-sm"
+                                                    style={{
+                                                        backgroundColor: '#E07A00',
+                                                        color: 'white',
+                                                        fontSize: '0.72rem'
+                                                    }}
+                                                    title="Descargar horario del docente en PDF"
+                                                >
+                                                    {downloadingTeacherId === teacher.id ? (
+                                                        <>
+                                                            <CSpinner size="sm" style={{ width: '13px', height: '13px' }} className="me-1 text-white" />
+                                                            <span>Generando...</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <CIcon icon={cilCloudDownload} size="sm" className="me-1" />
+                                                            <span>Horario PDF</span>
+                                                        </>
+                                                    )}
+                                                </CButton>
+                                            </CTableDataCell>
                                         </CTableRow>
                                     )
                                 })}
@@ -268,6 +331,16 @@ const TeacherSectionsList = ({ sections = [], teachers = [], currentYear, loadin
                     background: rgba(255, 255, 255, 0.02) !important;
                 }
             `}</style>
+
+            <CToaster placement="top-end">
+                {toasts.map(toast => (
+                    <CToast key={toast.id} autohide={true} visible={true} color={toast.color} className="text-white align-items-center border-0 mb-2">
+                        <div className="d-flex">
+                            <CToastBody>{toast.message}</CToastBody>
+                        </div>
+                    </CToast>
+                ))}
+            </CToaster>
         </CCard>
     )
 }

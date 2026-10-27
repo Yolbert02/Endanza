@@ -41,14 +41,17 @@ import {
   cilTrash,
   cilPencil,
   cilSearch,
-  cilUser
+  cilUser,
+  cilArrowRight
 } from '@coreui/icons'
 
 import {
   listSections,
   createSection,
+  updateSection,
   deleteSection,
   getSectionStudents,
+  changeStudentSection,
   listLapsos,
   createLapso,
   updateLapso,
@@ -79,12 +82,28 @@ const SeccionesLapsos = () => {
     Id_especialidad: ''
   })
 
+  // Edit capacity state
+  const [editCapacityModal, setEditCapacityModal] = useState({
+    isOpen: false,
+    section: null,
+    capacity: 30
+  })
+  const [savingCapacity, setSavingCapacity] = useState(false)
+
   // Students in section modal state
   const [isStudentsModalOpen, setIsStudentsModalOpen] = useState(false)
   const [selectedSectionForStudents, setSelectedSectionForStudents] = useState(null)
   const [sectionStudents, setSectionStudents] = useState([])
   const [loadingStudents, setLoadingStudents] = useState(false)
   const [studentSearch, setStudentSearch] = useState('')
+
+  // Change student section modal state
+  const [changeSectionModal, setChangeSectionModal] = useState({
+    isOpen: false,
+    student: null,
+    targetSectionId: ''
+  })
+  const [changingSection, setChangingSection] = useState(false)
 
   // Lapsos state
   const [lapsos, setLapsos] = useState([])
@@ -155,8 +174,10 @@ const SeccionesLapsos = () => {
   const filteredSections = useMemo(() => {
     return sections.filter((s) => {
       const gName = (s.nivel_academico || s.grade_name || '').replace(/Año/gi, 'Grado')
+      const cleanG = gName.replace(/\s*-\s*Danza\s+.*$/i, '').trim()
       const matchesGrade = filterGrade
-        ? gName.toLowerCase() === filterGrade.toLowerCase() ||
+        ? cleanG.toLowerCase() === filterGrade.toLowerCase() ||
+          gName.toLowerCase() === filterGrade.toLowerCase() ||
           (s.grade_name && s.grade_name.toLowerCase() === filterGrade.toLowerCase()) ||
           (s.nivel_academico && s.nivel_academico.toLowerCase() === filterGrade.toLowerCase())
         : true
@@ -224,6 +245,106 @@ const SeccionesLapsos = () => {
       showAlert('danger', 'Error al eliminar la sección')
     }
   }
+
+  // Handlers for Editing Capacity
+  const handleOpenEditCapacity = (sec) => {
+    setEditCapacityModal({
+      isOpen: true,
+      section: sec,
+      capacity: parseInt(sec.capacity || sec.capacidad || 30)
+    })
+  }
+
+  const handleSaveCapacity = async (e) => {
+    e.preventDefault()
+    if (!editCapacityModal.section) return
+    const newCap = parseInt(editCapacityModal.capacity)
+    const currentStudents = parseInt(editCapacityModal.section.student_count) || 0
+
+    if (isNaN(newCap) || newCap < 1) {
+      showAlert('warning', 'La capacidad debe ser un número entero mayor a 0.')
+      return
+    }
+
+    if (newCap < currentStudents) {
+      if (!window.confirm(`La nueva capacidad (${newCap}) es menor que el número de alumnos ya inscritos (${currentStudents}). ¿Deseas guardar este cambio de todas formas?`)) {
+        return
+      }
+    }
+
+    try {
+      setSavingCapacity(true)
+      const res = await updateSection(editCapacityModal.section.id, {
+        capacidad: newCap,
+        capacity: newCap
+      })
+      if (res?.ok || res?.data || res?.id || res?.section) {
+        showAlert('success', `Capacidad de ${editCapacityModal.section.section_name || 'la sección'} actualizada a ${newCap} cupos.`)
+        setEditCapacityModal({ isOpen: false, section: null, capacity: 30 })
+        await loadData(selectedYearId)
+      } else {
+        showAlert('danger', res?.msg || 'No se pudo actualizar la capacidad.')
+      }
+    } catch (err) {
+      console.error('Error al actualizar capacidad:', err)
+      showAlert('danger', err?.message || 'Error al actualizar la capacidad de la sección.')
+    } finally {
+      setSavingCapacity(false)
+    }
+  }
+
+  // Handlers for Change Section of Student
+  const handleOpenChangeSection = (st) => {
+    setChangeSectionModal({
+      isOpen: true,
+      student: st,
+      targetSectionId: ''
+    })
+  }
+
+  const handleConfirmChangeSection = async (e) => {
+    if (e) e.preventDefault()
+    if (!changeSectionModal.student || !changeSectionModal.targetSectionId) {
+      showAlert('warning', 'Por favor selecciona la sección de destino.')
+      return
+    }
+
+    const targetSec = sections.find(s => String(s.id) === String(changeSectionModal.targetSectionId))
+    const targetName = targetSec?.section_name || targetSec?.nombre_seccion || 'la sección seleccionada'
+
+    try {
+      setChangingSection(true)
+      const res = await changeStudentSection(
+        changeSectionModal.student.id,
+        changeSectionModal.targetSectionId,
+        selectedSectionForStudents?.id
+      )
+
+      if (res?.ok || res?.msg) {
+        showAlert('success', res?.msg || `Estudiante cambiado a ${targetName} exitosamente.`)
+        setChangeSectionModal({ isOpen: false, student: null, targetSectionId: '' })
+        // Recargar alumnos de la sección actual
+        if (selectedSectionForStudents?.id) {
+          const updatedStudents = await getSectionStudents(selectedSectionForStudents.id)
+          setSectionStudents(updatedStudents || [])
+        }
+        // Recargar lista de secciones para actualizar cupos inscritos de ambas secciones
+        await loadData(selectedYearId)
+      } else {
+        showAlert('danger', res?.msg || 'No se pudo cambiar de sección.')
+      }
+    } catch (err) {
+      console.error('Error al cambiar sección de estudiante:', err)
+      showAlert('danger', err?.message || 'Error al cambiar sección del estudiante.')
+    } finally {
+      setChangingSection(false)
+    }
+  }
+
+  const availableTargetSections = useMemo(() => {
+    if (!selectedSectionForStudents) return []
+    return sections.filter(s => String(s.id) !== String(selectedSectionForStudents.id))
+  }, [sections, selectedSectionForStudents])
 
   // Handler for viewing students
   const handleViewStudents = async (section) => {
@@ -510,27 +631,35 @@ const SeccionesLapsos = () => {
                         return (
                           <CTableRow key={sec.id} style={{ borderBottom: '1px solid #F4EFEC' }}>
                             <CTableDataCell>
-                              <div
-                                style={{
-                                  width: '42px',
-                                  height: '42px',
-                                  borderRadius: '8px',
-                                  backgroundColor: '#FDE1CD',
-                                  color: '#C35604',
-                                  fontWeight: '800',
-                                  fontSize: '1.2rem',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  border: '1px solid #FBC49B'
-                                }}
-                              >
-                                {sec.section_name}
+                              <div className="d-flex align-items-center gap-2">
+                                <div
+                                  style={{
+                                    width: '38px',
+                                    height: '38px',
+                                    borderRadius: '8px',
+                                    backgroundColor: '#FDE1CD',
+                                    color: '#C35604',
+                                    fontWeight: '800',
+                                    fontSize: '1.15rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    border: '1px solid #FBC49B',
+                                    flexShrink: 0
+                                  }}
+                                >
+                                  {sec.section_letter || (sec.nombre_seccion || (sec.section_name ? sec.section_name.trim().split(' ').pop() : 'A'))}
+                                </div>
+                                <span className="fw-bold" style={{ color: '#2B2827' }}>
+                                  Sección {sec.section_letter || (sec.nombre_seccion || (sec.section_name ? sec.section_name.trim().split(' ').pop() : 'A'))}
+                                </span>
                               </div>
                             </CTableDataCell>
                             <CTableDataCell>
                               <div className="fw-bold" style={{ color: '#2B2827' }}>
-                                {(sec.nivel_academico || sec.grade_name || 'Sin asignar').replace(/Año/gi, 'Grado')}
+                                {(sec.nivel_academico || sec.grade_name || 'Sin asignar')
+                                  .replace(/Año/gi, 'Grado')
+                                  .replace(/\s*-\s*Danza\s+.*$/i, '')}
                               </div>
                               <span className="small text-muted">Aplica a los 3 lapsos</span>
                             </CTableDataCell>
@@ -551,9 +680,25 @@ const SeccionesLapsos = () => {
                               )}
                             </CTableDataCell>
                             <CTableDataCell>
-                              <div className="d-flex justify-content-between small fw-semibold mb-1">
+                              <div className="d-flex justify-content-between align-items-center small fw-semibold mb-1">
                                 <span style={{ color: '#2B2827' }}>{count} alumnos</span>
-                                <span className="text-muted">{cap} cupos</span>
+                                <span
+                                  role="button"
+                                  className="d-inline-flex align-items-center gap-1 px-2 py-0 rounded-pill hover-lift"
+                                  style={{
+                                    backgroundColor: '#FEF0E6',
+                                    color: '#C35604',
+                                    border: '1px solid #FCD3B4',
+                                    cursor: 'pointer',
+                                    fontSize: '0.8rem',
+                                    fontWeight: '600'
+                                  }}
+                                  onClick={() => handleOpenEditCapacity(sec)}
+                                  title="Haz clic para modificar la capacidad de cupos"
+                                >
+                                  <CIcon icon={cilPencil} size="sm" style={{ width: '10px', height: '10px' }} />
+                                  {cap} cupos
+                                </span>
                               </div>
                               <CProgress
                                 value={pct}
@@ -579,6 +724,21 @@ const SeccionesLapsos = () => {
                               >
                                 <CIcon icon={cilPeople} className="me-1" />
                                 Ver Alumnos ({count})
+                              </CButton>
+                              <CButton
+                                size="sm"
+                                variant="outline"
+                                className="me-2 fw-semibold"
+                                style={{
+                                  borderColor: '#ECE4E0',
+                                  color: '#57504D',
+                                  borderRadius: '6px'
+                                }}
+                                onClick={() => handleOpenEditCapacity(sec)}
+                                title="Modificar cupos de la sección"
+                              >
+                                <CIcon icon={cilPencil} className="me-1" style={{ color: '#C35604' }} />
+                                Cupos
                               </CButton>
                               <CButton
                                 size="sm"
@@ -822,6 +982,7 @@ const SeccionesLapsos = () => {
                     <CTableHeaderCell>Cédula</CTableHeaderCell>
                     <CTableHeaderCell>Representante</CTableHeaderCell>
                     <CTableHeaderCell>Contacto</CTableHeaderCell>
+                    <CTableHeaderCell className="text-end pe-3">Acción</CTableHeaderCell>
                   </CTableRow>
                 </CTableHead>
                 <CTableBody>
@@ -837,6 +998,23 @@ const SeccionesLapsos = () => {
                         <div className="small">{st.representative_phone || '-'}</div>
                         <div className="small text-muted">{st.representative_email || ''}</div>
                       </CTableDataCell>
+                      <CTableDataCell className="text-end pe-3">
+                        <CButton
+                          size="sm"
+                          variant="outline"
+                          style={{
+                            borderColor: '#C35604',
+                            color: '#C35604',
+                            fontWeight: '600',
+                            borderRadius: '6px'
+                          }}
+                          onClick={() => handleOpenChangeSection(st)}
+                          title={`Cambiar a ${st.first_name} de sección`}
+                        >
+                          <CIcon icon={cilArrowRight} className="me-1" size="sm" />
+                          Cambiar Sección
+                        </CButton>
+                      </CTableDataCell>
                     </CTableRow>
                   ))}
                 </CTableBody>
@@ -849,6 +1027,86 @@ const SeccionesLapsos = () => {
             Cerrar
           </CButton>
         </CModalFooter>
+      </CModal>
+
+      {/* ===================== MODAL: CAMBIAR SECCIÓN DE ESTUDIANTE ===================== */}
+      <CModal
+        visible={changeSectionModal.isOpen}
+        onClose={() => setChangeSectionModal({ isOpen: false, student: null, targetSectionId: '' })}
+        backdrop="static"
+      >
+        <CModalHeader closeButton style={{ borderBottom: '1px solid #ECE4E0' }}>
+          <CModalTitle className="fw-bold" style={{ color: '#2B2827' }}>
+            Cambiar Sección de Estudiante
+          </CModalTitle>
+        </CModalHeader>
+        <CForm onSubmit={handleConfirmChangeSection}>
+          <CModalBody className="p-4">
+            <div className="mb-3 p-3 rounded" style={{ backgroundColor: '#FAF6F4', border: '1px solid #ECE4E0' }}>
+              <div className="small text-muted text-uppercase fw-bold ls-1 mb-1">Estudiante</div>
+              <div className="fw-bold fs-5" style={{ color: '#2B2827' }}>
+                {changeSectionModal.student?.first_name} {changeSectionModal.student?.last_name}
+              </div>
+              <div className="small text-muted">
+                {changeSectionModal.student?.dni ? `C.I. ${changeSectionModal.student.dni}` : `ID #${changeSectionModal.student?.id}`}
+              </div>
+              <div className="mt-2 pt-2 border-top d-flex justify-content-between align-items-center">
+                <span className="small text-muted">Sección Actual:</span>
+                <CBadge color="secondary" className="px-2 py-1">
+                  {selectedSectionForStudents?.section_name || selectedSectionForStudents?.nombre_seccion || 'Sección actual'}
+                </CBadge>
+              </div>
+            </div>
+
+            <div className="mb-3">
+              <CFormLabel className="fw-semibold small" style={{ color: '#413C3A' }}>
+                Seleccionar Sección de Destino
+              </CFormLabel>
+              <CFormSelect
+                value={changeSectionModal.targetSectionId}
+                onChange={(e) => setChangeSectionModal({ ...changeSectionModal, targetSectionId: e.target.value })}
+                required
+                style={{ borderColor: '#ECE4E0' }}
+              >
+                <option value="">-- Selecciona la nueva sección --</option>
+                {availableTargetSections.map((sec) => {
+                  const cap = parseInt(sec.capacity || sec.capacidad || 30)
+                  const count = parseInt(sec.student_count || 0)
+                  const isFull = count >= cap
+                  return (
+                    <option key={sec.id} value={sec.id} disabled={isFull}>
+                      {sec.section_name} - {sec.grade_name || sec.nivel_academico || ''} ({count}/{cap} cupos){isFull ? ' - [LLENA]' : ''}
+                    </option>
+                  )
+                })}
+              </CFormSelect>
+              <div className="form-text small mt-1 text-muted">
+                Solo se pueden seleccionar secciones que tengan cupos disponibles.
+              </div>
+            </div>
+          </CModalBody>
+          <CModalFooter style={{ borderTop: '1px solid #ECE4E0' }}>
+            <CButton
+              color="secondary"
+              variant="ghost"
+              onClick={() => setChangeSectionModal({ isOpen: false, student: null, targetSectionId: '' })}
+            >
+              Cancelar
+            </CButton>
+            <CButton
+              type="submit"
+              disabled={changingSection || !changeSectionModal.targetSectionId}
+              style={{
+                backgroundColor: '#C35604',
+                borderColor: '#C35604',
+                color: '#FFFFFF',
+                fontWeight: '600'
+              }}
+            >
+              {changingSection ? <CSpinner size="sm" /> : 'Confirmar Cambio'}
+            </CButton>
+          </CModalFooter>
+        </CForm>
       </CModal>
 
       {/* ===================== MODAL: CREAR / EDITAR LAPSO ===================== */}
@@ -914,6 +1172,86 @@ const SeccionesLapsos = () => {
               }}
             >
               {savingLapso ? <CSpinner size="sm" /> : 'Guardar Lapso'}
+            </CButton>
+          </CModalFooter>
+        </CForm>
+      </CModal>
+
+      {/* ===================== MODAL: EDITAR CAPACIDAD ===================== */}
+      <CModal
+        visible={editCapacityModal.isOpen}
+        onClose={() => setEditCapacityModal({ isOpen: false, section: null, capacity: 30 })}
+        backdrop="static"
+      >
+        <CModalHeader closeButton style={{ borderBottom: '1px solid #ECE4E0' }}>
+          <CModalTitle className="fw-bold" style={{ color: '#2B2827' }}>
+            Modificar Capacidad de la Sección
+          </CModalTitle>
+        </CModalHeader>
+        <CForm onSubmit={handleSaveCapacity}>
+          <CModalBody className="p-4">
+            {editCapacityModal.section && (
+              <div className="p-3 mb-3 rounded-3" style={{ backgroundColor: '#FBFAF9', border: '1px solid #ECE4E0' }}>
+                <div className="d-flex align-items-center gap-2 mb-1">
+                  <span className="fw-bold fs-6" style={{ color: '#C35604' }}>
+                    Sección {editCapacityModal.section.section_letter || (editCapacityModal.section.nombre_seccion || 'A')}
+                  </span>
+                  <span className="text-muted">•</span>
+                  <span className="fw-semibold" style={{ color: '#2B2827' }}>
+                    {(editCapacityModal.section.nivel_academico || editCapacityModal.section.grade_name || '').replace(/Año/gi, 'Grado').replace(/\s*-\s*Danza\s+.*$/i, '')}
+                  </span>
+                </div>
+                <div className="small text-muted">
+                  Alumnos inscritos actualmente: <strong className="text-dark">{parseInt(editCapacityModal.section.student_count) || 0}</strong>
+                </div>
+              </div>
+            )}
+
+            <div className="mb-3">
+              <CFormLabel className="fw-semibold small" style={{ color: '#413C3A' }}>
+                Capacidad de Estudiantes (Cupos Máximos)
+              </CFormLabel>
+              <CFormInput
+                type="number"
+                min="1"
+                max="200"
+                value={editCapacityModal.capacity}
+                onChange={(e) => setEditCapacityModal({ ...editCapacityModal, capacity: e.target.value })}
+                required
+                autoFocus
+                style={{ borderColor: '#ECE4E0' }}
+              />
+              <small className="text-muted d-block mt-1">
+                Indica la cantidad máxima de alumnos permitidos para inscribirse en esta sección.
+              </small>
+            </div>
+          </CModalBody>
+          <CModalFooter style={{ borderTop: '1px solid #ECE4E0' }}>
+            <CButton
+              color="secondary"
+              variant="ghost"
+              onClick={() => setEditCapacityModal({ isOpen: false, section: null, capacity: 30 })}
+              disabled={savingCapacity}
+            >
+              Cancelar
+            </CButton>
+            <CButton
+              type="submit"
+              disabled={savingCapacity}
+              style={{
+                backgroundColor: '#C35604',
+                borderColor: '#C35604',
+                color: '#FFFFFF',
+                fontWeight: '600'
+              }}
+            >
+              {savingCapacity ? (
+                <>
+                  <CSpinner size="sm" className="me-2" /> Guardando...
+                </>
+              ) : (
+                'Guardar Capacidad'
+              )}
             </CButton>
           </CModalFooter>
         </CForm>

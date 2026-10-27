@@ -76,9 +76,9 @@ const routePermissions = {
   '/api/students/:id/horario-grado': ['admin', 'representante', 'secretaria', 'docente'],
   '/api/students/:id/seccion-actual': ['admin', 'representante', 'docente', 'secretaria'],
 
-  // Rutas generales
   '/api/students/list': ['admin', 'docente', 'secretaria'],
   '/api/students/search': ['admin', 'docente', 'secretaria'],
+  '/api/students/:id/change-section': ['admin', 'secretaria', 'docente'],
   '/api/students/:id': ['admin', 'docente', 'secretaria', 'representante'],
   '/api/students/*': ['admin', 'docente', 'secretaria', 'representante'],
 

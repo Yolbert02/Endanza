@@ -112,6 +112,23 @@ const _nav = [
     ],
   },
 
+  // USUARIOS (Solo admin)
+  {
+    component: CNavGroup,
+    name: 'Usuarios',
+    to: '/users',
+    icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
+    roles: ['admin'],
+    items: [
+      {
+        component: CNavItem,
+        name: 'Gestión de Usuarios',
+        to: '/users',
+        roles: ['admin']
+      }
+    ],
+  },
+
 
 
   // NOTAS (Solo docentes y admin)

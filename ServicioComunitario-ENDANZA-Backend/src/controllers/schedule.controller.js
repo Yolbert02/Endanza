@@ -83,7 +83,8 @@ const createSection = async (req, res) => {
         const modelData = {
             section_name: sectionData.section_name,
             grade_level: sectionData.grade_level,  // ← AGREGAR ESTA LÍNEA
-            capacity: sectionData.capacity || 30,
+            capacity: sectionData.capacity || sectionData.capacidad || 30,
+            capacidad: sectionData.capacidad || sectionData.capacity || 30,
             subject_id: sectionData.subject_id || null,
             academic_year_id: academicYearId
         };

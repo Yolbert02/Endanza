@@ -1254,6 +1254,129 @@ const getStudentBoletines = async (studentId, academicYearId = null) => {
 
 
 
+/**
+ * Cambia a un estudiante de una sección a otra
+ * @param {number} studentId - ID del estudiante
+ * @param {number} newSectionId - ID de la nueva sección (destino)
+ * @param {number} [currentSectionId] - ID de la sección actual (opcional)
+ * @returns {Promise<Object>}
+ */
+const changeSection = async (studentId, newSectionId, currentSectionId = null) => {
+  try {
+    const sId = parseInt(studentId);
+    const nSecId = parseInt(newSectionId);
+    if (!sId || !nSecId) {
+      throw new Error("ID de estudiante y nueva sección son requeridos");
+    }
+
+    // 1. Obtener información de la sección destino y verificar capacidad
+    const targetQuery = {
+      text: `
+        SELECT 
+          s.id_seccion,
+          s.nombre_seccion,
+          s.id_ano,
+          s.id_nivel_danza,
+          s.id_especialidad,
+          nd.nivel_danza,
+          COALESCE(s.capacidad, 30) as capacidad,
+          COUNT(i.id_inscripcion) as enrolled
+        FROM seccion s
+        LEFT JOIN nivel_danza nd ON s.id_nivel_danza = nd.id_nivel_danza
+        LEFT JOIN inscripcion i ON s.id_seccion = i.id_seccion AND i.estado_inscripcion = 'activo'
+        WHERE s.id_seccion = $1
+        GROUP BY s.id_seccion, s.nombre_seccion, s.id_ano, s.id_nivel_danza, s.id_especialidad, nd.nivel_danza, s.capacidad
+      `,
+      values: [nSecId]
+    };
+    const targetRes = await db.query(targetQuery.text, targetQuery.values);
+    if (targetRes.rows.length === 0) {
+      throw new Error("La sección de destino no existe");
+    }
+    const targetSection = targetRes.rows[0];
+
+    // Verificar si la sección destino ya alcanzó su capacidad máxima
+    const enrolledCount = parseInt(targetSection.enrolled || 0);
+    const maxCapacity = parseInt(targetSection.capacidad || 30);
+    if (enrolledCount >= maxCapacity) {
+      throw new Error(`La sección destino ha alcanzado su capacidad máxima (${maxCapacity} cupos)`);
+    }
+
+    // 2. Buscar la inscripción activa del estudiante
+    let insQuery;
+    let insValues;
+    if (currentSectionId) {
+      insQuery = `
+        SELECT id_inscripcion, id_seccion, id_ano 
+        FROM inscripcion 
+        WHERE id_estudiante = $1 AND id_seccion = $2 AND estado_inscripcion = 'activo'
+        LIMIT 1
+      `;
+      insValues = [sId, parseInt(currentSectionId)];
+    } else {
+      insQuery = `
+        SELECT id_inscripcion, id_seccion, id_ano 
+        FROM inscripcion 
+        WHERE id_estudiante = $1 AND id_ano = $2 AND estado_inscripcion = 'activo'
+        LIMIT 1
+      `;
+      insValues = [sId, targetSection.id_ano];
+    }
+
+    const insRes = await db.query(insQuery, insValues);
+
+    let idInscripcion;
+    let oldSectionId = null;
+
+    if (insRes.rows.length > 0) {
+      const currentIns = insRes.rows[0];
+      idInscripcion = currentIns.id_inscripcion;
+      oldSectionId = currentIns.id_seccion;
+
+      if (oldSectionId === nSecId) {
+        throw new Error("El estudiante ya se encuentra asignado a esta sección");
+      }
+
+      // Actualizar la inscripción con la nueva sección
+      await db.query(
+        `UPDATE inscripcion SET id_seccion = $1 WHERE id_inscripcion = $2`,
+        [nSecId, idInscripcion]
+      );
+    } else {
+      // Si no tenía inscripción activa para este año, crearla
+      const newInsRes = await db.query(
+        `INSERT INTO inscripcion (id_estudiante, id_ano, id_seccion, estado_inscripcion, fecha_inscripcion)
+         VALUES ($1, $2, $3, 'activo', NOW())
+         RETURNING id_inscripcion`,
+        [sId, targetSection.id_ano, nSecId]
+      );
+      idInscripcion = newInsRes.rows[0].id_inscripcion;
+    }
+
+    // 3. Sincronizar id_nivel_danza en la tabla estudiante si la sección tiene uno asignado
+    if (targetSection.id_nivel_danza) {
+      await db.query(
+        `UPDATE estudiante SET id_nivel_danza = $1 WHERE id_estudiante = $2`,
+        [targetSection.id_nivel_danza, sId]
+      );
+    }
+
+    console.log(`✅ Estudiante ${sId} cambiado exitosamente a la sección ${targetSection.nombre_seccion} (ID: ${nSecId})`);
+
+    return {
+      ok: true,
+      msg: `Estudiante asignado a la sección "${targetSection.nombre_seccion}" exitosamente`,
+      id_estudiante: sId,
+      id_seccion: nSecId,
+      nombre_seccion: targetSection.nombre_seccion,
+      id_inscripcion: idInscripcion
+    };
+  } catch (error) {
+    console.error("❌ Error en changeSection:", error);
+    throw error;
+  }
+};
+
 export const StudentModel = {
   findAll,
   findById,
@@ -1263,8 +1386,9 @@ export const StudentModel = {
   remove,
   enrollInSection,
   removeFromSection,
+  changeSection,
   search,
   existsByCedula,
-  findByRepresentante, // 👈 NUEVO
+  findByRepresentante,
   getStudentBoletines,
 };
