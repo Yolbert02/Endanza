@@ -38,6 +38,12 @@ router.get(
   RepresentanteController.searchRepresentantes
 );
 
+// Verificar si cédula o correo ya existen (validación previa para preinscripción)
+router.get(
+  "/check-existing",
+  RepresentanteController.checkExisting
+);
+
 // Obtener representante con sus estudiantes
 router.get(
   "/:id/estudiantes",

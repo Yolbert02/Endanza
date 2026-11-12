@@ -69,7 +69,7 @@ const DatosEstudiante = ({ formData, onChange, errores = {}, mode = "completo" }
     { value: "8vo_grado", label: "8vo Grado" }
   ];
 
-  // Normalizar valor de grado para que el CFormSelect coincida exactamente
+  // Normalizar valor de grado para que coincida exactamente
   const normalizedGrado = () => {
     if (!formData.grado) return "";
     const g = String(formData.grado).trim();
@@ -86,6 +86,25 @@ const DatosEstudiante = ({ formData, onChange, errores = {}, mode = "completo" }
     if (lower.includes('7mo') || lower.includes('septimo') || lower.includes('séptimo')) return '7mo_grado';
     if (lower.includes('8vo') || lower.includes('octavo')) return '8vo_grado';
     return formData.grado;
+  };
+
+  // Obtener etiqueta legible del grado para visualización
+  const getGradoLabel = (val) => {
+    if (!val) return "";
+    const found = gradosDanza.find(d => d.value.toLowerCase() === String(val).toLowerCase());
+    if (found) return found.label;
+    const g = String(val).toLowerCase();
+    if (g.includes("pre-ballet") || g.includes("preballet")) return "Pre-Ballet";
+    if (g.includes("preparatorio") || g.includes("prep")) return "Preparatorio";
+    if (g.includes("1er") || g.includes("primero")) return "1er Grado";
+    if (g.includes("2do") || g.includes("segundo")) return "2do Grado";
+    if (g.includes("3er") || g.includes("tercero")) return "3er Grado";
+    if (g.includes("4to") || g.includes("cuarto")) return "4to Grado";
+    if (g.includes("5to") || g.includes("quinto")) return "5to Grado";
+    if (g.includes("6to") || g.includes("sexto")) return "6to Grado";
+    if (g.includes("7mo") || g.includes("septimo") || g.includes("séptimo")) return "7mo Grado";
+    if (g.includes("8vo") || g.includes("octavo")) return "8vo Grado";
+    return val;
   };
 
   // Opciones para especialidades oficiales (solo para grados avanzados 6to, 7mo y 8vo)
@@ -287,34 +306,38 @@ const DatosEstudiante = ({ formData, onChange, errores = {}, mode = "completo" }
                 />
               </CCol>
               <CCol md={3}>
-                <CFormSelect
-                  label={
-                    <span className="fw-bold step-label text-uppercase ls-1 small mb-1">
-                      Grado Académico (Danza) <span className="text-danger">*</span>
-                    </span>
-                  }
-                  name="grado"
-                  value={normalizedGrado()}
-                  onChange={(e) => {
-                    onChange(e);
-                    const selectedVal = e.target.value;
-                    const isAdv = selectedVal.includes('6to') || selectedVal.includes('7mo') || selectedVal.includes('8vo');
-                    if (!isAdv && formData.especialidad) {
-                      onChange({ target: { name: 'especialidad', value: '' } });
-                    }
+                <label className="fw-bold step-label text-uppercase ls-1 small mb-1 d-block">
+                  Grado Académico (Danza) <span className="text-danger">*</span>
+                </label>
+                <div 
+                  className="input-premium py-2 px-3 d-flex align-items-center justify-content-between"
+                  style={{
+                    backgroundColor: 'rgba(224, 122, 0, 0.08)',
+                    border: '1.5px solid rgba(224, 122, 0, 0.4)',
+                    borderRadius: '8px',
+                    minHeight: '40px'
                   }}
-                  required
-                  className={`input-premium py-2 ${errores.grado ? 'is-invalid' : ''}`}
-                  feedback={errores.grado}
-                  invalid={!!errores.grado}
+                  title="Grado asignado automáticamente para el nuevo ciclo escolar"
                 >
-                  <option value="">Seleccione grado de danza...</option>
-                  {gradosDanza.map(grado => (
-                    <option key={grado.value} value={grado.value}>
-                      {grado.label}
-                    </option>
-                  ))}
-                </CFormSelect>
+                  <div className="d-flex align-items-center gap-2">
+                    <CIcon icon={cilSchool} size="sm" style={{ color: '#E07A00' }} />
+                    <span className="fw-bold" style={{ color: '#E07A00', fontSize: '0.9rem' }}>
+                      {formData.grado_siguiente_label || getGradoLabel(formData.grado) || "1er Grado"}
+                    </span>
+                  </div>
+                  <span 
+                    className="badge rounded-pill text-white" 
+                    style={{ backgroundColor: '#E07A00', fontSize: '0.62rem', letterSpacing: '0.5px' }}
+                  >
+                    NIVEL SIGUIENTE
+                  </span>
+                </div>
+                {formData.grado_anterior && (
+                  <small className="text-muted d-block mt-1" style={{ fontSize: '0.72rem' }}>
+                    Promoción desde: <strong>{formData.grado_anterior}</strong>
+                  </small>
+                )}
+                <input type="hidden" name="grado" value={formData.grado || ""} />
               </CCol>
             </CRow>
 

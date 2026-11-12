@@ -29,7 +29,8 @@ const createInitialStudent = () => ({
     gradeLevel: '',
     section: 'A',
     birthDate: '',
-    gender: ''
+    gender: '',
+    cedula: ''
 });
 
 const DEFAULT_STUDENTS = [createInitialStudent()];
@@ -117,7 +118,8 @@ const Preinscripcion = () => {
                         gradeLevel: s.gradeLevel,
                         section: s.section || 'A',
                         birthDate: s.birthDate,
-                        gender: s.gender
+                        gender: s.gender,
+                        cedula: s.cedula && s.cedula.trim() !== '' ? s.cedula.trim() : undefined
                     }))
             };
 

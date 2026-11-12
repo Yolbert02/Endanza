@@ -101,6 +101,13 @@ const editModal = ({
       const nombreEst = `${finalEstPrimerNombre} ${finalEstSegundoNombre}`.trim()
       const apellidoEst = `${finalEstPrimerApellido} ${finalEstSegundoApellido}`.trim()
 
+      // Cédula del estudiante
+      let rawEstCedula = studentData.Cedula || studentData.cedula || studentData.dni || studentData.student_dni || ''
+      if (rawEstCedula === '—' || rawEstCedula === 'N/A' || rawEstCedula === 'null' || rawEstCedula === 'undefined') {
+        rawEstCedula = ''
+      }
+      const estCedula = String(rawEstCedula).replace(/^V-?/i, '').replace(/[^0-9]/g, '').slice(0, 8)
+
       // Fecha de nacimiento para datepicker (YYYY-MM-DD)
       let fechaNac = studentData.FechaNacimiento || studentData.birth_date || studentData.fecha_nacimiento || ''
       if (fechaNac && fechaNac.includes('/')) {
@@ -230,6 +237,9 @@ const editModal = ({
 
       setFormData({
         ...studentData,
+        Cedula: estCedula,
+        cedula: estCedula,
+        dni: estCedula,
         EstudiantePrimerNombre: finalEstPrimerNombre,
         EstudianteSegundoNombre: finalEstSegundoNombre,
         EstudiantePrimerApellido: finalEstPrimerApellido,
@@ -239,6 +249,8 @@ const editModal = ({
         FechaNacimiento: fechaNac,
         Sexo: sexoVal,
         TipoSangre: tipoSangre,
+        tipo_sangre: tipoSangre,
+        blood_type: tipoSangre,
         Estatus: estatusVal,
         Grado: gradoVal,
         Seccion: seccionVal,
@@ -308,14 +320,28 @@ const editModal = ({
 
     // Solo permitir números en cédulas (máximo 8 dígitos)
     let cleanValue = value
-    if (['PadreCedula', 'MadreCedula', 'RepresentanteCedula'].includes(name)) {
-      cleanValue = value.replace(/[^0-9]/g, '').slice(0, 8)
+    if (['PadreCedula', 'MadreCedula', 'RepresentanteCedula', 'Cedula', 'cedula', 'dni'].includes(name)) {
+      cleanValue = value ? String(value).replace(/[^0-9]/g, '').slice(0, 8) : ''
     }
 
     setFormData(prev => {
       const updated = {
         ...prev,
         [name]: cleanValue
+      }
+
+      // Sincronizar cédula del estudiante
+      if (name === 'Cedula' || name === 'cedula' || name === 'dni') {
+        updated.Cedula = cleanValue
+        updated.cedula = cleanValue
+        updated.dni = cleanValue
+      }
+
+      // Sincronizar tipo de sangre del estudiante
+      if (name === 'TipoSangre' || name === 'tipo_sangre' || name === 'blood_type') {
+        updated.TipoSangre = cleanValue
+        updated.tipo_sangre = cleanValue
+        updated.blood_type = cleanValue
       }
 
       // Sincronizar nombres completos de estudiante
@@ -466,11 +492,12 @@ const editModal = ({
     }
 
     if (!formData.Estatus) {
-      newErrors.Estatus = "El estatus es requerido"
+      formData.Estatus = 'Activo'
     }
 
-    // Validar cédulas (7-8 dígitos)
+    // Validar cédulas (6-9 dígitos si se ingresan)
     const cedulaFields = [
+      { key: 'Cedula', label: 'La cédula del estudiante' },
       { key: 'PadreCedula', label: 'La cédula del padre' },
       { key: 'MadreCedula', label: 'La cédula de la madre' },
       { key: 'RepresentanteCedula', label: 'La cédula del representante' }
@@ -478,8 +505,8 @@ const editModal = ({
     cedulaFields.forEach(({ key, label }) => {
       if (formData[key]) {
         const digits = String(formData[key]).replace(/[^0-9]/g, '')
-        if (digits && (digits.length < 7 || digits.length > 8)) {
-          newErrors[key] = `${label} debe tener entre 7 y 8 dígitos`
+        if (digits && (digits.length < 6 || digits.length > 9)) {
+          newErrors[key] = `${label} debe tener entre 6 y 9 dígitos`
         }
       }
     })
@@ -578,13 +605,14 @@ const editModal = ({
           birth_date: formData.FechaNacimiento,
           genero: formData.Sexo,
           gender: formData.Sexo,
-          tipo_sangre: formData.TipoSangre,
-          blood_type: formData.TipoSangre,
-          TipoSangre: formData.TipoSangre,
-          status: formData.Estatus,
-          estatus: formData.Estatus,
-          cedula: formData.Cedula || formData.dni,
-          dni: formData.Cedula || formData.dni,
+          tipo_sangre: formData.TipoSangre || formData.tipo_sangre || formData.blood_type || null,
+          blood_type: formData.TipoSangre || formData.tipo_sangre || formData.blood_type || null,
+          TipoSangre: formData.TipoSangre || formData.tipo_sangre || formData.blood_type || null,
+          status: formData.Estatus || 'Activo',
+          estatus: formData.Estatus || 'Activo',
+          cedula: formData.Cedula ? String(formData.Cedula).trim() : (formData.cedula || formData.dni || null),
+          dni: formData.Cedula ? String(formData.Cedula).trim() : (formData.cedula || formData.dni || null),
+          Cedula: formData.Cedula ? String(formData.Cedula).trim() : (formData.cedula || formData.dni || null),
           PadrePrimerNombre: capitalizeWords(formData.PadrePrimerNombre),
           PadreSegundoNombre: capitalizeWords(formData.PadreSegundoNombre),
           PadrePrimerApellido: capitalizeWords(formData.PadrePrimerApellido),
@@ -648,7 +676,7 @@ const editModal = ({
     } else {
       // Si hay errores, saltar a la primera pestaña con error
       const tabErrorMap = [
-        { tab: 0, fields: ['NombreEstudiante', 'ApellidoEstudiante', 'EstudiantePrimerNombre', 'EstudiantePrimerApellido', 'FechaNacimiento', 'Estatus'] },
+        { tab: 0, fields: ['NombreEstudiante', 'ApellidoEstudiante', 'EstudiantePrimerNombre', 'EstudiantePrimerApellido', 'FechaNacimiento', 'Cedula'] },
         { tab: 1, fields: ['Telefono'] },
         { tab: 2, fields: ['PadreCedula', 'PadreTelefono'] },
         { tab: 3, fields: ['MadreCedula', 'MadreTelefono'] },

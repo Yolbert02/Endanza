@@ -102,6 +102,96 @@ const calculateAge = (birthDate) => {
   }
 };
 
+// Función para determinar el grado del año siguiente automáticamente
+export const calcularSiguienteGrado = (gradoActualRaw) => {
+  if (!gradoActualRaw) {
+    return {
+      value: "1er_grado",
+      label: "1er Grado",
+      actualLabel: "Sin registro previo"
+    };
+  }
+
+  const g = String(gradoActualRaw).toLowerCase().trim();
+
+  if (g.includes("pre-ballet") || g.includes("preballet") || g.includes("pre ballet")) {
+    return {
+      value: "preparatorio",
+      label: "Preparatorio",
+      actualLabel: "Pre-Ballet"
+    };
+  }
+  if (g.includes("preparatorio") || g.includes("prep")) {
+    return {
+      value: "1er_grado",
+      label: "1er Grado",
+      actualLabel: "Preparatorio"
+    };
+  }
+  if (g.includes("1er") || g.includes("primero") || g.includes("1°") || g === "1") {
+    return {
+      value: "2do_grado",
+      label: "2do Grado",
+      actualLabel: "1er Grado"
+    };
+  }
+  if (g.includes("2do") || g.includes("segundo") || g.includes("2°") || g === "2") {
+    return {
+      value: "3er_grado",
+      label: "3er Grado",
+      actualLabel: "2do Grado"
+    };
+  }
+  if (g.includes("3er") || g.includes("tercero") || g.includes("3°") || g === "3") {
+    return {
+      value: "4to_grado",
+      label: "4to Grado",
+      actualLabel: "3er Grado"
+    };
+  }
+  if (g.includes("4to") || g.includes("cuarto") || g.includes("4°") || g === "4") {
+    return {
+      value: "5to_grado",
+      label: "5to Grado",
+      actualLabel: "4to Grado"
+    };
+  }
+  if (g.includes("5to") || g.includes("quinto") || g.includes("5°") || g === "5") {
+    return {
+      value: "6to_grado",
+      label: "6to Grado",
+      actualLabel: "5to Grado"
+    };
+  }
+  if (g.includes("6to") || g.includes("sexto") || g.includes("6°") || g === "6") {
+    return {
+      value: "7mo_grado",
+      label: "7mo Grado",
+      actualLabel: "6to Grado"
+    };
+  }
+  if (g.includes("7mo") || g.includes("septimo") || g.includes("séptimo") || g.includes("7°") || g === "7") {
+    return {
+      value: "8vo_grado",
+      label: "8vo Grado",
+      actualLabel: "7mo Grado"
+    };
+  }
+  if (g.includes("8vo") || g.includes("octavo") || g.includes("8°") || g === "8") {
+    return {
+      value: "8vo_grado",
+      label: "8vo Grado",
+      actualLabel: "8vo Grado"
+    };
+  }
+
+  return {
+    value: "1er_grado",
+    label: "1er Grado",
+    actualLabel: gradoActualRaw
+  };
+};
+
 const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }) => {
   const [step, setStep] = useState(1);
   const [inscripcionEnviada, setInscripcionEnviada] = useState(false);
@@ -113,6 +203,8 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
   const [mensajeYaInscrito, setMensajeYaInscrito] = useState("");
 
   const initialBirthDate = (student?.birth_date || student?.birthDate || "").split("T")[0];
+  const rawInitGrade = student?.dance_level_name || student?.dance_level || student?.danceLevel || "";
+  const initialNextGrade = calcularSiguienteGrado(rawInitGrade);
 
   // Estado inicial LIMPIO
   const [formData, setFormData] = useState({
@@ -124,8 +216,10 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
     cedula: student?.cedula || student?.dni || "",
     direccion_Habitacion: "",
     telefono_fijo: "",
-    grado: student?.dance_level_name || student?.dance_level || student?.danceLevel || (student?.grade_level !== student?.grade_level_name ? student?.grade_level : "") || "",
-    especialidad: "",
+    grado: initialNextGrade.value,
+    grado_anterior: initialNextGrade.actualLabel,
+    grado_siguiente_label: initialNextGrade.label,
+    especialidad: student?.specialty_name || student?.especialidad || "",
     convivencia: "",
     escuela: "",
     Grado_Escuela: "",
@@ -248,13 +342,9 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
         }
         const edadCalculada = calculateAge(formattedDate);
 
-        // Grado de Danza del estudiante mapeado (de la Escuela de Danza)
-        // IMPORTANTE: NO usar grade_level_name / grade_level / gradeLevel, esos son el grado de la escuela regular (primaria/bachillerato)
-        let mappedGrade = "";
+        // Grado de Danza del estudiante: calcular automáticamente el siguiente año académico
         const rawGrade = est.dance_level_name || est.dance_level || student.dance_level_name || student.dance_level || "";
-        if (rawGrade) {
-          mappedGrade = rawGrade.toLowerCase().replace(" ", "_");
-        }
+        const nextGradeInfo = calcularSiguienteGrado(rawGrade);
 
         // Separar partes de nombres y teléfonos
         const repNombres = splitTwoParts(rep.nombres);
@@ -304,7 +394,10 @@ const InscripcionCompletaForm = ({ onVolver, student, studentsList, activeYear }
           cedula: est.cedula || prev.cedula,
           edad: edadCalculada || calculateAge(prev.fecha_nac) || prev.edad,
           direccion_Habitacion: est.direccion || prev.direccion_Habitacion,
-          grado: mappedGrade || prev.grado,
+          grado: nextGradeInfo.value,
+          grado_anterior: nextGradeInfo.actualLabel,
+          grado_siguiente_label: nextGradeInfo.label,
+          especialidad: est.especialidad || student.specialty_name || prev.especialidad || "",
           escuela: est.escuela || prev.escuela,
           Grado_Escuela: est.grado_escuela || prev.Grado_Escuela,
           Seguro_Escolar: est.seguro_escolar ? "si" : (prev.Seguro_Escolar || "no"),

@@ -54,7 +54,8 @@ const RegistroEstudiante = ({
                 gradeLevel: '',
                 section: 'A',
                 birthDate: '',
-                gender: ''
+                gender: '',
+                cedula: ''
             }
         ];
     });
@@ -64,6 +65,14 @@ const RegistroEstudiante = ({
             setNewStudents(initialStudents);
         }
     }, [initialStudents]);
+
+    const getProvisionalCedula = (idx) => {
+        const repDni = (representative?.dni || '').replace(/^[vVeE]-?/, '').trim();
+        if (!repDni) return '';
+        const existingCount = existingStudents?.length || 0;
+        const siblingNum = existingCount + idx + 1;
+        return `${repDni}-${siblingNum}`;
+    };
 
     const updateStudents = (list) => {
         setNewStudents(list);
@@ -111,11 +120,14 @@ const RegistroEstudiante = ({
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        const formattedList = newStudents.map(s => {
+        const formattedList = newStudents.map((s, idx) => {
             const f1 = capitalizeWords(s.firstName1);
             const f2 = capitalizeWords(s.firstName2);
             const l1 = capitalizeWords(s.lastName1);
             const l2 = capitalizeWords(s.lastName2);
+            const cedulaFinal = (s.cedula && s.cedula.trim() !== '')
+                ? s.cedula.trim()
+                : getProvisionalCedula(idx);
             return {
                 ...s,
                 firstName1: f1,
@@ -123,7 +135,8 @@ const RegistroEstudiante = ({
                 lastName1: l1,
                 lastName2: l2,
                 name: `${f1} ${f2}`.trim() || capitalizeWords(s.name),
-                lastName: `${l1} ${l2}`.trim() || capitalizeWords(s.lastName)
+                lastName: `${l1} ${l2}`.trim() || capitalizeWords(s.lastName),
+                cedula: cedulaFinal
             };
         });
         updateStudents(formattedList);
@@ -240,6 +253,35 @@ const RegistroEstudiante = ({
                                     />
                                 </CCol>
                                 <CCol md={4}>
+                                    <div className="d-flex justify-content-between align-items-center mb-1">
+                                        <label className="form-label small fw-bold text-uppercase text-muted-custom ls-1 mb-0">
+                                            Cédula Estudiantil / Identidad
+                                        </label>
+                                        {getProvisionalCedula(idx) && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleStudentChange(idx, 'cedula', getProvisionalCedula(idx))}
+                                                className="btn btn-link p-0 extra-small text-warning text-decoration-none fw-bold"
+                                            >
+                                                Usar Escolar ({getProvisionalCedula(idx)})
+                                            </button>
+                                        )}
+                                    </div>
+                                    <CFormInput
+                                        placeholder={`Ej: ${getProvisionalCedula(idx) || '34123456'}`}
+                                        value={student.cedula || ''}
+                                        onChange={(e) => handleStudentChange(idx, 'cedula', e.target.value)}
+                                        className="input-premium py-2"
+                                    />
+                                    <div className="text-muted-custom extra-small mt-1">
+                                        {student.cedula
+                                            ? `Cédula: ${student.cedula}`
+                                            : (getProvisionalCedula(idx)
+                                                ? `Si no tiene cédula propia, se asignará: ${getProvisionalCedula(idx)}`
+                                                : 'Cédula de identidad o escolar provisional')}
+                                    </div>
+                                </CCol>
+                                <CCol md={3}>
                                     <label className="form-label small fw-bold text-uppercase text-muted-custom ls-1">Grado <span className="text-danger">*</span></label>
                                     <CFormSelect
                                         value={student.gradeLevel}
@@ -253,7 +295,7 @@ const RegistroEstudiante = ({
                                         ))}
                                     </CFormSelect>
                                 </CCol>
-                                <CCol md={4}>
+                                <CCol md={3}>
                                     <label className="form-label small fw-bold text-uppercase text-muted-custom ls-1">Fecha de Nacimiento <span className="text-danger">*</span></label>
                                     <CFormInput
                                         type="date"
@@ -263,7 +305,7 @@ const RegistroEstudiante = ({
                                         required
                                     />
                                 </CCol>
-                                <CCol md={4}>
+                                <CCol md={2}>
                                     <label className="form-label small fw-bold text-uppercase text-muted-custom ls-1">Género <span className="text-danger">*</span></label>
                                     <CFormSelect
                                         value={student.gender}
@@ -271,7 +313,7 @@ const RegistroEstudiante = ({
                                         className="input-premium py-2"
                                         required
                                     >
-                                        <option value="" disabled>Seleccione Género</option>
+                                        <option value="" disabled>Seleccione</option>
                                         <option value="Femenino">Femenino</option>
                                         <option value="Masculino">Masculino</option>
                                     </CFormSelect>

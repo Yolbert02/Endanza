@@ -232,25 +232,72 @@ export const UserModel = {
   // ==========================================
   // CREACIÓN DE USUARIO (TRANSACCIÓN)
   // ==========================================
-  create: async ({
-    nombre,
-    segundo_nombre = null,
-    apellido,
-    segundo_apellido = null,
-    cedula = null,
-    telefono = null,
-    email = null,
-    fecha_nacimiento = null,
-    genero = null,
-    password,
-    id_rol = 5,
-    direccion = null,
-    estado_usuario = 'activo',
-    foto_usuario = null
-  }) => {
+  create: async (userData) => {
     const client = await db.pool.connect();
     try {
       await client.query('BEGIN');
+
+      // Normalizar nombres y aliases que pueden venir del frontend
+      const rawNombre = userData.nombre || userData.first_name || '';
+      const rawSegundoNombre = userData.segundo_nombre || null;
+      const rawApellido = userData.apellido || userData.last_name || '';
+      const rawSegundoApellido = userData.segundo_apellido || null;
+
+      let nombre = rawNombre;
+      let segundo_nombre = rawSegundoNombre;
+      if (!segundo_nombre && rawNombre.includes(' ')) {
+        const parts = rawNombre.trim().split(/\s+/);
+        nombre = parts[0];
+        segundo_nombre = parts.slice(1).join(' ');
+      }
+
+      let apellido = rawApellido;
+      let segundo_apellido = rawSegundoApellido;
+      if (!segundo_apellido && rawApellido.includes(' ')) {
+        const parts = rawApellido.trim().split(/\s+/);
+        apellido = parts[0];
+        segundo_apellido = parts.slice(1).join(' ');
+      }
+
+      const cedula = userData.cedula || userData.dni || null;
+      const telefono = userData.telefono || userData.phone || userData.numero_telefono || null;
+      const email = userData.email || userData.correo || null;
+      const fecha_nacimiento = userData.fecha_nacimiento || null;
+      const genero = userData.genero || null;
+      const direccion = userData.direccion || null;
+      const foto_usuario = userData.foto_usuario || null;
+
+      // Mapear rol si viene en string
+      const roleMapping = {
+        'admin': 1,
+        'administrador': 1,
+        'superadmin': 1,
+        'docente': 2,
+        'profesor': 2,
+        'secretaria': 3,
+        'representante': 4,
+        'estudiante': 5,
+      };
+      let id_rol = userData.id_rol;
+      if (!id_rol && userData.role) {
+        id_rol = roleMapping[String(userData.role).toLowerCase()] || 2;
+      }
+      id_rol = Number(id_rol || 2);
+
+      // Mapear estado
+      const statusMapping = {
+        'active': 'activo',
+        'activo': 'activo',
+        'inactive': 'inactivo',
+        'inactivo': 'inactivo',
+        'suspended': 'suspendido',
+        'suspendido': 'suspendido'
+      };
+      const rawStatus = userData.estado_usuario || userData.status || 'activo';
+      const estado_usuario = statusMapping[String(rawStatus).toLowerCase()] || 'activo';
+
+      // Password
+      const rawPassword = userData.password || userData.contrasena || 'Endanza.2024';
 
       // 1. Crear dirección si se suministró
       let id_direccion = null;
@@ -273,20 +320,43 @@ export const UserModel = {
         ? genero.toLowerCase() 
         : null;
 
+      // Verificar si ya existe un usuario con este correo o cédula
+      if (emailNorm) {
+        const uEmailExist = await client.query(
+          `SELECT u.id_usuario FROM usuario u JOIN persona p ON u.id_persona = p.id_persona WHERE LOWER(TRIM(p.email)) = $1 LIMIT 1`,
+          [emailNorm]
+        );
+        if (uEmailExist.rows.length > 0) {
+          throw new Error(`Ya existe un usuario con el correo electrónico "${emailNorm}"`);
+        }
+      }
+
+      if (cedulaNorm) {
+        const cleanCed = cedulaNorm.replace(/^V-/i, '').trim();
+        const uCedExist = await client.query(
+          `SELECT u.id_usuario FROM usuario u JOIN persona p ON u.id_persona = p.id_persona WHERE REPLACE(UPPER(TRIM(p.cedula)), 'V-', '') = $1 LIMIT 1`,
+          [cleanCed]
+        );
+        if (uCedExist.rows.length > 0) {
+          throw new Error(`Ya existe un usuario registrado con la cédula "${cedulaNorm}"`);
+        }
+      }
+
       // 3. Crear o actualizar persona
       let id_persona = null;
       if (cedulaNorm) {
+        const cleanCed = cedulaNorm.replace(/^V-/i, '').trim();
         const pExist = await client.query(
-          `SELECT id_persona FROM persona WHERE cedula = $1 LIMIT 1`,
-          [cedulaNorm]
+          `SELECT id_persona FROM persona WHERE REPLACE(UPPER(TRIM(cedula)), 'V-', '') = $1 LIMIT 1`,
+          [cleanCed]
         );
         if (pExist.rows.length > 0) {
           id_persona = pExist.rows[0].id_persona;
           await client.query(`
             UPDATE persona SET
-              nombre = COALESCE($1, nombre),
+              nombre = COALESCE(NULLIF($1, ''), nombre),
               segundo_nombre = COALESCE($2, segundo_nombre),
-              apellido = COALESCE($3, apellido),
+              apellido = COALESCE(NULLIF($3, ''), apellido),
               segundo_apellido = COALESCE($4, segundo_apellido),
               numero_telefono = COALESCE($5, numero_telefono),
               email = COALESCE($6, email),
@@ -309,9 +379,9 @@ export const UserModel = {
       }
 
       // 4. Hashear password
-      const hashedPassword = password.startsWith('$2') 
-        ? password 
-        : await bcryptjs.hash(password, 10);
+      const hashedPassword = rawPassword.startsWith('$2') 
+        ? rawPassword 
+        : await bcryptjs.hash(rawPassword, 10);
 
       // 5. Crear usuario
       const uRes = await client.query(`
@@ -332,11 +402,10 @@ export const UserModel = {
 
       // 7. Si es docente (id_rol = 2), registrar en tabla docente si no existe
       if (Number(id_rol) === 2) {
-        await client.query(`
-          INSERT INTO docente (id_usuario)
-          VALUES ($1)
-          ON CONFLICT DO NOTHING
-        `, [id_usuario]);
+        const docExist = await client.query(`SELECT id_docente FROM docente WHERE id_usuario = $1 LIMIT 1`, [id_usuario]);
+        if (docExist.rows.length === 0) {
+          await client.query(`INSERT INTO docente (id_usuario) VALUES ($1)`, [id_usuario]);
+        }
       }
 
       // 8. Si es representante (id_rol = 4), registrar en tabla representante
@@ -362,9 +431,6 @@ export const UserModel = {
     }
   },
 
-  // ==========================================
-  // ACTUALIZACIÓN DE USUARIO
-  // ==========================================
   update: async (userId, updateData) => {
     const client = await db.pool.connect();
     try {
@@ -380,20 +446,37 @@ export const UserModel = {
       }
       const { id_persona, id_direccion, id_rol: currentRol } = currentRes.rows[0];
 
+      // Normalizar campos recibidos
+      const rawNombre = updateData.nombre || updateData.first_name;
+      const rawSegundoNombre = updateData.segundo_nombre;
+      let nombre = rawNombre ? capitalizeWords(rawNombre.trim()) : null;
+      let segundo_nombre = rawSegundoNombre ? capitalizeWords(rawSegundoNombre.trim()) : null;
+      if (rawNombre && !segundo_nombre && rawNombre.includes(' ')) {
+        const parts = rawNombre.trim().split(/\s+/);
+        nombre = capitalizeWords(parts[0]);
+        segundo_nombre = capitalizeWords(parts.slice(1).join(' '));
+      }
+
+      const rawApellido = updateData.apellido || updateData.last_name;
+      const rawSegundoApellido = updateData.segundo_apellido;
+      let apellido = rawApellido ? capitalizeWords(rawApellido.trim()) : null;
+      let segundo_apellido = rawSegundoApellido ? capitalizeWords(rawSegundoApellido.trim()) : null;
+      if (rawApellido && !segundo_apellido && rawApellido.includes(' ')) {
+        const parts = rawApellido.trim().split(/\s+/);
+        apellido = capitalizeWords(parts[0]);
+        segundo_apellido = capitalizeWords(parts.slice(1).join(' '));
+      }
+
+      const cedula = updateData.cedula || updateData.dni ? (updateData.cedula || updateData.dni).trim() : null;
+      const telefono = updateData.telefono || updateData.phone || updateData.numero_telefono || null;
+      const email = updateData.email || updateData.correo ? (updateData.email || updateData.correo).trim().toLowerCase() : null;
+      const fecha_nacimiento = updateData.fecha_nacimiento || null;
+      const genero = updateData.genero && ['masculino', 'femenino'].includes(updateData.genero.toLowerCase())
+        ? updateData.genero.toLowerCase()
+        : null;
+
       // Actualizar datos de persona
       if (id_persona) {
-        const nombre = updateData.nombre ? capitalizeWords(updateData.nombre.trim()) : null;
-        const segundo_nombre = updateData.segundo_nombre ? capitalizeWords(updateData.segundo_nombre.trim()) : null;
-        const apellido = updateData.apellido ? capitalizeWords(updateData.apellido.trim()) : null;
-        const segundo_apellido = updateData.segundo_apellido ? capitalizeWords(updateData.segundo_apellido.trim()) : null;
-        const cedula = updateData.cedula?.trim() || null;
-        const telefono = updateData.telefono || updateData.numero_telefono || null;
-        const email = updateData.email?.trim().toLowerCase() || null;
-        const fecha_nacimiento = updateData.fecha_nacimiento || null;
-        const genero = updateData.genero && ['masculino', 'femenino'].includes(updateData.genero.toLowerCase())
-          ? updateData.genero.toLowerCase()
-          : null;
-
         await client.query(`
           UPDATE persona SET
             nombre = COALESCE($1, nombre),
@@ -429,28 +512,65 @@ export const UserModel = {
         values.push(updateData.foto_usuario);
       }
 
-      if (updateData.estado_usuario) {
+      const statusMapping = {
+        'active': 'activo',
+        'activo': 'activo',
+        'inactive': 'inactivo',
+        'inactivo': 'inactivo',
+        'suspended': 'suspendido',
+        'suspendido': 'suspendido'
+      };
+      const rawStatus = updateData.estado_usuario || updateData.status;
+      if (rawStatus) {
+        const estado_usuario = statusMapping[String(rawStatus).toLowerCase()] || 'activo';
         updates.push(`estado_usuario = $${valIdx++}`);
-        values.push(updateData.estado_usuario);
+        values.push(estado_usuario);
       }
 
-      if (updateData.id_rol) {
+      // Rol
+      const roleMapping = {
+        'admin': 1,
+        'administrador': 1,
+        'superadmin': 1,
+        'docente': 2,
+        'profesor': 2,
+        'secretaria': 3,
+        'representante': 4,
+        'estudiante': 5,
+      };
+      let targetRolId = updateData.id_rol;
+      if (!targetRolId && updateData.role) {
+        targetRolId = roleMapping[String(updateData.role).toLowerCase()];
+      }
+
+      if (targetRolId) {
         updates.push(`id_rol = $${valIdx++}`);
-        values.push(updateData.id_rol);
+        values.push(targetRolId);
 
         // Actualizar tabla usuario_rol
         await client.query(`
           INSERT INTO usuario_rol (id_usuario, id_rol)
           VALUES ($1, $2)
           ON CONFLICT (id_usuario, id_rol) DO NOTHING
-        `, [userId, updateData.id_rol]);
+        `, [userId, targetRolId]);
 
-        if (Number(updateData.id_rol) === 2) {
-          await client.query(`INSERT INTO docente (id_usuario) VALUES ($1) ON CONFLICT DO NOTHING`, [userId]);
+        if (Number(targetRolId) === 2) {
+          const docExist = await client.query(`SELECT id_docente FROM docente WHERE id_usuario = $1 LIMIT 1`, [userId]);
+          if (docExist.rows.length === 0) {
+            await client.query(`INSERT INTO docente (id_usuario) VALUES ($1)`, [userId]);
+          }
         }
-        if (Number(updateData.id_rol) === 4 && id_persona) {
+        if (Number(targetRolId) === 4 && id_persona) {
           await client.query(`INSERT INTO representante (id_persona, id_usuario) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [id_persona, userId]);
         }
+      }
+
+      // Contraseña si se envió
+      const newPass = updateData.password || updateData.contrasena;
+      if (newPass && String(newPass).trim().length >= 4) {
+        const hashed = newPass.startsWith('$2') ? newPass : await bcryptjs.hash(newPass.trim(), 10);
+        updates.push(`contrasena = $${valIdx++}`);
+        values.push(hashed);
       }
 
       if (updates.length > 0) {
@@ -587,13 +707,74 @@ export const UserModel = {
   },
 
   deleteUser: async (userId) => {
+    const client = await db.pool.connect();
     try {
-      // Soft-delete cambiando estado a inactivo
-      await db.query(`UPDATE usuario SET estado_usuario = 'inactivo', updated_at = CURRENT_TIMESTAMP WHERE id_usuario = $1`, [userId]);
+      await client.query('BEGIN');
+
+      // 1. Verificar existencia del usuario
+      const uRes = await client.query(`SELECT id_usuario, id_persona, id_rol FROM usuario WHERE id_usuario = $1`, [userId]);
+      if (uRes.rows.length === 0) {
+        throw new Error("Usuario no encontrado");
+      }
+      const user = uRes.rows[0];
+
+      // Proteger al administrador principal (id_usuario = 2 o único admin)
+      if (Number(userId) === 2 || user.id_rol === 1) {
+        const adminCount = await client.query(`SELECT COUNT(*) FROM usuario WHERE id_rol = 1 AND estado_usuario = 'activo'`);
+        if (Number(adminCount.rows[0].count) <= 1) {
+          throw new Error("No se puede eliminar al único administrador del sistema");
+        }
+      }
+
+      // 2. Desvincular de docente y sus horarios si existiera
+      await client.query(`
+        UPDATE horario SET id_docente = NULL 
+        WHERE id_docente IN (SELECT id_docente FROM docente WHERE id_usuario = $1)
+      `, [userId]);
+
+      await client.query(`
+        UPDATE horario SET id_docente_auxiliar = NULL 
+        WHERE id_docente_auxiliar IN (SELECT id_docente FROM docente WHERE id_usuario = $1)
+      `, [userId]);
+
+      await client.query(`DELETE FROM docente WHERE id_usuario = $1`, [userId]);
+
+      // 3. Desvincular de otras tablas donde pueda estar como FK nullable
+      await client.query(`UPDATE representante SET id_usuario = NULL WHERE id_usuario = $1`, [userId]);
+      await client.query(`UPDATE incidencia SET id_usuario_involucrado = NULL WHERE id_usuario_involucrado = $1`, [userId]);
+      await client.query(`UPDATE incidencia SET id_usuario_reporta = NULL WHERE id_usuario_reporta = $1`, [userId]);
+      await client.query(`UPDATE revision_materia SET creado_por = NULL WHERE creado_por = $1`, [userId]);
+      await client.query(`UPDATE acta_promocion SET creado_por = NULL WHERE creado_por = $1`, [userId]);
+
+      // 4. Eliminar roles asignados
+      await client.query(`DELETE FROM usuario_rol WHERE id_usuario = $1`, [userId]);
+
+      // 5. Eliminar usuario
+      await client.query(`DELETE FROM usuario WHERE id_usuario = $1`, [userId]);
+
+      // 6. Si la persona asociada no tiene rol de estudiante, representante ni familiar de estudiante, eliminar la persona
+      if (user.id_persona) {
+        const inEst = await client.query(`SELECT COUNT(*) FROM estudiante WHERE id_persona = $1`, [user.id_persona]);
+        const inRep = await client.query(`SELECT COUNT(*) FROM representante WHERE id_persona = $1`, [user.id_persona]);
+        const inEf = await client.query(`SELECT COUNT(*) FROM estudiante_familiar WHERE id_persona = $1`, [user.id_persona]);
+        const otherUsers = await client.query(`SELECT COUNT(*) FROM usuario WHERE id_persona = $1`, [user.id_persona]);
+
+        if (Number(inEst.rows[0].count) === 0 && 
+            Number(inRep.rows[0].count) === 0 && 
+            Number(inEf.rows[0].count) === 0 && 
+            Number(otherUsers.rows[0].count) === 0) {
+          await client.query(`DELETE FROM persona WHERE id_persona = $1`, [user.id_persona]);
+        }
+      }
+
+      await client.query('COMMIT');
       return true;
     } catch (error) {
+      await client.query('ROLLBACK');
       console.error("❌ UserModel.deleteUser error:", error);
       throw error;
+    } finally {
+      client.release();
     }
   },
 
@@ -606,6 +787,7 @@ export const UserModel = {
         SELECT 
           d.id_docente,
           u.id_usuario,
+          u.id_usuario as id,
           p.id_persona,
           p.nombre,
           p.segundo_nombre,
@@ -614,6 +796,7 @@ export const UserModel = {
           p.cedula,
           p.email,
           p.numero_telefono as telefono,
+          p.numero_telefono as phone,
           u.estado_usuario,
           u.foto_usuario
         FROM docente d

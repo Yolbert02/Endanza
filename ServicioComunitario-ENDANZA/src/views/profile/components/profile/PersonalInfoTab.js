@@ -32,6 +32,11 @@ const PersonalInfoTab = ({ student }) => {
                         <CCardBody className="p-4">
                             <div className="d-flex flex-column gap-2">
                                 <InfoItem
+                                    icon={cilUser}
+                                    label="Cédula de Identidad"
+                                    value={student.dni || student.cedula ? (String(student.dni || student.cedula).startsWith('V-') ? (student.dni || student.cedula) : `V-${student.dni || student.cedula}`) : 'Sin cédula'}
+                                />
+                                <InfoItem
                                     icon={cilHome}
                                     label="Dirección de Habitación"
                                     value={student.address || 'N/A'}

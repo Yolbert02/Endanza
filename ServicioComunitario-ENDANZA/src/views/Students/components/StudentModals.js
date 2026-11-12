@@ -242,6 +242,16 @@ const StudentModals = ({
                             </CCol>
                             <CCol md={6}>
                                 <label className="form-label label-micro text-muted-custom ms-2">
+                                    CÉDULA DEL ESTUDIANTE
+                                </label>
+                                <CFormInput 
+                                    type="text" 
+                                    className="input-premium py-2 px-3" 
+                                    defaultValue={selectedItem.dni || selectedItem.cedula || ''} 
+                                />
+                            </CCol>
+                            <CCol md={6}>
+                                <label className="form-label label-micro text-muted-custom ms-2">
                                     CORREO ELECTRÓNICO
                                 </label>
                                 <CFormInput 
@@ -250,7 +260,7 @@ const StudentModals = ({
                                     defaultValue={selectedItem.representative_email || selectedItem.email || selectedItem.correo || ''} 
                                 />
                             </CCol>
-                            <CCol md={6}>
+                            <CCol md={12}>
                                 <label className="form-label label-micro text-muted-custom ms-2">
                                     TELÉFONO DE CONTACTO
                                 </label>
@@ -276,8 +286,14 @@ const StudentModals = ({
                                         </CButton>
                                     )}
                                 </p>
-                                <CButton className="btn-premium px-5 py-2 rounded-pill shadow-sm">
-                                    GUARDAR CAMBIOS
+                                <CButton 
+                                    className="btn-premium px-5 py-2 rounded-pill shadow-sm"
+                                    onClick={() => {
+                                        onClose()
+                                        if (onView) onView(selectedItem.id)
+                                    }}
+                                >
+                                    EDITAR EN PERFIL COMPLETO
                                 </CButton>
                             </CCol>
                         </CRow>

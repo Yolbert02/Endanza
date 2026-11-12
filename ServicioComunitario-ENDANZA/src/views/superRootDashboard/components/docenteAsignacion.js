@@ -13,7 +13,8 @@ import {
     cilPlus, cilPencil, cilTrash, cilUser, cilSchool,
     cilInfo, cilSearch, cilCheck,
     cilBan, cilLockLocked, cilStar, cilBookmark,
-    cilArrowLeft, cilSpeedometer, cilChevronBottom, cilCalendar
+    cilArrowLeft, cilSpeedometer, cilChevronBottom, cilCalendar,
+    cilCloudDownload
 } from '@coreui/icons'
 import { useNavigate } from 'react-router-dom'
 
@@ -30,6 +31,7 @@ import AsignarEspecialidadGradosModal from './AsignarModal'
 import * as TeacherService from '../../../services/teacherService'
 import { formatShortName } from '../../../utils/formatters'
 import { getAvailableYears } from '../../../services/configService'
+import { downloadTeacherSchedule } from '../../../utils/downloadTeacherSchedule'
 
 const TeacherManagement = () => {
     const navigate = useNavigate()
@@ -40,6 +42,7 @@ const TeacherManagement = () => {
     const [editing, setEditing] = useState(null)
     const [selectedTeacher, setSelectedTeacher] = useState(null)
     const [toasts, setToasts] = useState([])
+    const [downloadingTeacherId, setDownloadingTeacherId] = useState(null)
 
     // Estados para asignación unificada
     const [showUnifiedModal, setShowUnifiedModal] = useState(false)
@@ -151,6 +154,23 @@ const TeacherManagement = () => {
 
     const showToast = (message, color = 'success') => {
         setToasts(prev => [...prev, { id: Date.now(), message, color }])
+    }
+
+    const handleDownloadSchedule = async (teacher) => {
+        setDownloadingTeacherId(teacher.id)
+        try {
+            const res = await downloadTeacherSchedule(teacher)
+            if (res.success) {
+                showToast(res.message, 'success')
+            } else {
+                showToast(res.message, 'warning')
+            }
+        } catch (err) {
+            console.error('Error al descargar horario:', err)
+            showToast('Error inesperado al generar el PDF del horario', 'danger')
+        } finally {
+            setDownloadingTeacherId(null)
+        }
     }
 
     // ✅ Filtrar docentes por búsqueda y año seleccionado
@@ -558,7 +578,7 @@ const TeacherManagement = () => {
                                 Gestión de Docentes
                             </h3>
                             <p className="mb-0 small" style={{ color: '#64748b', marginLeft: '64px' }}>
-                                Asignación de especialidades y grados académicos por período
+                                Directorio y gestión del personal docente
                             </p>
                         </div>
                         <div className="d-flex gap-2">
@@ -591,7 +611,7 @@ const TeacherManagement = () => {
                             {currentYear && (
                                 <span className="ms-2 text-muted">
                                     <CIcon icon={cilCalendar} size="sm" className="me-1" />
-                                    mostrando asignaciones de {currentYear.name}
+                                    período académico {currentYear.name}
                                 </span>
                             )}
                         </div>
@@ -616,10 +636,8 @@ const TeacherManagement = () => {
                                         <CTableRow>
                                             <CTableHeaderCell className="border-0 py-3" style={{ color: '#64748b', fontWeight: '600' }}>DOCENTE</CTableHeaderCell>
                                             <CTableHeaderCell className="border-0 py-3" style={{ color: '#64748b', fontWeight: '600' }}>CONTACTO</CTableHeaderCell>
-                                            <CTableHeaderCell className="border-0 py-3" style={{ color: '#64748b', fontWeight: '600' }}>ESPECIALIDAD ({currentYear?.name || 'ACTUAL'})</CTableHeaderCell>
-                                            <CTableHeaderCell className="border-0 py-3" style={{ color: '#64748b', fontWeight: '600' }}>GRADOS ({currentYear?.name || 'TODOS'})</CTableHeaderCell>
                                             <CTableHeaderCell className="border-0 py-3" style={{ color: '#64748b', fontWeight: '600' }}>ESTADO</CTableHeaderCell>
-                                            <CTableHeaderCell className="border-0 py-3 text-end" style={{ color: '#64748b', fontWeight: '600' }}>ACCIONES</CTableHeaderCell>
+                                            <CTableHeaderCell className="border-0 py-3 text-end pe-4" style={{ color: '#64748b', fontWeight: '600' }}>ACCIONES</CTableHeaderCell>
                                         </CTableRow>
                                     </CTableHead>
                                     <CTableBody>
@@ -650,10 +668,8 @@ const TeacherManagement = () => {
                                                     <div style={{ color: '#1e293b' }}>{teacher.email}</div>
                                                     <div className="small" style={{ color: '#64748b' }}>{teacher.phone || 'Sin teléfono'}</div>
                                                 </CTableDataCell>
-                                                <CTableDataCell className="py-3">{getSpecialtyBadge(teacher)}</CTableDataCell>
-                                                <CTableDataCell className="py-3">{getGradeBadges(teacher.grades)}</CTableDataCell>
                                                 <CTableDataCell className="py-3">{getStatusBadge(teacher.status)}</CTableDataCell>
-                                                <CTableDataCell className="py-3 text-end">
+                                                <CTableDataCell className="py-3 text-end pe-4">
                                                     <div className="d-flex gap-2 justify-content-end">
                                                         {/* Botón Ver Info */}
                                                         <CButton
@@ -676,6 +692,34 @@ const TeacherManagement = () => {
                                                             onMouseLeave={(e) => e.target.style.background = 'rgba(224,122,0,0.1)'}
                                                         >
                                                             <CIcon icon={cilInfo} />
+                                                        </CButton>
+                                                        
+                                                        {/* Botón Descargar Horario */}
+                                                        <CButton
+                                                            size="sm"
+                                                            disabled={downloadingTeacherId === teacher.id}
+                                                            onClick={() => handleDownloadSchedule(teacher)}
+                                                            title="Descargar horario del docente (PDF)"
+                                                            style={{
+                                                                width: '36px',
+                                                                height: '36px',
+                                                                borderRadius: '10px',
+                                                                background: 'rgba(224,122,0,0.1)',
+                                                                border: 'none',
+                                                                color: '#E07A00',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                padding: 0
+                                                            }}
+                                                            onMouseEnter={(e) => e.target.style.background = 'rgba(224,122,0,0.2)'}
+                                                            onMouseLeave={(e) => e.target.style.background = 'rgba(224,122,0,0.1)'}
+                                                        >
+                                                            {downloadingTeacherId === teacher.id ? (
+                                                                <CSpinner size="sm" style={{ color: '#E07A00', width: '13px', height: '13px' }} />
+                                                            ) : (
+                                                                <CIcon icon={cilCloudDownload} />
+                                                            )}
                                                         </CButton>
                                                         
                                                         {/* Botón Asignar */}

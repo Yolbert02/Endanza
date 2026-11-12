@@ -16,6 +16,10 @@ export const representanteAPI = {
   search: (term) =>
     fetch.get(`/api/representantes/search?term=${encodeURIComponent(term)}`),
 
+  // Verificar si cédula o email ya existen para preinscripción
+  checkExisting: (dni, email) =>
+    fetch.get(`/api/representantes/check-existing?dni=${encodeURIComponent(dni || '')}&email=${encodeURIComponent(email || '')}`),
+
   // Listar TODOS los representantes (NUEVO)
   list: () =>
     fetch.get('/api/representantes/list')
@@ -145,5 +149,16 @@ export const getGradosEndanza = async () => {
   } catch (error) {
     console.error('❌ Error en getGradosEndanza:', error);
     return GRADOS_ENDANZA;
+  }
+};
+
+
+export const checkRepresentanteExisting = async (dni, email) => {
+  try {
+    const response = await representanteAPI.checkExisting(dni, email);
+    return response;
+  } catch (error) {
+    console.error('❌ Error en checkRepresentanteExisting:', error);
+    return { ok: false, error: error.message };
   }
 };

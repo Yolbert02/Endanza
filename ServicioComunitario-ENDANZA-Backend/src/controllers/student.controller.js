@@ -223,16 +223,18 @@ const formatStudentPayload = (student, sections = [], currentYear = null) => {
     lugar_trabajo_Padre: student.representative_relationship === 'Padre' ? (student.representative_workplace || student.lugar_trabajo) : null,
     direccion_Trabajo_Padre: student.representative_relationship === 'Padre' ? (student.representative_work_address || student.direccion_trabajo) : null,
     telefono_trabajo_Padre: student.representative_relationship === 'Padre' ? (student.representative_work_phone || student.telefono_trabajo) : null,
-    cedula: student.cedula || student.dni || '—',
+    cedula: student.cedula || student.dni || null,
+    dni: student.cedula || student.dni || null,
+    Cedula: student.cedula || student.dni || null,
     convivencia: student.convivencia || '—',
     address: student.address,
     city: student.city,
     state: student.state,
     status: student.status || 'Activo',
     estatus: student.status || 'Activo',
-    blood_type: student.blood_type || null,
-    tipo_sangre: student.blood_type || null,
-    TipoSangre: student.blood_type || null,
+    blood_type: student.blood_type || student.tipo_sangre || null,
+    tipo_sangre: student.tipo_sangre || student.blood_type || null,
+    TipoSangre: student.TipoSangre || student.blood_type || student.tipo_sangre || null,
     NutricionPeso: student.peso_kg ? `${student.peso_kg} kg` : (student.NutricionPeso || null),
     NutricionAltura: student.altura_m ? `${student.altura_m} m` : (student.NutricionAltura || null),
     Alergias: student.tiene_alergias ? (student.descripcion_alergias || 'Sí') : (student.Alergias || 'Ninguna'),
@@ -500,8 +502,21 @@ const updateStudent = async (req, res) => {
     const { id } = req.params;
     const studentData = req.body;
 
+    let cleanCedula = studentData.cedula ?? studentData.dni ?? studentData.Cedula;
+    if (cleanCedula === '—' || cleanCedula === 'N/A' || cleanCedula === 'null' || cleanCedula === 'undefined') {
+      cleanCedula = null;
+    }
+    if (cleanCedula) {
+      cleanCedula = String(cleanCedula).replace(/^V-?/i, '').replace(/[^0-9]/g, '').trim() || null;
+    }
+    studentData.cedula = cleanCedula;
+    studentData.dni = cleanCedula;
+    studentData.Cedula = cleanCedula;
+
     console.log('📝 [CONTROLLER] updateStudent recibido:', {
       id,
+      cedula: studentData.cedula,
+      TipoSangre: studentData.TipoSangre ?? studentData.tipo_sangre ?? studentData.blood_type,
       RepresentanteCedula: studentData.RepresentanteCedula,
       MadreCedula: studentData.MadreCedula,
       PadreCedula: studentData.PadreCedula,
@@ -520,9 +535,9 @@ const updateStudent = async (req, res) => {
       });
     }
 
-    // Verificar si la cédula ya existe (si se está cambiando)
-    if (studentData.cedula && studentData.cedula !== existing.dni) {
-      const exists = await StudentModel.existsByCedula(studentData.cedula, id);
+    // Verificar si la cédula ya existe (si se está cambiando y no es null)
+    if (cleanCedula && cleanCedula !== existing.dni && cleanCedula !== existing.cedula) {
+      const exists = await StudentModel.existsByCedula(cleanCedula, id);
       if (exists) {
         return res.status(400).json({
           ok: false,

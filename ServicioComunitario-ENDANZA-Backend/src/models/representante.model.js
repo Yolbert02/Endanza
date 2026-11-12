@@ -219,6 +219,8 @@ export const RepresentanteModel = {
   // Buscar representante por cédula
   findByCedula: async (cedula) => {
     try {
+      const clean = String(cedula || '').replace(/^[vVeE]-?/, '').trim();
+      const withV = `V-${clean}`;
       const query = {
         text: `
           SELECT 
@@ -236,9 +238,12 @@ export const RepresentanteModel = {
           FROM representante r
           JOIN persona p ON r.id_persona = p.id_persona
           LEFT JOIN usuario u ON r.id_usuario = u.id_usuario
-          WHERE p.cedula = $1
+          WHERE p.cedula = $1 
+             OR p.cedula = $2 
+             OR REPLACE(REPLACE(p.cedula, 'V-', ''), 'v-', '') = $3
+          LIMIT 1
         `,
-        values: [cedula],
+        values: [cedula, withV, clean],
       };
 
       const { rows } = await db.query(query.text, query.values);
@@ -267,6 +272,7 @@ export const RepresentanteModel = {
   // Buscar por email
   findByEmail: async (email) => {
     try {
+      const cleanEmail = String(email || '').trim().toLowerCase();
       const query = {
         text: `
           SELECT 
@@ -277,13 +283,17 @@ export const RepresentanteModel = {
             p.nombre as first_name,
             p.apellido as last_name,
             p.numero_telefono as phone,
-            p.email
+            p.email,
+            r.profesion as profesion_rep,
+            r.direccion_trabajo as direccion,
+            u.estado_usuario as status
           FROM representante r
           JOIN persona p ON r.id_persona = p.id_persona
           LEFT JOIN usuario u ON r.id_usuario = u.id_usuario
-          WHERE p.email = $1
+          WHERE LOWER(TRIM(p.email)) = $1
+          LIMIT 1
         `,
-        values: [email],
+        values: [cleanEmail],
       };
 
       const { rows } = await db.query(query.text, query.values);
@@ -291,7 +301,14 @@ export const RepresentanteModel = {
 
       const row = rows[0];
       return {
-        ...row,
+        id_representante: row.id_representante,
+        id_usuario: row.id_usuario,
+        id_persona: row.id_persona,
+        dni: row.dni,
+        first_name: row.first_name,
+        last_name: row.last_name,
+        phone: row.phone,
+        email: row.email,
         parentesco: "Familiar",
       };
     } catch (error) {
@@ -300,6 +317,40 @@ export const RepresentanteModel = {
     }
   },
 
+  // Buscar persona/representante/usuario por cédula o email
+  findAnyByCedulaOrEmail: async (cedula, email) => {
+    try {
+      const cleanCed = cedula ? String(cedula).replace(/^[vVeE]-?/, '').trim() : null;
+      const withV = cleanCed ? `V-${cleanCed}` : null;
+      const cleanEmail = email ? String(email).trim().toLowerCase() : null;
+
+      const query = {
+        text: `
+          SELECT 
+            p.id_persona,
+            p.cedula as dni,
+            p.nombre as first_name,
+            p.apellido as last_name,
+            p.numero_telefono as phone,
+            p.email,
+            r.id_representante,
+            u.id_usuario
+          FROM persona p
+          LEFT JOIN representante r ON r.id_persona = p.id_persona
+          LEFT JOIN usuario u ON (u.id_persona = p.id_persona OR r.id_usuario = u.id_usuario)
+          WHERE ($1::text IS NOT NULL AND (p.cedula = $1 OR p.cedula = $2 OR REPLACE(REPLACE(p.cedula, 'V-', ''), 'v-', '') = $3))
+             OR ($4::text IS NOT NULL AND LOWER(TRIM(p.email)) = $4)
+          LIMIT 10
+        `,
+        values: [cedula || null, withV, cleanCed, cleanEmail],
+      };
+      const { rows } = await db.query(query.text, query.values);
+      return rows;
+    } catch (error) {
+      console.error("Error en findAnyByCedulaOrEmail:", error);
+      throw error;
+    }
+  },
   // Buscar representantes por término
   search: async (term) => {
     try {

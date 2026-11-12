@@ -142,6 +142,12 @@ const editForm = ({ formData, onInputChange, activeTab, errors = {} }) => {
     gradoOptions.splice(1, 0, { value: formData.Grado, label: formData.Grado })
   }
 
+  const currentTipoSangre = formData.TipoSangre || formData.blood_type || formData.tipo_sangre || "";
+  const dynamicTipoSangreOptions = [...tipoSangreOptions];
+  if (currentTipoSangre && !tipoSangreOptions.some(o => o.value.toLowerCase() === String(currentTipoSangre).toLowerCase())) {
+    dynamicTipoSangreOptions.splice(1, 0, { value: currentTipoSangre, label: currentTipoSangre });
+  }
+
   return (
     <CForm className="animate__animated animate__fadeIn">
       {/* SECCIÓN 0: DATOS PERSONALES */}
@@ -208,7 +214,17 @@ const editForm = ({ formData, onInputChange, activeTab, errors = {} }) => {
           </CRow>
 
           <CRow className="mb-3">
-            <CCol md={4}>
+            <CCol md={3}>
+              <CedulaField
+                label="Cédula del Estudiante"
+                name="Cedula"
+                value={formData.Cedula || formData.cedula || formData.dni || ""}
+                onChange={onInputChange}
+                error={errors.Cedula || errors.cedula || errors.dni}
+                placeholder="12345678"
+              />
+            </CCol>
+            <CCol md={3}>
               <CFormLabel className="fw-bold">Fecha de Nacimiento</CFormLabel>
               <CFormInput
                 type="date"
@@ -218,7 +234,7 @@ const editForm = ({ formData, onInputChange, activeTab, errors = {} }) => {
                 className="input-premium h-auto py-2"
               />
             </CCol>
-            <CCol md={4}>
+            <CCol md={3}>
               <CFormLabel className="fw-bold">Sexo</CFormLabel>
               <CFormSelect
                 name="Sexo"
@@ -228,46 +244,13 @@ const editForm = ({ formData, onInputChange, activeTab, errors = {} }) => {
                 className="input-premium h-auto py-2"
               />
             </CCol>
-            <CCol md={4}>
+            <CCol md={3}>
               <CFormLabel className="fw-bold">Tipo de Sangre</CFormLabel>
               <CFormSelect
                 name="TipoSangre"
-                value={formData.TipoSangre || ""}
+                value={currentTipoSangre}
                 onChange={onInputChange}
-                options={tipoSangreOptions}
-                className="input-premium h-auto py-2"
-              />
-            </CCol>
-          </CRow>
-
-          <CRow className="mb-3">
-            <CCol md={6}>
-              <CFormLabel className="fw-bold">Estatus Académico</CFormLabel>
-              <CFormSelect
-                name="Estatus"
-                value={formData.Estatus || ""}
-                onChange={onInputChange}
-                options={estatusOptions}
-                className="input-premium h-auto py-2"
-              />
-            </CCol>
-            <CCol md={3}>
-              <CFormLabel className="fw-bold">Grado</CFormLabel>
-              <CFormSelect
-                name="Grado"
-                value={formData.Grado || ""}
-                onChange={onInputChange}
-                options={gradoOptions}
-                className="input-premium h-auto py-2"
-              />
-            </CCol>
-            <CCol md={3}>
-              <CFormLabel className="fw-bold">Sección</CFormLabel>
-              <CFormInput
-                type="text"
-                name="Seccion"
-                value={formData.Seccion || ""}
-                onChange={onInputChange}
+                options={dynamicTipoSangreOptions}
                 className="input-premium h-auto py-2"
               />
             </CCol>

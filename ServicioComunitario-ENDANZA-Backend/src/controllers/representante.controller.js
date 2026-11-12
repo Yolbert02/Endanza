@@ -50,6 +50,27 @@ export const RepresentanteController = {
 
       // CASO 1: Buscar si ya existe por cédula como representante
       const existing = await RepresentanteModel.findByCedula(dni);
+      const existingByEmail = email ? await RepresentanteModel.findByEmail(email) : null;
+
+      // Si existe por cédula pero el correo ingresado es distinto al registrado
+      if (existing && existing.email && email && existing.email.trim().toLowerCase() !== email.trim().toLowerCase()) {
+        return res.status(400).json({
+          ok: false,
+          msg: `La cédula ${dni} ya se encuentra registrada con otro correo electrónico. Por favor verifique sus datos.`,
+        });
+      }
+
+      // Si existe por correo pero la cédula ingresada es distinta a la registrada
+      if (existingByEmail && existingByEmail.dni && dni) {
+        const cleanExistingDni = existingByEmail.dni.replace(/^[vVeE]-?/, '').trim();
+        const cleanInputDni = dni.replace(/^[vVeE]-?/, '').trim();
+        if (cleanExistingDni !== cleanInputDni) {
+          return res.status(400).json({
+            ok: false,
+            msg: `El correo ${email} ya se encuentra registrado con otra cédula de identidad. Por favor verifique sus datos.`,
+          });
+        }
+      }
 
       // Si no existe como representante, verificar si existe como docente / usuario en general
       let existingUser = null;
@@ -155,10 +176,23 @@ export const RepresentanteController = {
             }
           }
 
-          const cedulaEstudiante =
+          // Calcular índice para cédula provisional escolar {rep_cedula}-{n}
+          const prevCountRes = await db.query(
+            "SELECT COUNT(*) FROM estudiante WHERE id_representante = $1",
+            [representante.id_representante]
+          );
+          const siblingIndex = parseInt(prevCountRes.rows[0].count, 10) + estudiantesCreados.length + 1;
+          const cleanRepDni = (representante.dni || dni || '').replace(/^[vVeE]-?/, '').trim();
+
+          let cedulaEstudiante =
             estudiante.cedula && estudiante.cedula.trim() !== ""
               ? estudiante.cedula.trim()
               : null;
+
+          // Si no se proporcionó cédula, asignar automáticamente la cédula escolar provisional
+          if (!cedulaEstudiante && cleanRepDni) {
+            cedulaEstudiante = `${cleanRepDni}-${siblingIndex}`;
+          }
 
           let generoEnum = null;
           if (estudiante.gender) {
@@ -330,6 +364,122 @@ export const RepresentanteController = {
       res.status(500).json({
         ok: false,
         msg: "Error al procesar la preinscripción",
+        error: error.message,
+      });
+    }
+  },
+
+
+  // Verificar si cédula o email ya existen para preinscripción (Validación previa)
+  checkExisting: async (req, res) => {
+    try {
+      const { dni, email } = req.query;
+      if (!dni && !email) {
+        return res.status(400).json({
+          ok: false,
+          msg: "Debe proporcionar cédula o correo electrónico",
+        });
+      }
+
+      const cleanDni = dni ? dni.trim() : null;
+      const cleanEmail = email ? email.trim().toLowerCase() : null;
+
+      let repByDni = null;
+      if (cleanDni) {
+        repByDni = await RepresentanteModel.findByCedula(cleanDni);
+      }
+
+      let repByEmail = null;
+      if (cleanEmail) {
+        repByEmail = await RepresentanteModel.findByEmail(cleanEmail);
+      }
+
+      // Si ninguno existe
+      if (!repByDni && !repByEmail) {
+        return res.json({
+          ok: true,
+          exists: false,
+        });
+      }
+
+      // CASO A: Ambos existen y coinciden con la misma persona
+      if (
+        repByDni &&
+        repByEmail &&
+        (repByDni.id_representante === repByEmail.id_representante ||
+          repByDni.id_persona === repByEmail.id_persona)
+      ) {
+        const countRes = await db.query(
+          "SELECT COUNT(*) FROM estudiante WHERE id_representante = $1",
+          [repByDni.id_representante]
+        );
+        const estudiantesCount = parseInt(countRes.rows[0].count, 10);
+
+        return res.json({
+          ok: true,
+          exists: true,
+          match: true,
+          representante: {
+            ...repByDni,
+            estudiantesCount,
+          },
+          msg: "Representante encontrado con cédula y correo coincidentes.",
+        });
+      }
+
+      // CASO B: Existe por DNI pero el correo no coincide
+      if (repByDni) {
+        const repEmail = (repByDni.email || '').trim().toLowerCase();
+        if (cleanEmail && repEmail && repEmail !== cleanEmail) {
+          return res.json({
+            ok: true,
+            exists: true,
+            match: false,
+            reason: "dni_mismatch",
+            msg: `La cédula ${cleanDni} ya se encuentra registrada en el sistema con otro correo electrónico. Por favor verifique sus datos.`,
+            existingRep: {
+              first_name: repByDni.first_name,
+              last_name: repByDni.last_name,
+              dni: repByDni.dni,
+            },
+          });
+        }
+      }
+
+      // CASO C: Existe por Email pero la cédula no coincide
+      if (repByEmail) {
+        const cleanExistingDni = (repByEmail.dni || '').replace(/^[vVeE]-?/, '').trim();
+        const cleanInputDni = cleanDni ? cleanDni.replace(/^[vVeE]-?/, '').trim() : '';
+        if (cleanInputDni && cleanExistingDni && cleanExistingDni !== cleanInputDni) {
+          return res.json({
+            ok: true,
+            exists: true,
+            match: false,
+            reason: "email_mismatch",
+            msg: `El correo electrónico ${cleanEmail} ya se encuentra registrado en el sistema con otra cédula de identidad. Por favor verifique sus datos.`,
+            existingRep: {
+              first_name: repByEmail.first_name,
+              last_name: repByEmail.last_name,
+              email: repByEmail.email,
+            },
+          });
+        }
+      }
+
+      // Si sólo se consultó uno de los dos y coincidió
+      const found = repByDni || repByEmail;
+      return res.json({
+        ok: true,
+        exists: true,
+        match: true,
+        representante: found,
+        msg: "Representante encontrado.",
+      });
+    } catch (error) {
+      console.error("Error en checkExisting:", error);
+      res.status(500).json({
+        ok: false,
+        msg: "Error al verificar representante",
         error: error.message,
       });
     }

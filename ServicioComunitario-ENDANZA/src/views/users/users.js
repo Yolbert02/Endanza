@@ -12,7 +12,7 @@ import {
     cilPlus, cilPencil, cilTrash, cilUser, cilShieldAlt,
     cilPeople, cilInfo, cilSearch, cilCheckCircle, cilWarning,
     cilBan, cilCheck, cilLockLocked, cilCircle, cilReportSlash,
-    cilArrowLeft, cilSpeedometer, cilCloudDownload
+    cilArrowLeft, cilSpeedometer
 } from '@coreui/icons'
 import { useNavigate } from 'react-router-dom'
 
@@ -24,7 +24,6 @@ import SearchInput from 'src/components/SearchInput'
 import Pagination from 'src/components/Pagination'
 import SystemMessageModal from 'src/components/SystemMessageModal'
 import { formatShortName } from '../../utils/formatters'
-import { downloadTeacherSchedule } from '../../utils/downloadTeacherSchedule'
 
 const Users = () => {
     const navigate = useNavigate()
@@ -42,7 +41,7 @@ const Users = () => {
     const [actionUser, setActionUser] = useState(null)
     const [selectedRole, setSelectedRole] = useState('')
     const [selectedStatus, setSelectedStatus] = useState('')
-    const [downloadingUserId, setDownloadingUserId] = useState(null)
+
 
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage] = useState(8)
@@ -74,22 +73,6 @@ const Users = () => {
         setToasts(prev => [...prev, { id: Date.now(), message, color }])
     }
 
-    const handleDownloadSchedule = async (targetUser) => {
-        setDownloadingUserId(targetUser.id)
-        try {
-            const res = await downloadTeacherSchedule(targetUser)
-            if (res.success) {
-                showToast(res.message, 'success')
-            } else {
-                showToast(res.message, 'warning')
-            }
-        } catch (err) {
-            console.error('Error al descargar horario:', err)
-            showToast('Error inesperado al generar el PDF del horario', 'danger')
-        } finally {
-            setDownloadingUserId(null)
-        }
-    }
 
     const filteredUsers = data.filter(user => {
         if (user.role === 'representante') return false;
@@ -362,24 +345,6 @@ const Users = () => {
                                                         >
                                                             <CIcon icon={cilInfo} style={{ color: '#E07A00' }} />
                                                         </CButton>
-
-                                                        {/* Botón Descargar Horario (si es docente) */}
-                                                        {(user.role === 'docente' || user.rol === 'docente' || user.roles?.includes('docente') || !!user.id_docente) && (
-                                                            <CButton
-                                                                color="light"
-                                                                size="sm"
-                                                                disabled={downloadingUserId === user.id}
-                                                                onClick={() => handleDownloadSchedule(user)}
-                                                                className="px-3 border-0 btn-icon-premium bg-transparent"
-                                                                title="Descargar horario del docente (PDF)"
-                                                            >
-                                                                {downloadingUserId === user.id ? (
-                                                                    <CSpinner size="sm" style={{ color: '#E07A00', width: '13px', height: '13px' }} />
-                                                                ) : (
-                                                                    <CIcon icon={cilCloudDownload} style={{ color: '#E07A00' }} />
-                                                                )}
-                                                            </CButton>
-                                                        )}
 
                                                         {/* Botón Editar */}
                                                         <CButton

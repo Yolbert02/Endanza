@@ -357,6 +357,7 @@ const update = async (id, studentData) => {
         e.id_estudiante,
         e.id_persona,
         e.id_representante,
+        e.id_historia,
         e.id_nivel_danza,
         e.id_nivel,
         e.id_especialidad,
@@ -406,7 +407,14 @@ const update = async (id, studentData) => {
       return null;
     };
 
-    const cedula = studentData.cedula ?? studentData.dni ?? studentData.Cedula;
+    let cleanCedula = studentData.cedula ?? studentData.dni ?? studentData.Cedula;
+    if (cleanCedula === '—' || cleanCedula === 'N/A' || cleanCedula === 'null' || cleanCedula === 'undefined') {
+      cleanCedula = null;
+    }
+    if (cleanCedula) {
+      cleanCedula = String(cleanCedula).replace(/^V-?/i, '').replace(/[^0-9]/g, '').trim() || null;
+    }
+
     const fechaNac = studentData.fecha_nacimiento ?? studentData.birth_date ?? studentData.FechaNacimiento;
     const rawGenero = studentData.genero ?? studentData.gender ?? studentData.Sexo;
     const normalizedGenero = normalizeGenero(rawGenero);
@@ -423,18 +431,19 @@ const update = async (id, studentData) => {
           segundo_nombre = COALESCE($2, segundo_nombre),
           apellido = COALESCE($3, apellido),
           segundo_apellido = COALESCE($4, segundo_apellido),
-          cedula = COALESCE($5, cedula),
-          fecha_nacimiento = COALESCE($6, fecha_nacimiento),
-          genero = COALESCE($7, genero),
-          numero_telefono = CASE WHEN $8 THEN $9 ELSE numero_telefono END,
-          email = CASE WHEN $10 THEN $11 ELSE email END
-        WHERE id_persona = $12
+          cedula = CASE WHEN $5 THEN $6 ELSE cedula END,
+          fecha_nacimiento = COALESCE($7, fecha_nacimiento),
+          genero = COALESCE($8, genero),
+          numero_telefono = CASE WHEN $9 THEN $10 ELSE numero_telefono END,
+          email = CASE WHEN $11 THEN $12 ELSE email END
+        WHERE id_persona = $13
       `, [
         rawNombre || null,
         p2Nombre !== undefined ? (p2Nombre || null) : null,
         rawApellido || null,
         p2Apellido !== undefined ? (p2Apellido || null) : null,
-        cedula || null,
+        cleanCedula !== undefined,
+        cleanCedula || null,
         fechaNac || null,
         normalizedGenero || null,
         studentTel !== undefined,
@@ -754,19 +763,37 @@ const update = async (id, studentData) => {
 
     // 8. Actualizar tipo de sangre en historial_medico
     const bloodTypeVal = studentData.TipoSangre ?? studentData.tipo_sangre ?? studentData.blood_type;
-    if (bloodTypeVal) {
-      if (currentStudent.id_historia) {
+    if (bloodTypeVal !== undefined && bloodTypeVal !== null) {
+      const cleanBloodType = String(bloodTypeVal).trim();
+      let historiaId = currentStudent.id_historia;
+      if (!historiaId) {
+        const hRes = await client.query('SELECT id_historia FROM estudiante WHERE id_estudiante = $1', [id]);
+        if (hRes.rows.length > 0 && hRes.rows[0].id_historia) {
+          historiaId = hRes.rows[0].id_historia;
+        }
+      }
+
+      if (historiaId) {
         await client.query(
           'UPDATE historial_medico SET tipo_sangre = $1 WHERE id_historia = $2',
-          [bloodTypeVal, currentStudent.id_historia]
+          [cleanBloodType || null, historiaId]
         );
-      } else {
-        const insHm = await client.query(
-          'INSERT INTO historial_medico (tipo_sangre) VALUES ($1) RETURNING id_historia',
-          [bloodTypeVal]
-        );
-        await client.query('UPDATE estudiante SET id_historia = $1 WHERE id_estudiante = $2', [insHm.rows[0].id_historia, id]);
-        currentStudent.id_historia = insHm.rows[0].id_historia;
+      } else if (cleanBloodType) {
+        try {
+          const insHm = await client.query(
+            'INSERT INTO historial_medico (tipo_sangre, dolores_frecuentes, constipacion_frecuente, tiene_cirugia, control_hormonal, tiene_alergias) VALUES ($1, false, false, false, false, false) RETURNING id_historia',
+            [cleanBloodType]
+          );
+          await client.query('UPDATE estudiante SET id_historia = $1 WHERE id_estudiante = $2', [insHm.rows[0].id_historia, id]);
+          currentStudent.id_historia = insHm.rows[0].id_historia;
+        } catch (eIns) {
+          const insHmSimple = await client.query(
+            'INSERT INTO historial_medico (tipo_sangre) VALUES ($1) RETURNING id_historia',
+            [cleanBloodType]
+          );
+          await client.query('UPDATE estudiante SET id_historia = $1 WHERE id_estudiante = $2', [insHmSimple.rows[0].id_historia, id]);
+          currentStudent.id_historia = insHmSimple.rows[0].id_historia;
+        }
       }
     }
 

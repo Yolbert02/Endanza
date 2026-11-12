@@ -49,7 +49,7 @@ export const generarComprobantePreInscripcion = (formData, codigoPreInscripcion,
       <div>
         <div class="info-item"><span class="label">Estudiante:</span> ${formData.nombres || ''} ${formData.apellidos || ''}</div>
         <div class="info-item"><span class="label">Representante:</span> ${formData.nombres_Representante || formData.nombre_Madre || formData.nombre_Padre || ''}</div>
-        <div class="info-item"><span class="label">Grado interés:</span> ${formData.grado || ''}</div>
+        <div class="info-item"><span class="label">Grado a Cursar:</span> ${formData.grado_siguiente_label || formData.grado || ''}</div>
         <div class="info-item"><span class="label">Fecha registro:</span> ${new Date().toLocaleString('es-ES')}</div>
       </div>
       <div class="footer">

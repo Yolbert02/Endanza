@@ -108,6 +108,11 @@ const ProfileSummary = ({ student }) => {
                         value={seccionActual && seccionActual !== 'Sin asignar' ? `${gradoActual} - ${seccionActual}` : `${gradoActual} (Sin asignar)`} 
                     />
                     <SummaryItem 
+                        icon={cilUser} 
+                        label="Cédula de Identidad" 
+                        value={student.dni || student.cedula ? (String(student.dni || student.cedula).startsWith('V-') ? (student.dni || student.cedula) : `V-${student.dni || student.cedula}`) : 'Sin cédula'} 
+                    />
+                    <SummaryItem 
                         icon={cilCalendar} 
                         label="Fecha Nacimiento" 
                         value={formatFecha(student.birth_date)} 
@@ -125,11 +130,12 @@ const ProfileSummary = ({ student }) => {
                     <SummaryItem 
                         icon={cilDrop} 
                         label="Factor Sanguíneo" 
-                        value={
-                          !student.blood_type || student.blood_type === 'Desconocido' || student.blood_type === 'No sabe' || student.blood_type === 'null' || student.blood_type === 'N/A'
+                        value={(() => {
+                          const bt = student.blood_type || student.TipoSangre || student.tipo_sangre;
+                          return (!bt || bt === 'Desconocido' || bt === 'No sabe' || bt === 'null' || bt === 'N/A')
                             ? 'No sabe' 
-                            : student.blood_type
-                        } 
+                            : bt;
+                        })()} 
                     />
                 </div>
             </CCardBody>

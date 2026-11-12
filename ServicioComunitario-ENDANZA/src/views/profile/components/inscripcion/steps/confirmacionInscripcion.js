@@ -79,7 +79,7 @@ const ConfirmacionInscripcion = ({ formData, codigoInscripcion, onDescargar }) =
               <div className="ps-4 ms-1">
                 <h5 className="fw-bold confirm-title mb-1">{formData.nombres} {formData.apellidos}</h5>
                 <p className="mb-0 confirm-subtitle small">
-                  <span className="fw-bold">Nivel:</span> {formData.grado} • <span className="fw-bold">Especialidad:</span> {formData.especialidad || 'General'}
+                  <span className="fw-bold">Nivel a Cursar:</span> {formData.grado_siguiente_label || formData.grado} • <span className="fw-bold">Especialidad:</span> {formData.especialidad || 'General'}
                 </p>
               </div>
             </CCol>

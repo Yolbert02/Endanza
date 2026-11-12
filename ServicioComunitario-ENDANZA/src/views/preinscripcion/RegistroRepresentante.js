@@ -18,7 +18,8 @@ import CIcon from '@coreui/icons-react';
 import { cilUser, cilArrowRight, cilWarning, cilLockLocked, cilEducation } from '@coreui/icons';
 
 // Importar servicio
-import { searchRepresentantes, getDocentesList } from '../../services/representanteService';
+import { searchRepresentantes, getDocentesList, checkRepresentanteExisting } from '../../services/representanteService';
+import SystemMessageModal from '../../components/SystemMessageModal';
 import { capitalizeWords } from '../../utils/formatters';
 
 const parseInitialData = (data) => {
@@ -95,6 +96,18 @@ const parseInitialData = (data) => {
 
 const RegistroRepresentante = ({ onNext, initialData = {}, onChange, loading = false }) => {
     const [formData, setFormData] = useState(() => parseInitialData(initialData));
+    const [validatingRep, setValidatingRep] = useState(false);
+    const [modalData, setModalData] = useState({
+        visible: false,
+        type: 'info',
+        variant: 'alert',
+        title: '',
+        message: '',
+        confirmText: '',
+        cancelText: '',
+        onConfirm: () => {},
+        onClose: () => {}
+    });
 
     const [searchTerm, setSearchTerm] = useState('');
     const [filteredReps, setFilteredReps] = useState([]);
@@ -158,7 +171,7 @@ const RegistroRepresentante = ({ onNext, initialData = {}, onChange, loading = f
                 .then(docs => {
                     setDocentesList(docs || []);
                     if (formData.id_usuario_docente) {
-                        const found = (docs || []).find(d => String(d.id) === String(formData.id_usuario_docente));
+                        const found = (docs || []).find(d => String(d.id || d.id_usuario) === String(formData.id_usuario_docente));
                         if (found) setDocenteSeleccionado(found);
                     }
                 })
@@ -181,41 +194,59 @@ const RegistroRepresentante = ({ onNext, initialData = {}, onChange, loading = f
             return;
         }
 
-        const doc = docentesList.find(d => String(d.id) === String(docenteId));
+        const doc = docentesList.find(d => String(d.id || d.id_usuario) === String(docenteId));
         if (!doc) return;
 
         setDocenteSeleccionado(doc);
 
-        const [fName1, ...fNameRest] = (doc.nombre || '').trim().split(' ');
-        const [lName1, ...lNameRest] = (doc.apellido || '').trim().split(' ');
-        const fName2 = fNameRest.join(' ');
-        const lName2 = lNameRest.join(' ');
+        let fn1 = doc.nombre || '';
+        let fn2 = doc.segundo_nombre || '';
+        let ln1 = doc.apellido || '';
+        let ln2 = doc.segundo_apellido || '';
 
+        // Si no vienen segundo_nombre / segundo_apellido separados, separar por espacios
+        if (!fn2 && fn1.includes(' ')) {
+            const parts = fn1.trim().split(/\s+/);
+            fn1 = parts[0];
+            fn2 = parts.slice(1).join(' ');
+        }
+        if (!ln2 && ln1.includes(' ')) {
+            const parts = ln1.trim().split(/\s+/);
+            ln1 = parts[0];
+            ln2 = parts.slice(1).join(' ');
+        }
+
+        const rawPhone = doc.phone || doc.telefono || '';
         let pPrefix = '0414';
         let pNumber = '';
-        if (doc.phone && doc.phone.includes('-')) {
-            const parts = doc.phone.split('-');
-            pPrefix = parts[0];
-            pNumber = parts[1];
-        } else if (doc.phone) {
-            pNumber = doc.phone;
+        const prefijos = ['0414', '0424', '0416', '0426', '0412', '0422'];
+        const matched = prefijos.find(p => rawPhone.startsWith(p + '-') || rawPhone.startsWith(p));
+        if (matched) {
+            pPrefix = matched;
+            pNumber = rawPhone.replace(matched + '-', '').replace(matched, '').slice(0, 7);
+        } else if (rawPhone.includes('-')) {
+            const parts = rawPhone.split('-');
+            pPrefix = parts[0] || '0414';
+            pNumber = parts[1] || '';
+        } else if (rawPhone) {
+            pNumber = rawPhone.replace(/[^0-9]/g, '').slice(0, 7);
         }
 
         const newDocData = {
             ...formData,
             dni: doc.cedula || 'V-',
-            firstName1: fName1 || '',
-            firstName2: fName2 || '',
-            lastName1: lName1 || '',
-            lastName2: lName2 || '',
-            first_name: doc.nombre || '',
-            last_name: doc.apellido || '',
+            firstName1: fn1,
+            firstName2: fn2,
+            lastName1: ln1,
+            lastName2: ln2,
+            first_name: `${fn1} ${fn2}`.trim() || doc.nombre || '',
+            last_name: `${ln1} ${ln2}`.trim() || doc.apellido || '',
             phonePrefix: pPrefix,
             phoneNumber: pNumber,
-            phone: doc.phone || '',
+            phone: rawPhone || (pNumber ? `${pPrefix}-${pNumber}` : ''),
             email: doc.email || '',
             password: '', // Sin contraseña requerida, usa la de docente
-            id_usuario_docente: doc.id,
+            id_usuario_docente: doc.id || doc.id_usuario,
             id_representante: null
         };
 
@@ -378,7 +409,7 @@ const RegistroRepresentante = ({ onNext, initialData = {}, onChange, loading = f
         if (errors[field]) setErrors(prev => ({ ...prev, [field]: null }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         if (!validate()) return;
 
@@ -398,8 +429,80 @@ const RegistroRepresentante = ({ onNext, initialData = {}, onChange, loading = f
         };
 
         setFormData(formattedData);
-        // Pasar los datos al componente padre
-        onNext(formattedData);
+
+        // Si ya fue seleccionado de la búsqueda o es docente vinculado, avanzar directo
+        if (representanteSeleccionado || formData.id_usuario_docente) {
+            onNext(formattedData);
+            return;
+        }
+
+        // VALIDACIÓN PREVIA DE CÉDULA Y CORREO
+        setValidatingRep(true);
+        try {
+            const checkRes = await checkRepresentanteExisting(formData.dni, formData.email);
+            if (checkRes && checkRes.ok && checkRes.exists) {
+                if (checkRes.match) {
+                    // Coinciden la cédula y el correo: es el mismo representante ya registrado
+                    const repExistente = checkRes.representante;
+                    const nombreCompleto = `${repExistente.first_name || ''} ${repExistente.last_name || ''}`.trim();
+
+                    setModalData({
+                        visible: true,
+                        variant: 'confirm',
+                        type: 'warning',
+                        title: 'Representante Ya Registrado',
+                        message: `La cédula (${formData.dni}) y el correo (${formData.email}) corresponden al representante "${nombreCompleto}", quien ya se encuentra registrado en el sistema.\n\n¿Desea agregar el nuevo estudiante a este mismo representante?`,
+                        confirmText: 'SÍ, AGREGAR A ESTE REPRESENTANTE',
+                        cancelText: 'REVISAR DATOS',
+                        onConfirm: () => {
+                            setModalData(prev => ({ ...prev, visible: false }));
+                            selectRep(repExistente);
+                            const updated = {
+                                ...formattedData,
+                                id_representante: repExistente.id_representante,
+                                id_usuario: repExistente.id_usuario,
+                                id_persona: repExistente.id_persona,
+                                dni: repExistente.dni || formattedData.dni,
+                                first_name: repExistente.first_name || formattedData.first_name,
+                                last_name: repExistente.last_name || formattedData.last_name,
+                                email: repExistente.email || formattedData.email,
+                                phone: repExistente.phone || formattedData.phone,
+                                password: ''
+                            };
+                            onNext(updated);
+                        },
+                        onClose: () => {
+                            setModalData(prev => ({ ...prev, visible: false }));
+                        }
+                    });
+                    return;
+                } else {
+                    // No coinciden: la cédula ya existe con otro correo, o el correo con otra cédula
+                    const msgError = checkRes.msg || 'La cédula o el correo electrónico ingresado ya se encuentran registrados con datos diferentes en el sistema. Por favor revise y verifique sus datos.';
+                    setModalData({
+                        visible: true,
+                        variant: 'alert',
+                        type: 'danger',
+                        title: 'Datos Inconsistentes',
+                        message: msgError,
+                        confirmText: 'REVISAR DATOS',
+                        onClose: () => {
+                            setModalData(prev => ({ ...prev, visible: false }));
+                        }
+                    });
+                    return;
+                }
+            }
+
+            // Si no existe, es un nuevo representante: continuar normalmente
+            onNext(formattedData);
+        } catch (error) {
+            console.error("Error validando representante:", error);
+            // Si hubo error de red, permitir continuar al paso siguiente
+            onNext(formattedData);
+        } finally {
+            setValidatingRep(false);
+        }
     };
 
     const isFieldDisabled = !!representanteSeleccionado || !!docenteSeleccionado;
@@ -546,11 +649,14 @@ const RegistroRepresentante = ({ onNext, initialData = {}, onChange, loading = f
                                         onChange={(e) => handleDocenteChange(e.target.value)}
                                     >
                                         <option value="">-- Seleccione un docente --</option>
-                                        {docentesList.map((doc) => (
-                                            <option key={doc.id} value={doc.id}>
-                                                {doc.nombre} {doc.apellido} ({doc.cedula || 'Sin cédula'}) - {doc.email}
-                                            </option>
-                                        ))}
+                                        {docentesList.map((doc) => {
+                                            const docId = doc.id || doc.id_usuario;
+                                            return (
+                                                <option key={docId} value={docId}>
+                                                    {doc.nombre} {doc.apellido} ({doc.cedula || 'Sin cédula'}) - {doc.email}
+                                                </option>
+                                            );
+                                        })}
                                     </CFormSelect>
                                 )}
 
@@ -829,13 +935,13 @@ const RegistroRepresentante = ({ onNext, initialData = {}, onChange, loading = f
                         <div className="d-flex justify-content-end mt-5 pt-4 border-top border-light-custom">
                             <CButton
                                 type="submit"
-                                disabled={loading}
+                                disabled={loading || validatingRep}
                                 className="btn-premium px-5 d-flex align-items-center fw-bold"
                             >
-                                {loading ? (
+                                {loading || validatingRep ? (
                                     <>
                                         <CSpinner size="sm" className="me-2" />
-                                        CARGANDO...
+                                        {validatingRep ? 'VERIFICANDO DATOS...' : 'CARGANDO...'}
                                     </>
                                 ) : (
                                     <>
@@ -852,6 +958,18 @@ const RegistroRepresentante = ({ onNext, initialData = {}, onChange, loading = f
                     </CForm>
                 </CCardBody>
             </CCard>
+
+            <SystemMessageModal
+                visible={modalData.visible}
+                type={modalData.type}
+                variant={modalData.variant}
+                title={modalData.title}
+                message={modalData.message}
+                confirmText={modalData.confirmText}
+                cancelText={modalData.cancelText}
+                onConfirm={modalData.onConfirm}
+                onClose={modalData.onClose}
+            />
 
             <style>{`
                 .parentesco-option {
